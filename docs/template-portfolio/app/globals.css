@@ -1,0 +1,320 @@
+/* ---------------------------------------------------------------------------
+   Reel Portfolio — global stylesheet
+   Lifted verbatim from the single-file implementation (reference/reel.html).
+   Fonts are provided by next/font in app/layout.tsx and exposed as
+   --font-inter / --font-caveat; the two rules that name them are marked PORT.
+   --------------------------------------------------------------------------- */
+/* ---------- palette lifted from the reference ---------- */
+  :root{
+    --paper:#FBFAF7; --ink:#171716; --ink-link:#292927; --ink-soft:#686863;
+    --rule:#C4C4BE; --rule-soft:#E4E2DC; --chip:#EDEBE5;
+    --glow-a:rgba(255,255,255,.76); --glow-b:rgba(176,142,91,.06); --glow-c:rgba(55,52,45,.035);
+    --line3d:#3A3A34; --line3d-soft:#B9B7AE;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#141513; --ink:#F0EFEA; --ink-link:#E2E1DB; --ink-soft:#9A9A93;
+      --rule:#3E3E38; --rule-soft:#2A2A26; --chip:#26261F;
+      --glow-a:rgba(255,255,255,.035); --glow-b:rgba(176,142,91,.07); --glow-c:rgba(0,0,0,.25);
+      --line3d:#D6D4CB; --line3d-soft:#4A4A43;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#141513; --ink:#F0EFEA; --ink-link:#E2E1DB; --ink-soft:#9A9A93;
+    --rule:#3E3E38; --rule-soft:#2A2A26; --chip:#26261F;
+    --glow-a:rgba(255,255,255,.035); --glow-b:rgba(176,142,91,.07); --glow-c:rgba(0,0,0,.25);
+    --line3d:#D6D4CB; --line3d-soft:#4A4A43;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background-color:var(--paper); color:var(--ink);
+    background-image:
+      radial-gradient(1088px 608px at -8% -4%, var(--glow-a), rgba(0,0,0,0) 64%),
+      radial-gradient(864px 992px at 108% 32%, var(--glow-b), rgba(0,0,0,0) 72%),
+      radial-gradient(992px 672px at 18% 108%, var(--glow-c), rgba(0,0,0,0) 70%);
+    background-attachment:fixed;
+    font-family:var(--font-inter),Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; /* PORT */
+    font-size:15px; line-height:24px; -webkit-font-smoothing:antialiased;
+  }
+  main{max-width:632px; margin:0 auto; padding-inline:16px; padding-block:88px 108px; position:relative}  /* 600px of text, 16px gutters */
+  @media (max-width:640px){ main{padding-block:56px 72px} }
+
+  h1{margin:0; font-size:28px; line-height:1.22; font-weight:400; letter-spacing:-.012em}
+  h1 .who{display:block; font-weight:620; color:var(--ink)}
+  h1 .what{display:block; font-weight:430; color:var(--ink-soft)}
+  @media (max-width:520px){ h1{font-size:24px} }
+
+  .bio{display:grid; gap:16px; margin-top:28px; color:var(--ink-soft)}
+  .bio p{margin:0}
+  .bio strong{font-weight:500; color:var(--ink)}
+
+  a.fav{color:var(--ink-link); text-decoration:none; white-space:nowrap}
+  a.fav span{text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:2.7px; text-decoration-color:var(--rule)}
+  a.fav:hover span{text-decoration-color:var(--ink-soft)}
+  a.fav:focus-visible{outline:2px solid var(--ink-soft); outline-offset:2px; border-radius:2px}
+  i.chip{
+    display:inline-block; width:16px; height:16px; border-radius:3px; margin-right:4.5px; vertical-align:-3.2px;
+    background:var(--chip); color:var(--ink-soft); font-style:normal; font-size:9.5px; line-height:16px;
+    text-align:center; font-weight:600; letter-spacing:0;
+  }
+
+  .links{display:flex; flex-wrap:wrap; gap:6px 20px; margin-top:12px; font-size:15px}
+
+  section{margin-top:64px}
+  section h2{margin:0 0 24px; font-size:15px; font-weight:500; color:var(--ink-soft)}
+  ol.list{list-style:none; margin:0; padding:0; display:grid; gap:14px}
+  ol.list li{display:grid; grid-template-columns:1fr auto; gap:16px; align-items:start}
+  .pos{display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px}
+  .pos .desc{color:var(--ink-soft)}
+  .years{color:var(--ink-soft); font-variant-numeric:tabular-nums}
+  @media (max-width:520px){ ol.list li{grid-template-columns:1fr} .years{font-size:14px} }
+
+  /* ============ the reel: a 3D drum set into the headline ============ */
+  h1 .what{display:flex; align-items:center; flex-wrap:wrap; min-height:40px}
+  .reel{
+    display:block; position:relative; height:36px; overflow:hidden; flex:0 0 auto;
+    width:220px; border:0; padding:0; margin:0; background:none;
+    cursor:pointer; touch-action:manipulation;
+    transition:width .5s cubic-bezier(.16,.84,.26,1);
+  }
+  .reel canvas{position:absolute; left:0; top:0; height:100%; display:block}
+  .reel::after{
+    content:""; position:absolute; left:0; right:2px; bottom:2px; height:2px;
+    background:var(--rule); opacity:.85;
+    -webkit-mask-image:repeating-linear-gradient(90deg,#000 0 6px,transparent 6px 10px);
+    mask-image:repeating-linear-gradient(90deg,#000 0 6px,transparent 6px 10px);
+  }
+  .reel:hover::after, .reel:focus-visible::after{background:var(--ink-soft)}
+  .reel:focus-visible{outline:2px solid var(--ink-soft); outline-offset:3px; border-radius:3px}
+  .what .tail{white-space:pre; padding-left:9px}
+
+  /* ============ word-level morph ============ */
+  .w{display:inline-block; transition:opacity .28s ease, transform .34s cubic-bezier(.2,.8,.2,1), filter .28s ease}
+  .w.out{opacity:0; transform:translateY(-.32em); filter:blur(2px)}
+  .w.in{opacity:0; transform:translateY(.32em); filter:blur(2px)}
+
+  /* ============ the plate ============ */
+  .plate{margin:30px 0 0; touch-action:pan-y; cursor:grab}
+  .plate:active{cursor:grabbing}
+  .platebox{position:relative; height:216px}
+  .plate canvas{display:block; width:100%; height:100%}
+  .plate figcaption{margin-top:10px; font-size:11.5px; color:var(--ink-soft);
+    opacity:.75; font-variant-numeric:tabular-nums}
+  .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+
+  /* ============ the wall switch (atlas-driven rocker) ============ */
+  :root{ --wall-contact:#26221c5c; --wall-cast:#312c2421; }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --wall-contact:#00000085; --wall-cast:#00000038; } }
+  :root[data-theme="dark"]{ --wall-contact:#00000085; --wall-cast:#00000038; }
+
+  .theme-switcher{position:absolute; top:36px; right:-4px; width:2.8rem; height:3.7rem; z-index:9; user-select:none}
+  @media (max-width:900px){ .theme-switcher{position:fixed; top:16px; right:16px} }
+  .theme-wall-toggle{cursor:pointer; -webkit-tap-highlight-color:transparent; background:none; border:0;
+    width:100%; height:100%; padding:0; display:block; position:absolute; inset:0}
+  .theme-wall-toggle:focus-visible{outline:2px solid var(--ink-soft); outline-offset:4px; border-radius:6px}
+  .theme-wall-stage{display:block; position:absolute; inset:0;
+    filter:drop-shadow(0 .075rem .045rem var(--wall-contact)) drop-shadow(.025rem .24rem .22rem var(--wall-cast))}
+  .theme-wall-image{object-fit:contain; pointer-events:none; width:100%; height:100%; display:block; position:absolute; inset:0}
+  .theme-wall-state{transition:none}
+  .theme-wall-state--light{opacity:1}
+  .theme-wall-state--dark, :root[data-theme="dark"] .theme-wall-state--light{opacity:0}
+  :root[data-theme="dark"] .theme-wall-state--dark{opacity:1}
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]) .theme-wall-state--light{opacity:0}
+    :root:not([data-theme="light"]) .theme-wall-state--dark{opacity:1}
+  }
+  .theme-wall-motion{visibility:hidden}
+  .theme-wall-stage[data-motion-ready="true"] .theme-wall-motion{visibility:visible}
+  .theme-wall-stage[data-motion-ready="true"] .theme-wall-state{visibility:hidden}
+  :root[data-theme-transition] body, :root[data-theme-transition] .bio, :root[data-theme-transition] h1,
+  :root[data-theme-transition] .who, :root[data-theme-transition] .what, :root[data-theme-transition] .tail,
+  :root[data-theme-transition] .bio strong, :root[data-theme-transition] a.fav, :root[data-theme-transition] a.fav span,
+  :root[data-theme-transition] i.chip, :root[data-theme-transition] .years, :root[data-theme-transition] .desc,
+  :root[data-theme-transition] section h2, :root[data-theme-transition] figcaption, :root[data-theme-transition] .links a,
+  :root[data-theme-transition] #wheel, :root[data-theme-transition] .sel, :root[data-theme-transition] .row .nm,
+  :root[data-theme-transition] .row .mt, :root[data-theme-transition] .hint, :root[data-theme-transition] .reel::after{
+    transition:background-color .38s ease, color .38s ease, border-color .38s ease, text-decoration-color .38s ease, box-shadow .38s ease}
+  :root[data-theme-transition] .w{transition:opacity .28s ease, transform .34s cubic-bezier(.2,.8,.2,1), filter .28s ease, color .38s ease}
+
+  /* ============ the blowout ============ */
+  :root{ --flick:rgba(0,0,0,.28); }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --flick:rgba(255,236,200,.10); } }
+  :root[data-theme="dark"]{ --flick:rgba(255,236,200,.10); }
+  #flick{position:fixed; inset:0; z-index:96; pointer-events:none; background:var(--flick); opacity:0}
+  :root[data-flicker] #flick{animation:boFlicker .42s steps(1,end) both}
+  :root[data-flicker="1"] #flick{animation-duration:.5s}
+  :root[data-flicker="3"] #flick, :root[data-flicker="4"] #flick{animation-name:boFlickerHard}
+  @keyframes boFlicker{0%{opacity:0} 30%{opacity:.6} 42%{opacity:0} 70%{opacity:.35} 100%{opacity:0}}
+  @keyframes boFlickerHard{0%{opacity:0} 12%{opacity:1} 22%{opacity:0} 38%{opacity:.8} 50%{opacity:0} 74%{opacity:.5} 100%{opacity:0}}
+  .bo-flash{position:fixed; inset:0; z-index:98; pointer-events:none; opacity:0;
+    background:radial-gradient(circle at var(--x) var(--y), rgba(255,246,222,1) 0, rgba(255,236,190,.92) 7%, rgba(255,228,168,0) 36%)}
+  .bo-flash.in{animation:boFlash .55s ease-out both}
+  @keyframes boFlash{0%{opacity:0} 6%{opacity:1} 30%{opacity:.5} 100%{opacity:0}}
+  .bo-veil{position:fixed; inset:0; z-index:97; pointer-events:none; opacity:0;
+    background:radial-gradient(circle at var(--x) var(--y), rgba(0,0,0,.30) 0, rgba(0,0,0,.82) 14%, rgba(0,0,0,.965) 42%, #000 72%);
+    transition:opacity .9s cubic-bezier(.2,.7,.2,1)}
+  .bo-veil.in{opacity:1}
+  .bo-veil.out{opacity:0; transition-duration:.75s}
+  :root[data-blackout] main > :not(.theme-switcher){filter:brightness(.5) saturate(.85); transition:filter .5s ease}
+  .bo-fall{position:fixed; z-index:99; pointer-events:none; transform-origin:50% 50%; will-change:transform;
+    filter:brightness(.72)}
+  .bo-fall .theme-wall-toggle{position:absolute; inset:0}
+  .bo-fall.out{opacity:0; transition:opacity .5s ease}
+  .bo-puff{position:fixed; z-index:100; pointer-events:none; border-radius:50%; will-change:transform, opacity;
+    background:radial-gradient(circle at 45% 42%, rgba(214,210,200,.95), rgba(190,186,176,.75) 45%, rgba(170,166,156,0) 72%)}
+  .bo-shard{position:fixed; z-index:99; pointer-events:none; width:5px; height:5px; border-radius:1px; background:#E6E2D8; will-change:transform, opacity}
+  @media (prefers-reduced-motion:reduce){ .bo-flash.in{animation:none; opacity:.6} .bo-veil{transition:none} }
+
+  /* ============ the picker wheel: the role morphs into a short list ============ */
+  .reelwrap{position:relative; display:flex; align-items:center}
+  .reel{transition:width .5s cubic-bezier(.16,.84,.26,1), opacity .18s ease}
+  .reelwrap.open .reel{opacity:.12}
+
+  #wheel{
+    position:absolute; left:-12px; top:50%; z-index:30;
+    width:300px; margin-top:-63px; display:none;
+    padding:0; border-radius:12px;
+    background:var(--paper); border:1px solid var(--rule-soft);
+    box-shadow:0 20px 40px -26px rgba(40,38,32,.6), 0 2px 5px -3px rgba(40,38,32,.22);
+  }
+  #wheel.on{display:block}
+  #wheel.on .win{animation:wheelIn .26s cubic-bezier(.2,1.1,.3,1) both}
+  @keyframes wheelIn{ from{opacity:0; transform:scaleY(.55)} to{opacity:1; transform:none} }
+  .win{
+    position:relative; height:126px; overflow:hidden; border-radius:12px;
+    -webkit-mask-image:linear-gradient(transparent 0, #000 16%, #000 84%, transparent 100%);
+    mask-image:linear-gradient(transparent 0, #000 16%, #000 84%, transparent 100%);
+    cursor:ns-resize; touch-action:none;
+  }
+  .sel{                                   /* the slot the current role sits in */
+    position:absolute; left:6px; right:6px; top:42px; height:42px; border-radius:8px;
+    background:var(--chip); border:1px solid var(--rule-soft); pointer-events:none;
+  }
+  .rows{position:relative; will-change:transform}
+  .row{
+    height:42px; display:flex; align-items:center; gap:10px; padding:0 14px;
+    cursor:pointer; user-select:none;
+  }
+  .row .nm{
+    font-size:23px; font-weight:430; letter-spacing:-.012em; color:var(--ink-soft);
+    white-space:nowrap; transition:color .2s ease, opacity .2s ease; opacity:.5;
+  }
+  .row .mt{
+    margin-left:auto; font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-soft); opacity:0; transition:opacity .2s ease;
+  }
+  .row.is-current .nm{color:var(--ink); opacity:1}
+  .row.is-current .mt{opacity:.75}
+  .row:hover .nm{opacity:.8}
+  .hint{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:6px 0 8px; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-soft); opacity:.55; border-top:1px solid var(--rule-soft);
+  }
+  @media (max-width:520px){ #wheel{width:260px} .row .nm{font-size:20px} }
+
+  @media (prefers-reduced-motion:reduce){ #picker.on .pickinner{animation:none} }
+
+  .card{
+    position:relative; width:150px; padding:11px 11px 12px; text-align:left;
+    border:1px solid var(--rule-soft); border-radius:10px; background:var(--chip);
+    cursor:pointer; font:inherit; color:var(--ink);
+    transition:transform .18s cubic-bezier(.2,1.2,.3,1), border-color .18s, background .18s;
+  }
+  .card:hover, .card:focus-visible{transform:translateY(-4px); border-color:var(--ink-soft); outline:none}
+  .card[data-active="true"]{border-color:var(--ink-soft); transform:translateY(-4px)}
+  .card .sig{display:block; width:100%; height:44px; margin-bottom:8px; color:var(--ink-soft)}
+  .card[data-active="true"] .sig, .card:hover .sig{color:var(--ink)}
+  .card .cls{display:block; font-size:12.5px; font-weight:620; letter-spacing:-.005em; line-height:1.25}
+  .card .lv{display:block; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft); margin-top:2px}
+  .card .stat{display:flex; align-items:center; gap:6px; margin-top:5px; font-size:10px; color:var(--ink-soft)}
+  .card .stat b{flex:0 0 62px; font-weight:400; letter-spacing:.03em; text-transform:uppercase}
+  .pips{display:flex; gap:2px}
+  .pips i{display:block; width:5px; height:8px; border-radius:1px; background:var(--rule-soft)}
+  .pips i.f{background:var(--ink-soft)}
+  .card[data-active="true"] .pips i.f, .card:hover .pips i.f{background:var(--ink)}
+  .card .flav{display:block; margin-top:8px; padding-top:7px; border-top:1px solid var(--rule-soft);
+    font-size:10.5px; line-height:1.4; color:var(--ink-soft)}
+  .card .eq{display:inline-block; margin-top:6px; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-soft); border:1px solid var(--rule-soft); border-radius:99px; padding:1px 6px}
+  .card[data-active="true"] .eq{color:var(--ink); border-color:var(--ink-soft)}
+
+  @media (max-width:640px){
+    #picker{position:fixed; left:8px !important; right:8px; top:auto !important; bottom:10px;
+      transform:none !important; width:auto}
+    .pickinner{overflow-x:auto; -webkit-overflow-scrolling:touch}
+    .card{width:142px; flex:0 0 auto}
+  }
+
+  /* ============ curious mode ============ */
+  :root{ --accent:#3155ff; --switch-track:#e4e1d9; --switch-border:#827e74; --switch-thumb:#fbfaf7; }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --accent:#8FA4FF; --switch-track:#2a2a26; --switch-border:#6b6b64; --switch-thumb:#e6e5df; } }
+  :root[data-theme="dark"]{ --accent:#8FA4FF; --switch-track:#2a2a26; --switch-border:#6b6b64; --switch-thumb:#e6e5df; }
+
+  .curiosity-trigger{
+    appearance:none; background:none; border:0; padding:0; margin:0; color:inherit; font:inherit; cursor:pointer;
+    display:inline-flex; align-items:center; gap:.35rem; vertical-align:baseline; -webkit-tap-highlight-color:transparent;
+  }
+  .curiosity-trigger:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:4px}
+  .curiosity-word{cursor:inherit}
+  .curiosity-switch-track{
+    position:relative; flex:0 0 auto; width:1.625rem; height:1.125rem; border-radius:999px;
+    border:1px solid var(--switch-border); background:var(--switch-track);
+    transition:border-color .14s ease-out, background-color .14s ease-out;
+  }
+  .curiosity-switch-thumb{
+    position:absolute; top:50%; left:.0625rem; width:.875rem; height:.875rem; border-radius:50%; z-index:1;
+    border:1px solid var(--switch-border); background:var(--switch-thumb); transform:translateY(-50%);
+    transition:transform .16s cubic-bezier(.16,1,.3,1);
+  }
+  .curiosity-trigger:hover .curiosity-switch-track{background:color-mix(in srgb, var(--switch-track) 92%, var(--ink))}
+  .curiosity-trigger[aria-checked="true"] .curiosity-switch-track{border-color:var(--accent); background:var(--accent)}
+  .curiosity-trigger[aria-checked="true"] .curiosity-switch-thumb{background:var(--paper); border:0; transform:translate(.5rem,-50%)}
+
+  .curiosity-overlay{position:absolute; top:0; left:0; right:0; z-index:8; pointer-events:none; overflow:clip}
+  .curiosity-guide{
+    display:block; position:absolute; color:var(--accent); opacity:0; transform:translateY(4px);
+    transition:opacity .22s cubic-bezier(.16,1,.3,1), transform .22s cubic-bezier(.16,1,.3,1);
+  }
+  .curiosity-overlay[data-visible="true"] .curiosity-guide{opacity:1; transform:translateY(0); transition-delay:var(--guide-delay,0s)}
+  .curiosity-rail{border-left:1px dashed color-mix(in srgb, var(--accent) 42%, transparent)}
+  .curiosity-width, .curiosity-section-guide{height:0; border-top:1px solid color-mix(in srgb, var(--accent) 46%, transparent)}
+  .curiosity-width::before, .curiosity-width::after{content:""; position:absolute; top:-3px; width:1px; height:7px; background:currentColor}
+  .curiosity-width::before{left:0} .curiosity-width::after{right:0}
+  .curiosity-gap{width:0; border-left:1px solid color-mix(in srgb, var(--accent) 60%, transparent)}
+  .curiosity-gap::before, .curiosity-gap::after{content:""; position:absolute; left:-3px; width:7px; height:1px; background:currentColor}
+  .curiosity-gap::before{top:0} .curiosity-gap::after{bottom:0}
+  .curiosity-label{
+    position:absolute; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:10px; line-height:1;
+    letter-spacing:.02em; color:var(--accent); background:var(--paper); padding:.12em .28em; white-space:nowrap;
+  }
+  .curiosity-width .curiosity-label{left:50%; top:-8.8px; transform:translateX(-50%)}
+  .curiosity-section-guide .curiosity-label{left:8px; top:-6px; transform:translateY(-100%)}
+  .curiosity-gap .curiosity-label{left:-8px; top:50%; transform:translate(-100%,-50%)}
+  .curiosity-annotation{
+    width:12.5rem; color:color-mix(in srgb, var(--ink-soft) 82%, var(--accent)); letter-spacing:.005em; white-space:pre-line;
+    font-family:var(--font-caveat),Caveat,"Segoe Print",cursive; /* PORT */ font-size:1.25rem; font-weight:520; line-height:1.08;
+    transform:translateY(4px) rotate(var(--note-rotation, 0deg));
+  }
+  .curiosity-overlay[data-visible="true"] .curiosity-annotation{transform:translateY(0) rotate(var(--note-rotation, 0deg))}
+  .curiosity-annotation::before, .curiosity-annotation::after{content:""; position:absolute; top:.65em; height:1.5px;
+    background:color-mix(in srgb, var(--accent) 58%, transparent)}
+  .curiosity-annotation::before{width:1.1rem} .curiosity-annotation::after{width:.4rem; transform:rotate(68deg); transform-origin:50% center}
+  .curiosity-annotation[data-side="right"]::before{right:calc(100% + .55rem)}
+  .curiosity-annotation[data-side="right"]::after{right:calc(100% + 1.5rem)}
+  .curiosity-annotation[data-side="left"]{text-align:right}
+  .curiosity-annotation[data-side="left"]::before{left:calc(100% + .55rem)}
+  .curiosity-annotation[data-side="left"]::after{left:calc(100% + 1.5rem)}
+  .curiosity-annotation.formula{font-size:1.15rem; font-weight:600}
+  .curiosity-annotation .fm{font-family:"Times New Roman", Georgia, serif; font-style:italic; font-size:1.02rem; font-weight:400;
+    letter-spacing:0; display:block; margin-top:.15em; color:var(--accent)}
+  @media (max-width:1040px){ .curiosity-annotation{display:none} }
+
+  @media (prefers-reduced-motion:reduce){
+    .w, .reel, .rocker{transition:none}
+    #wheel.on .win{animation:none}
+    .rows{transition:none !important}
+  }

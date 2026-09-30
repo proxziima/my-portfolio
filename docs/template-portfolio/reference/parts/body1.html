@@ -1,0 +1,56 @@
+
+<div id="flick" aria-hidden="true"></div>
+<div id="curiosity-overlay" class="curiosity-overlay" aria-hidden="true"></div>
+<main>
+  <div class="theme-switcher" id="switcher">
+    <button class="theme-wall-toggle" id="wall" type="button" aria-label="Turn the lights off" aria-pressed="false">
+      <span class="theme-wall-stage" id="wallstage" aria-hidden="true">
+        <img class="theme-wall-image theme-wall-state theme-wall-state--light" src="theme-switch/rocker-on.webp" alt="" width="530" height="700" decoding="async">
+        <img class="theme-wall-image theme-wall-state theme-wall-state--dark" src="theme-switch/rocker-off.webp" alt="" width="530" height="700" decoding="async">
+        <canvas class="theme-wall-image theme-wall-motion" id="rockerc" width="212" height="280"></canvas>
+      </span>
+    </button>
+  </div>
+
+  <h1>
+    <span class="who">Vinicius Queiroz</span>
+    <span class="what">
+      <span class="reelwrap" id="reelwrap">
+        <button class="reel" id="reel" aria-haspopup="listbox" aria-expanded="false"
+                aria-label="Software engineer. Open the class list.">
+          <canvas id="reelc"></canvas>
+        </button>
+        <div id="wheel" role="listbox" aria-label="Choose a class">
+          <div class="win" id="win">
+            <div class="sel" aria-hidden="true"></div>
+            <div class="rows" id="rows"></div>
+          </div>
+          <div class="hint" aria-hidden="true">
+            <svg width="8" height="11" viewBox="0 0 9 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.5 1.4v9.2M1.6 4.3 4.5 1.2l2.9 3.1M1.6 7.7l2.9 3.1 2.9-3.1"/></svg>
+            scroll to change class
+          </div>
+        </div>
+      </span><span class="tail">and builder.</span>
+    </span>
+  </h1>
+  <p class="sr" id="say" role="status"></p>
+
+  <div class="bio" id="bio"></div>
+
+  <figure class="plate" id="plate">
+    <div class="platebox" id="platebox"><canvas id="platec"></canvas></div>
+    <figcaption id="platecap"></figcaption>
+  </figure>
+
+  <nav class="links" id="links"></nav>
+
+  <section>
+    <h2>Work</h2>
+    <ol class="list" id="work"></ol>
+  </section>
+
+  <section>
+    <h2>Projects</h2>
+    <ol class="list" id="projects"></ol>
+  </section>
+</main>
