@@ -55,7 +55,9 @@ export const filterByDiscipline = (rows: Entry[], slug: string): Entry[] =>
 export const mediaUrl = (m: number | Media | null | undefined, base: string): string | undefined => {
   if (!m || typeof m !== 'object' || !m.url) return undefined
   try {
-    return new URL(m.url, base).toString()
+    const url = new URL(m.url, base)
+    // Only web URLs reach src/href: a stored `javascript:` or `data:` URL resolves to itself.
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : undefined
   } catch {
     return undefined
   }

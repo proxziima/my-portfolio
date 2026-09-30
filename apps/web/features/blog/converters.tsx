@@ -42,22 +42,25 @@ function renderLink(fields: LinkFields, children: ReactNode): ReactNode {
   return <a href={href} {...external}>{children}</a>
 }
 
-export const postConverters = (base: string): JSXConvertersFunction<NodeTypes> => ({ defaultConverters }) => ({
-  ...defaultConverters,
-  link: ({ node, nodesToJSX }) => renderLink(node.fields, nodesToJSX({ nodes: node.children })),
-  autolink: ({ node, nodesToJSX }) => renderLink(node.fields, nodesToJSX({ nodes: node.children })),
-  upload: ({ node }) => <MediaFigure media={asMedia(node.value)} base={base} />,
-  blocks: {
-    code: ({ node }) => (
-      <pre className={styles.code} data-language={node.fields.language}>
-        <code>{node.fields.code}</code>
-      </pre>
-    ),
-    banner: ({ node }) => (
-      <aside className={styles.banner} data-style={node.fields.style}>
-        <RichText data={node.fields.content} disableContainer />
-      </aside>
-    ),
-    mediaBlock: ({ node }) => <MediaFigure media={asMedia(node.fields.media)} base={base} />,
-  },
-})
+// A function declaration so the banner can nest the same converters, built lazily at render time.
+export function postConverters(base: string): JSXConvertersFunction<NodeTypes> {
+  return ({ defaultConverters }) => ({
+    ...defaultConverters,
+    link: ({ node, nodesToJSX }) => renderLink(node.fields, nodesToJSX({ nodes: node.children })),
+    autolink: ({ node, nodesToJSX }) => renderLink(node.fields, nodesToJSX({ nodes: node.children })),
+    upload: ({ node }) => <MediaFigure media={asMedia(node.value)} base={base} />,
+    blocks: {
+      code: ({ node }) => (
+        <pre className={styles.code} data-language={node.fields.language}>
+          <code>{node.fields.code}</code>
+        </pre>
+      ),
+      banner: ({ node }) => (
+        <aside className={styles.banner} data-style={node.fields.style}>
+          <RichText data={node.fields.content} converters={postConverters(base)} disableContainer />
+        </aside>
+      ),
+      mediaBlock: ({ node }) => <MediaFigure media={asMedia(node.fields.media)} base={base} />,
+    },
+  })
+}

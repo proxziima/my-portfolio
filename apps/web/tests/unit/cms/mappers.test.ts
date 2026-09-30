@@ -91,4 +91,13 @@ describe('mediaUrl', () => {
   it('returns undefined instead of throwing on a malformed url', () => {
     expect(mediaUrl({ id: 1, alt: '', url: 'http://[bad' } as unknown as Media, BASE)).toBeUndefined()
   })
+  it('keeps absolute http(s) urls', () => {
+    expect(mediaUrl({ id: 1, alt: '', url: 'https://cdn.test/a.png' } as unknown as Media, BASE)).toBe('https://cdn.test/a.png')
+  })
+  it.each(['javascript:alert(1)', 'data:image/svg+xml,<svg/>', 'ftp://x.test/a.png', 'blob:http://x/1'])(
+    'rejects the non-web url %s',
+    (url) => {
+      expect(mediaUrl({ id: 1, alt: '', url } as unknown as Media, BASE)).toBeUndefined()
+    },
+  )
 })

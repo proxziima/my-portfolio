@@ -55,6 +55,7 @@ The CMS is ready to author a blog (following Payload's [website/blog guide](http
 - **SEO:** the generated title is `<post title> | <profile name>` and the URL is `WEB_URL/blog/<slug>`.
 - Posts, categories, search and redirects are not exposed over MCP.
 - **Preview:** the post editor's **Preview** button opens `WEB_URL/api/preview?path=/blog/<slug>&previewSecret=…` (built in `src/plugins/preview-url.ts`; hidden until the post has a slug and `WEB_URL` + `PREVIEW_SECRET` are set). The web app checks the secret, verifies you through your `payload-token` admin cookie (cookies are per host, not per port, so the localhost cookie reaches the web app), enables Next draft mode and shows the latest draft at `/blog/<slug>`. `PREVIEW_SECRET` must match in `apps/payload/.env` and `apps/web/.env.local`. Exit through the banner link (`/api/exit-preview`). Without draft mode, `/blog/*` is a 404.
+- **Preview in production:** the web app can only see the admin cookie if both apps share a cookie domain. Host them under one parent domain (e.g. `cms.example.com` and `example.com`) and set the Users collection's `auth.cookies.domain` to it (e.g. `.example.com`, with `secure: true`); otherwise every preview ends in 403. Locally this works because cookies are scoped to `localhost`, not to the port.
 
 ## MCP
 

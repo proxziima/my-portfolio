@@ -43,6 +43,22 @@ describe('PostBody converters', () => {
     expect(html).toMatch(/<aside class="[^"]*" data-style="warning"><p>Heads up<\/p><\/aside>/)
     expect(html).toContain('src="http://cms.test/api/media/file/cat.png" alt="A cat"')
   })
+  it('applies the same link and media rules inside a banner', () => {
+    const html = render(
+      block({
+        blockType: 'banner',
+        style: 'info',
+        content: state(
+          paragraph(link({ linkType: 'custom', url: 'javascript:alert(1)', newTab: false })),
+          paragraph(link({ linkType: 'internal', newTab: false, doc: { relationTo: 'posts', value: { id: 2, slug: 'other' } } })),
+          { type: 'upload', version: 3, format: '', relationTo: 'media', value: image, fields: {} },
+        ),
+      }),
+    )
+    expect(html).not.toContain('javascript:')
+    expect(html).toContain('<a href="/blog/other">go</a>')
+    expect(html).toContain('src="http://cms.test/api/media/file/cat.png"')
+  })
   it('renders uploads against the CMS origin and skips unpopulated ones', () => {
     const html = render(
       { type: 'upload', version: 3, format: '', relationTo: 'media', value: image, fields: {} },

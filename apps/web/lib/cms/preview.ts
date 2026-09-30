@@ -6,6 +6,9 @@ import { cmsBaseUrl } from './client'
 /** Payload's auth cookie: `${cookiePrefix}-token`, and payload.config.ts keeps the default prefix `payload`. */
 export const PAYLOAD_TOKEN_COOKIE = 'payload-token'
 
+/** Uncached CMS calls (session check, draft read) give up after this, so a hung CMS can't hang the page. */
+export const CMS_TIMEOUT_MS = 5000
+
 export const isPreviewSecret = (provided: string | null | undefined): boolean =>
   secretsMatch(provided, process.env.PREVIEW_SECRET)
 
@@ -47,6 +50,7 @@ export async function getPreviewUser(cookieHeader: string | null | undefined): P
     const res = await fetch(new URL('/api/users/me', cmsBaseUrl()), {
       headers: { cookie: `${PAYLOAD_TOKEN_COOKIE}=${token}` },
       cache: 'no-store',
+      signal: AbortSignal.timeout(CMS_TIMEOUT_MS),
     })
     if (!res.ok) return null
     const body = (await res.json()) as { user?: { id?: number | string } | null }
