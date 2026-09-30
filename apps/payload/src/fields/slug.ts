@@ -1,4 +1,5 @@
-import type { TextField } from 'payload'
+import { slugField, type RowField } from 'payload'
+import type { Slugify } from 'payload/shared'
 
 // Letters NFKD does not decompose into a base letter plus a combining mark.
 const TRANSLITERATIONS: Record<string, string> = { ß: 'ss', ø: 'o', ł: 'l', đ: 'd', æ: 'ae', œ: 'oe', þ: 'th', ð: 'd' }
@@ -17,19 +18,13 @@ export const formatSlug = (value: string): string =>
     .replace(NON_ALPHANUMERIC, '-')
     .replace(EDGE_DASHES, '')
 
-/** A unique slug, formatted on save and generated from `source` when left empty. */
-export const slugField = (source = 'title'): TextField => ({
-  name: 'slug',
-  type: 'text',
-  unique: true,
-  index: true,
-  admin: { position: 'sidebar', description: `Leave empty to generate it from the ${source}.` },
-  hooks: {
-    beforeValidate: [
-      ({ value, data }) => {
-        const raw = typeof value === 'string' && value.trim() ? value : data?.[source]
-        return typeof raw === 'string' ? formatSlug(raw) || null : value
-      },
-    ],
-  },
-})
+/** Adapts `formatSlug` to core `slugField`; `undefined` (nothing to slugify) leaves the slug empty. */
+export const slugify: Slugify = ({ valueToSlugify }) =>
+  typeof valueToSlugify === 'string' ? formatSlug(valueToSlugify) || undefined : undefined
+
+/**
+ * Payload's core slug field (unique, indexed, in the sidebar): a hidden `generateSlug` checkbox keeps the
+ * slug synced to the title until the editor unlocks and edits it. Not required, so the column stays nullable.
+ */
+export const titleSlugField = (): RowField =>
+  slugField({ useAsSlug: 'title', slugify, position: 'sidebar', required: false })

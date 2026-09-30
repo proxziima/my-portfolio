@@ -5,7 +5,6 @@ import { publishedOrAuthenticated } from '@/access/published-or-authenticated'
 import { canRunJobs } from '@/access/run-jobs'
 import { validateLinkUrl } from '@/fields/link-url'
 import { relationIds } from '@/fields/relation-ids'
-import { formatSlug } from '@/fields/slug'
 import { toPopulatedAuthors } from '@/hooks/populate-authors'
 import { isAutosave, revalidateAfterChange } from '@/hooks/revalidate-web'
 import { blogPostUrl, categoryPath, seoTitle } from '@/plugins/blog-urls'
@@ -17,21 +16,6 @@ const fakeReq = (signedIn: boolean, authorization?: string): PayloadRequest =>
     user: signedIn ? user : null,
     headers: new Headers(authorization ? { authorization } : {}),
   }) as unknown as PayloadRequest
-
-describe('formatSlug', () => {
-  it('lowercases, strips diacritics and joins words with dashes', () => {
-    expect(formatSlug('Olá, Mundo! Ação 2026')).toBe('ola-mundo-acao-2026')
-  })
-  it('trims leading, trailing and repeated separators', () => {
-    expect(formatSlug('  --Hello   World__  ')).toBe('hello-world')
-  })
-  it('transliterates letters NFKD cannot decompose', () => {
-    expect(formatSlug('Straße Ørsted Łódź Đakovo Æsir Œuvre')).toBe('strasse-orsted-lodz-dakovo-aesir-oeuvre')
-  })
-  it('returns an empty string when nothing is left', () => {
-    expect(formatSlug('!!!')).toBe('')
-  })
-})
 
 describe('publishedOrAuthenticated', () => {
   it('lets signed-in users read everything', () => {

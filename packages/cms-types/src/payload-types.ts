@@ -342,8 +342,9 @@ export interface Post {
     image?: (number | null) | Media;
   };
   /**
-   * Leave empty to generate it from the title.
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
    */
+  generateSlug?: boolean | null;
   slug?: string | null;
   /**
    * Set on first publish.
@@ -419,8 +420,9 @@ export interface Category {
   id: number;
   title: string;
   /**
-   * Leave empty to generate it from the title.
+   * When enabled, the slug will auto-generate from the title field on save and autosave.
    */
+  generateSlug?: boolean | null;
   slug?: string | null;
   parent?: (number | null) | Category;
   breadcrumbs?:
@@ -919,6 +921,7 @@ export interface PostsSelect<T extends boolean = true> {
         description?: T;
         image?: T;
       };
+  generateSlug?: T;
   slug?: T;
   publishedAt?: T;
   authors?: T;
@@ -940,6 +943,7 @@ export interface PostsSelect<T extends boolean = true> {
  */
 export interface CategoriesSelect<T extends boolean = true> {
   title?: T;
+  generateSlug?: T;
   slug?: T;
   parent?: T;
   breadcrumbs?:

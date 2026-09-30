@@ -3367,6 +3367,7 @@ Also read the Payload skill at `apps/payload/.claude/skills/payload/`.
 2. `posts` collection. Fields:
    - `title`, required
    - a unique `slug`, generated from the title when empty by a `slugField()` factory in `fields/slug.ts` that lowercases, strips diacritics and uses dashes; unit-test the formatter
+     - *Revised 2026-09-30:* the custom factory froze the slug at the first autosave (a post titled "This is a sample template" got `t`). `fields/slug.ts` now wraps Payload's core `slugField` (its hidden `generateSlug` checkbox keeps the slug synced to the title until the editor unlocks and edits it), with `formatSlug` as its `slugify`.
    - `excerpt` (textarea)
    - `heroImage` (upload → media)
    - `content` (richText, `post-editor.ts`)
@@ -3377,7 +3378,7 @@ Also read the Payload skill at `apps/payload/.claude/skills/payload/`.
    - `publishedAt` (date, sidebar; set by a `beforeChange` hook the first time the post is published)
 
    Behaviour:
-   - `versions: { drafts: { autosave: { interval: 100 }, schedulePublish: true }, maxPerDoc: 50 }`
+   - `versions: { drafts: { autosave: { interval: 2000, showSaveDraftButton: true }, schedulePublish: true }, maxPerDoc: 50 }` (*revised 2026-09-30:* 100ms saved on almost every keystroke; autosave now waits for a ~2s pause, and "Save draft" saves immediately)
    - access: `read` = authenticated **or** `_status` equals `published` (`published-or-authenticated.ts`); create, update and delete are authenticated only
    - admin: `useAsTitle: 'title'`, `defaultColumns: ['title', 'slug', '_status', 'publishedAt']`
    - hooks: `revalidateCollectionHooks` (reused)
@@ -3473,7 +3474,7 @@ On `/blog/[slug]`, in draft mode, the page renders a client `RefreshRouteOnSave`
 - CMS:
   - `src/collections/Posts.ts`: `admin.livePreview.url: ({ data }) => buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: postPreviewPath(data?.slug) })`. When it returns null, live preview is unavailable for unsaved or slug-less docs; check how Payload treats a null or empty url, and return something harmless if it's required.
   - `src/payload.config.ts`: `admin.livePreview.breakpoints` for mobile 375×667, tablet 768×1024 and desktop 1440×900.
-  - Keep `versions.drafts.autosave.interval` at 100, which is already responsive. Document the choice.
+  - ~~Keep `versions.drafts.autosave.interval` at 100, which is already responsive. Document the choice.~~ *Revised 2026-09-30:* `interval: 2000` (`AUTOSAVE_INTERVAL_MS`) with `showSaveDraftButton: true`. Autosave is debounced, so it fires after a ~2s pause in typing; Live Preview refreshes on those pauses, or right away on "Save draft".
   - Tests: extend `tests/int/preview.int.spec.ts` to cover the livePreview url wiring.
 - Web:
   - `bun add --cwd apps/web @payloadcms/live-preview-react@3.90.2`

@@ -324,7 +324,8 @@ The user asked for the Payload blog feature to be ready, following Payload's "Ho
 
 The scope covers:
 - `posts`, with:
-  - drafts and autosave
+  - drafts and autosave (debounced: it saves after a ~2s pause in typing, `interval: 2000`; a "Save draft" button saves right away)
+  - a slug from Payload's core `slugField`, kept in sync with the title (formatted by our `formatSlug`) until the editor unlocks it
   - scheduled publish via the jobs queue
   - published-only public reads
   - a Lexical editor with code, banner and media blocks

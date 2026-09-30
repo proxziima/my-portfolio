@@ -26,7 +26,7 @@ async function notifyWeb(req: PayloadRequest): Promise<void> {
 }
 
 /**
- * True for admin autosaves (`PATCH …?autosave=true`, every few hundred ms while typing). They only
+ * True for admin autosaves (`PATCH …?autosave=true`, after each ~2s pause while typing). They only
  * write a draft version the web never shows. Payload's parseParams turns the flag into a boolean in place.
  */
 export const isAutosave = (req: Pick<PayloadRequest, 'query'>): boolean => {

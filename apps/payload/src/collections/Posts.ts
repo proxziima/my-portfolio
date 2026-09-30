@@ -2,11 +2,13 @@ import type { CollectionConfig } from 'payload'
 import { authenticated } from '../access/authenticated'
 import { publishedOrAuthenticated } from '../access/published-or-authenticated'
 import { postEditor } from '../editor/post-editor'
-import { slugField } from '../fields/slug'
+import { titleSlugField } from '../fields/slug'
 import { populateAuthors } from '../hooks/populate-authors'
 import { populatePublishedAt } from '../hooks/populate-published-at'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
 import { buildPreviewUrl, postPreviewPath } from '../plugins/preview-url'
+
+const AUTOSAVE_INTERVAL_MS = 2000
 
 // Both run on the server, so the secret never reaches the admin bundle. `null` (no slug or env) hides
 // the Preview button and the Live Preview tab.
@@ -39,8 +41,9 @@ export const Posts: CollectionConfig<'posts'> = {
     afterRead: [populateAuthors],
   },
   versions: {
-    // A 100ms autosave keeps Live Preview close to real time; each save triggers one draft re-render on the web.
-    drafts: { autosave: { interval: 100 }, schedulePublish: true },
+    // Autosave is debounced, so it only fires after a ~2s pause in typing, not on every keystroke. Live Preview
+    // refreshes after each autosave, so it updates on those pauses; "Save draft" saves (and refreshes) right away.
+    drafts: { autosave: { interval: AUTOSAVE_INTERVAL_MS, showSaveDraftButton: true }, schedulePublish: true },
     maxPerDoc: 50,
   },
   fields: [
@@ -58,7 +61,7 @@ export const Posts: CollectionConfig<'posts'> = {
         },
       ],
     },
-    slugField(),
+    titleSlugField(),
     {
       name: 'publishedAt',
       type: 'date',
