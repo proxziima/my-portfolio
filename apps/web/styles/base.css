@@ -64,17 +64,17 @@ h1 {
   color: var(--ink-soft);
 }
 
-/* the role drum sits inline with the tail */
+/* the role drum sits inline with the tail; a gap, not padding, so a wrapped tail isn't indented */
 h1 .what {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  column-gap: 9px;
   min-height: 40px;
 }
 
 .what .tail {
   white-space: pre;
-  padding-left: 9px;
 }
 
 @media (max-width: 520px) {
