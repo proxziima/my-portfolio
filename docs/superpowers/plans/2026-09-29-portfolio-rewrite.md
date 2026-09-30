@@ -3132,7 +3132,7 @@ export function Figure({ sceneUrl }: { sceneUrl: string }) {
   )
 }
 ```
-`Figure.module.css`: port `.plate`, `.platebox` and `figcaption` from template `globals.css` lines 99–105 (`margin: 30px 0 0`, box `height: 216px`, caption 11.5px, opacity .75). Add the same enter animation on the caption as the lists.
+`Figure.module.css`: port `.plate`, `.platebox` and `figcaption` from template `globals.css` lines 99–105 (`margin: 30px 0 0`, box `height: 216px`, caption 11.5px, opacity .75). *Superseded: the box is 3:2 (`aspect-ratio: 3 / 2`, full width), because the scene's framing gets cropped at 216px; see spec §6.8.* Add the same enter animation on the caption as the lists.
 
 - [ ] **Step 6: `Portfolio.tsx`** — client composition root:
 ```tsx

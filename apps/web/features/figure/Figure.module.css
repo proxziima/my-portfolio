@@ -5,26 +5,18 @@
   touch-action: pan-y;
 }
 
+/* 3:2, not the template's 216px strip: at 600×216 (and even 16:9) the scene's framing crops the lamp
+   and the plant. The ratio scales with the column on mobile. */
 .box {
   position: relative;
-  height: 216px;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
   cursor: grab;
 }
 
 .box:active {
   cursor: grabbing;
-}
-
-.box canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.box canvas[data-loaded='true'] {
-  opacity: 1;
 }
 
 .caption {

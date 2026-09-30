@@ -237,8 +237,16 @@ properties. Components use the tokens and never hard-code these values.
    its caption. The scene URL comes from
    `site-settings.figure.splineSceneUrl`; `public/spline/scene.splinecode` is
    the default when that field is empty. The scene is lazy-mounted when near
-   the viewport and loaded client-only. A skeleton frame of the same height
-   prevents layout shift. If the scene is missing or fails to load, the figure
+   the viewport and loaded client-only. The frame is 3:2 at the column's
+   width (600×400 on desktop, scaling down on mobile), not the template's
+   216px strip: at 216px (and even 16:9) the scene's framing crops the lamp
+   and the plant. The frame holds its size while the scene loads, so there is
+   no layout shift. The scene's camera is orthographic, so it frames as many
+   scene units as the canvas has CSS px: the scene renders into a fixed stage
+   (600×400 ÷ 0.7, pulled back so the whole desk has a margin) scaled into
+   the box, which keeps the same framing at every width. `app.setZoom` can't
+   do this: on an orthographic camera it's an absolute zoom clamped to the
+   scene's limits. If the scene is missing or fails to load, the figure
    collapses to its caption and the page stays fully usable. The caption is
    per-role. Per-role scene actions are out of scope for this phase.
 9. **Accessibility.**
