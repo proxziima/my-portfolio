@@ -1,0 +1,58 @@
+/* template globals.css: ol.list, .pos, .desc, .years */
+
+.list {
+  display: grid;
+  row-gap: var(--row-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  animation: enter 0.24s ease both;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(0.2em);
+  }
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.meta,
+.aside {
+  color: var(--ink-soft);
+  transition: var(--theme-transition);
+}
+
+.aside {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .aside {
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list {
+    animation: none;
+  }
+}
