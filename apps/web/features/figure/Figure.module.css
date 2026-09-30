@@ -12,11 +12,15 @@
   width: 100%;
   aspect-ratio: 3 / 2;
   overflow: hidden;
-  cursor: grab;
 }
 
-.box:active {
-  cursor: grabbing;
+/* once the scene is up, its own in-scene cursor is the only one; loading or failed keeps the normal one */
+.box:has(canvas[data-loaded='true']) {
+  cursor: none;
+}
+
+.box canvas[data-loaded='true'] {
+  cursor: none !important; /* the runtime writes an inline cursor on the canvas as it hovers objects */
 }
 
 .caption {
