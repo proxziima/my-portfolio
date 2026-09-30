@@ -6,14 +6,14 @@ import { titleSlugField } from '../fields/slug'
 import { populateAuthors } from '../hooks/populate-authors'
 import { populatePublishedAt } from '../hooks/populate-published-at'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
-import { buildPreviewUrl, postPreviewPath } from '../plugins/preview-url'
+import { buildPreviewUrl, postLivePreviewPath, postPreviewPath } from '../plugins/preview-url'
 
 const AUTOSAVE_INTERVAL_MS = 2000
 
-// Both run on the server, so the secret never reaches the admin bundle. `null` (no slug or env) hides
+// Both run on the server, so the secret never reaches the admin bundle. `null` (no path or env) hides
 // the Preview button and the Live Preview tab.
-const postPreviewUrl = (slug: unknown) =>
-  buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: postPreviewPath(slug) })
+const webPreviewUrl = (path: string | null) =>
+  buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path })
 
 // The SEO plugin (tabbedUI) appends an "SEO" tab with the `meta` group to the tabs below.
 export const Posts: CollectionConfig<'posts'> = {
@@ -22,10 +22,12 @@ export const Posts: CollectionConfig<'posts'> = {
     useAsTitle: 'title',
     defaultColumns: ['title', 'slug', '_status', 'publishedAt'],
     group: 'Blog',
-    preview: (doc) => postPreviewUrl(doc.slug),
-    // The Live Preview iframe enters through the same draft-preview route, then `RefreshRouteOnSave` on
-    // the web page re-renders it after every autosave. Breakpoints live in payload.config.ts.
-    livePreview: { url: ({ data }) => postPreviewUrl(data.slug) },
+    // The button opens the post's public URL, /blog/<slug>.
+    preview: (doc) => webPreviewUrl(postPreviewPath(doc.slug)),
+    // The Live Preview iframe enters through the same draft-preview route, but keyed by id: `data` is the
+    // unsaved form, and its slug changes with every title keystroke before autosave stores it. Then
+    // `RefreshRouteOnSave` on the web page re-renders it after every save. Breakpoints live in payload.config.ts.
+    livePreview: { url: ({ data }) => webPreviewUrl(postLivePreviewPath(data?.id)) },
   },
   access: {
     read: publishedOrAuthenticated,

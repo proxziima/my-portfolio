@@ -5,7 +5,7 @@ import { getPreviewUser, isPreviewSecret, isSafePreviewPath, readCookie } from '
 import { secretsMatch } from '@/lib/security/secrets'
 
 describe('isSafePreviewPath', () => {
-  it.each(['/blog/a', '/', '/blog/a?x=1#top', '/blog/%C3%A1'])('accepts %s', (path) => {
+  it.each(['/blog/a', '/', '/blog/a?x=1#top', '/blog/%C3%A1', '/blog/preview/42'])('accepts %s', (path) => {
     expect(isSafePreviewPath(path)).toBe(true)
   })
   it.each([

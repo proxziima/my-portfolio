@@ -3473,6 +3473,7 @@ On `/blog/[slug]`, in draft mode, the page renders a client `RefreshRouteOnSave`
 **Files:**
 - CMS:
   - `src/collections/Posts.ts`: `admin.livePreview.url: ({ data }) => buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: postPreviewPath(data?.slug) })`. When it returns null, live preview is unavailable for unsaved or slug-less docs; check how Payload treats a null or empty url, and return something harmless if it's required.
+    - *Revised 2026-09-30:* `data` is the unsaved form, and with the core slug field its slug changes on every title keystroke, so the iframe navigated to a slug the CMS hadn't stored yet (a 404 that never recovered). The url is now keyed by id, `postLivePreviewPath(data.id)` → `/blog/preview/<id>`, served by `app/blog/preview/[id]/page.tsx` through `getPostById`. Both preview pages share `features/blog/draft-preview.tsx` and `PostPreview`, and show a "not saved yet" notice with the refresher instead of a 404 while the draft is missing.
   - `src/payload.config.ts`: `admin.livePreview.breakpoints` for mobile 375×667, tablet 768×1024 and desktop 1440×900.
   - ~~Keep `versions.drafts.autosave.interval` at 100, which is already responsive. Document the choice.~~ *Revised 2026-09-30:* `interval: 2000` (`AUTOSAVE_INTERVAL_MS`) with `showSaveDraftButton: true`. Autosave is debounced, so it fires after a ~2s pause in typing; Live Preview refreshes on those pauses, or right away on "Save draft".
   - Tests: extend `tests/int/preview.int.spec.ts` to cover the livePreview url wiring.

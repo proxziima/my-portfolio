@@ -21,6 +21,15 @@ export const buildPreviewUrl = ({ webUrl, secret, path }: PreviewUrlArgs): strin
 export const postPreviewPath = (slug: unknown): string | null =>
   typeof slug === 'string' && slug.trim() ? `/blog/${encodeURIComponent(slug.trim())}` : null
 
+/**
+ * "/blog/preview/<id>", or `null` before the post exists. Live Preview keys on the id because the slug follows
+ * the title while the editor types, so a slug URL would point at a draft the CMS hasn't saved yet.
+ */
+export const postLivePreviewPath = (id: unknown): string | null => {
+  const key = typeof id === 'number' ? String(id) : typeof id === 'string' ? id.trim() : ''
+  return key ? `/blog/preview/${encodeURIComponent(key)}` : null
+}
+
 /** Device sizes in the Live Preview toolbar (Payload adds "Responsive" itself). */
 export const livePreviewBreakpoints = [
   { name: 'mobile', label: 'Mobile', width: 375, height: 667 },

@@ -10,10 +10,15 @@ vi.mock('next/navigation', () => ({
     throw new Error('NOT_FOUND')
   },
 }))
-const getPostBySlug = vi.fn<(slug: string) => Promise<PostView | null>>()
-vi.mock('@/lib/cms/posts', () => ({ getPostBySlug: (slug: string) => getPostBySlug(slug) }))
+type Load = (key: string, auth: { token?: string }) => Promise<PostView | null>
+const getPostBySlug = vi.fn<Load>()
+const getPostById = vi.fn<Load>()
+vi.mock('@/lib/cms/posts', () => ({ getPostBySlug, getPostById }))
 
-const { default: PostPreviewPage } = await import('@/app/blog/[slug]/page')
+const { default: SlugPage } = await import('@/app/blog/[slug]/page')
+const { default: LivePreviewPage } = await import('@/app/blog/preview/[id]/page')
+const { PostPreview } = await import('@/features/blog/PostPreview')
+const { PreviewNotice } = await import('@/features/blog/PreviewNotice')
 const { RefreshRouteOnSave } = await import('@/features/blog/RefreshRouteOnSave')
 
 const post: PostView = {
@@ -23,40 +28,63 @@ const post: PostView = {
   authors: [],
   status: 'draft',
 }
-const render = () => PostPreviewPage({ params: Promise.resolve({ slug: 'hello' }) } as PageProps<'/blog/[slug]'>)
 
-/** Every element of a server-rendered tree, depth first (enough to find a client component in it). */
+/** Every element of a server-rendered tree, depth first, with `PostPreview` (a plain function) rendered in place. */
 const elements = (node: ReactNode): ReactElement[] =>
-  Children.toArray(node).flatMap((child) =>
-    isValidElement<{ children?: ReactNode }>(child) ? [child, ...elements(child.props.children)] : [],
-  )
-const refresher = async () =>
-  elements(await render()).find((el) => el.type === RefreshRouteOnSave) as ReactElement<{ cmsOrigin: string }> | undefined
+  Children.toArray(node).flatMap((child) => {
+    if (!isValidElement<{ children?: ReactNode }>(child)) return []
+    const inner = child.type === PostPreview ? PostPreview(child.props as { post: PostView | null }) : child.props.children
+    return [child, ...elements(inner)]
+  })
+const find = <P>(tree: ReactElement[], type: unknown) => tree.find((el) => el.type === type) as ReactElement<P> | undefined
 
 beforeEach(() => {
   draft.isEnabled = true
   jar.clear()
   jar.set('payload-token', { value: 'jwt' })
   getPostBySlug.mockReset().mockResolvedValue(post)
+  getPostById.mockReset().mockResolvedValue(post)
   vi.unstubAllEnvs()
 })
 
-describe('/blog/[slug] live preview', () => {
-  it('renders the refresher for a draft post, listening to the CMS admin origin', async () => {
+describe.each([
+  {
+    page: '/blog/[slug]',
+    render: () => SlugPage({ params: Promise.resolve({ slug: 'hello' }) } as PageProps<'/blog/[slug]'>),
+    load: getPostBySlug,
+    loadArgs: ['hello', { draft: true, token: 'jwt' }],
+  },
+  {
+    page: '/blog/preview/[id]',
+    render: () => LivePreviewPage({ params: Promise.resolve({ id: '7' }) } as PageProps<'/blog/preview/[id]'>),
+    load: getPostById,
+    loadArgs: ['7', { token: 'jwt' }],
+  },
+])('$page preview', ({ render, load, loadArgs }) => {
+  const tree = async () => elements(await render())
+
+  it('reads the draft with the editor token and renders the refresher on the CMS admin origin', async () => {
     vi.stubEnv('NEXT_PUBLIC_CMS_URL', 'http://cms.test/')
-    expect((await refresher())?.props.cmsOrigin).toBe('http://cms.test')
+    const refresher = find<{ cmsOrigin: string }>(await tree(), RefreshRouteOnSave)
+    expect(refresher?.props.cmsOrigin).toBe('http://cms.test')
+    expect(load).toHaveBeenCalledWith(...loadArgs)
   })
   it('is a 404 without draft mode', async () => {
     draft.isEnabled = false
     await expect(render()).rejects.toThrow('NOT_FOUND')
-    expect(getPostBySlug).not.toHaveBeenCalled()
+    expect(load).not.toHaveBeenCalled()
   })
-  it('is a 404 when the post is missing', async () => {
-    getPostBySlug.mockResolvedValue(null)
-    await expect(render()).rejects.toThrow('NOT_FOUND')
+  it('shows the not-saved notice with the refresher, not a 404, while the post is missing', async () => {
+    load.mockResolvedValue(null)
+    const elementsOnPage = await tree()
+    expect(find<{ title: string }>(elementsOnPage, PreviewNotice)?.props.title).toBe('Not saved yet')
+    expect(find(elementsOnPage, RefreshRouteOnSave)).toBeDefined()
   })
   it('shows the expired-session notice, without a refresher, when the admin token is gone', async () => {
     jar.clear()
-    expect(await refresher()).toBeUndefined()
+    const elementsOnPage = await tree()
+    expect(find<{ title: string }>(elementsOnPage, PreviewNotice)?.props.title).toBe('Your CMS session has expired')
+    expect(find(elementsOnPage, RefreshRouteOnSave)).toBeUndefined()
+    expect(load).not.toHaveBeenCalled()
   })
 })
