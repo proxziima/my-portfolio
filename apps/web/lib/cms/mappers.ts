@@ -49,7 +49,10 @@ export const toContentEntry = (c: Content): Entry => ({
   disciplines: slugsOf(c.disciplines),
 })
 
-export const mediaUrl = (m: number | Media | null | undefined, base: string): string | undefined => {
+/** An upload document (media, scenes…) as a relation returns it: an id at depth 0, the document at depth ≥ 1. */
+type Upload = number | Pick<Media, 'url'> | null | undefined
+
+export const mediaUrl = (m: Upload, base: string): string | undefined => {
   if (!m || typeof m !== 'object' || !m.url) return undefined
   try {
     const url = new URL(m.url, base)
@@ -72,9 +75,15 @@ const toNav = (n: Navigation): NavItem[] =>
     return href ? [{ label: i.label, href, newTab: Boolean(i.newTab) }] : []
   })
 
+export const DEFAULT_SCENE_URL = '/spline/scene.splinecode'
+
+/** The uploaded scene, then the pasted URL, then the file bundled with the web app. */
+export const sceneUrl = (figure: SiteSetting['figure'], base: string): string =>
+  mediaUrl(figure?.scene, base) ?? (figure?.splineSceneUrl || DEFAULT_SCENE_URL)
+
 const toSettings = (s: SiteSetting, base: string): Settings => ({
   seo: { title: s.seo.title, description: s.seo.description, ogImage: mediaUrl(s.seo.ogImage, base) },
-  splineSceneUrl: s.figure?.splineSceneUrl || '/spline/scene.splinecode',
+  splineSceneUrl: sceneUrl(s.figure, base),
   sectionLabels: s.sectionLabels,
   pickerHint: s.pickerHint,
   pageNotes: s.pageNotes,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
-import { mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
+import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Profile, Project, Scene, SiteSetting } from '@repo/cms-types'
+import { DEFAULT_SCENE_URL, mediaUrl, sceneUrl, toContentEntry, toDiscipline, toExperienceEntry, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
 
 const discipline = { id: 1, slug: 'se', title: 'Software engineer', order: 1, level: 'LV 9', figureCaption: 'Fig. 1', bio: { root: { children: [] } }, curiousNotes: [{ id: 'n', side: 'left', text: 'x', formula: null }], updatedAt: '', createdAt: '' } as unknown as CmsDiscipline
 
@@ -67,7 +67,7 @@ describe('toPortfolio', () => {
     expect(p.nav).toEqual([{ label: 'ok', href: '#work', newTab: false }])
   })
   it('falls back to the bundled spline scene', () => {
-    expect(toPortfolio(snapshot(), BASE).settings.splineSceneUrl).toBe('/spline/scene.splinecode')
+    expect(toPortfolio(snapshot(), BASE).settings.splineSceneUrl).toBe(DEFAULT_SCENE_URL)
   })
 })
 
@@ -92,4 +92,32 @@ describe('mediaUrl', () => {
       expect(mediaUrl({ id: 1, alt: '', url } as unknown as Media, BASE)).toBeUndefined()
     },
   )
+})
+
+describe('sceneUrl', () => {
+  const upload = { id: 2, title: 'Desk', url: '/api/scenes/file/desk.splinecode' } as unknown as Scene
+  const pasted = 'https://prod.spline.design/abc/scene.splinecode'
+
+  it('prefers the uploaded scene, resolved against the CMS', () => {
+    expect(sceneUrl({ scene: upload, splineSceneUrl: pasted }, BASE)).toBe('http://cms.test/api/scenes/file/desk.splinecode')
+  })
+  it('falls back to the pasted url without an upload', () => {
+    expect(sceneUrl({ scene: null, splineSceneUrl: pasted }, BASE)).toBe(pasted)
+  })
+  it('falls back to the pasted url when the upload is unpopulated or has no url', () => {
+    expect(sceneUrl({ scene: 2, splineSceneUrl: pasted }, BASE)).toBe(pasted)
+    expect(sceneUrl({ scene: { ...upload, url: null }, splineSceneUrl: pasted }, BASE)).toBe(pasted)
+  })
+  it('ignores an upload url that is not http(s)', () => {
+    expect(sceneUrl({ scene: { ...upload, url: 'javascript:alert(1)' }, splineSceneUrl: pasted }, BASE)).toBe(pasted)
+  })
+  it('falls back to the bundled scene when neither is set', () => {
+    expect(sceneUrl({ scene: null, splineSceneUrl: '' }, BASE)).toBe(DEFAULT_SCENE_URL)
+    expect(sceneUrl({}, BASE)).toBe(DEFAULT_SCENE_URL)
+    expect(sceneUrl(undefined, BASE)).toBe(DEFAULT_SCENE_URL)
+  })
+  it('feeds the portfolio settings', () => {
+    const settings = { ...snapshot().settings, figure: { scene: upload, splineSceneUrl: pasted } } as SiteSetting
+    expect(toPortfolio(snapshot({ settings }), BASE).settings.splineSceneUrl).toBe('http://cms.test/api/scenes/file/desk.splinecode')
+  })
 })
