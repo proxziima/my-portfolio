@@ -4,10 +4,13 @@ import path from 'path'
 import { buildConfig } from 'payload'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
+import { canRunJobs } from './access/run-jobs'
+import { Categories } from './collections/Categories'
 import { Content } from './collections/Content'
 import { Disciplines } from './collections/Disciplines'
 import { Experiences } from './collections/Experiences'
 import { Media } from './collections/Media'
+import { Posts } from './collections/Posts'
 import { Projects } from './collections/Projects'
 import { Users } from './collections/Users'
 import { Contact } from './globals/Contact'
@@ -15,16 +18,19 @@ import { Navigation } from './globals/Navigation'
 import { Profile } from './globals/Profile'
 import { SiteSettings } from './globals/SiteSettings'
 import { portfolioMcp } from './mcp/mcp-plugin'
+import { blogPlugins } from './plugins/blog-plugins'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default buildConfig({
   admin: { user: Users.slug, importMap: { baseDir: dirname } },
-  collections: [Disciplines, Experiences, Projects, Content, Media, Users],
+  collections: [Disciplines, Experiences, Projects, Content, Posts, Categories, Media, Users],
   globals: [Profile, Contact, Navigation, SiteSettings],
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URL ?? '' } }),
   editor: lexicalEditor(),
-  plugins: [portfolioMcp],
+  // Runs the queue that scheduled publishing writes to. Needs a long-running server (not serverless).
+  jobs: { autoRun: [{ cron: '* * * * *', queue: 'default' }], access: { run: canRunJobs } },
+  plugins: [...blogPlugins, portfolioMcp],
   secret: process.env.PAYLOAD_SECRET ?? '',
   sharp,
   typescript: {

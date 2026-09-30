@@ -25,8 +25,14 @@ async function notifyWeb(req: PayloadRequest): Promise<void> {
   }
 }
 
-export const revalidateAfterChange: CollectionAfterChangeHook = async ({ doc, req }) => {
-  await notifyWeb(req)
+type Status = { _status?: string } | null | undefined
+
+/** Draft saves (autosave fires every few hundred ms) are invisible to the web, unless they unpublish. */
+export const isDraftOnlyChange = (doc: Status, previousDoc: Status): boolean =>
+  doc?._status === 'draft' && previousDoc?._status !== 'published'
+
+export const revalidateAfterChange: CollectionAfterChangeHook = async ({ doc, previousDoc, req }) => {
+  if (!isDraftOnlyChange(doc, previousDoc)) await notifyWeb(req)
   return doc
 }
 export const revalidateAfterDelete: CollectionAfterDeleteHook = async ({ doc, req }) => {

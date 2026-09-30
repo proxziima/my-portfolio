@@ -6,6 +6,7 @@ declare global {
       NEXT_PUBLIC_SERVER_URL: string
       WEB_URL?: string
       REVALIDATE_SECRET?: string
+      CRON_SECRET?: string
     }
   }
 }
