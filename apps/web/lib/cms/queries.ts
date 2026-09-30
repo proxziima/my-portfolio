@@ -6,13 +6,13 @@ import { toPortfolio } from './mappers'
 import type { Portfolio } from './types'
 
 interface List<T> { docs: T[] }
-const list = <T,>(slug: string) => cmsGet<List<T>>(`/api/${slug}?sort=order&limit=100&depth=1`).then((r) => r.docs)
-const global = <T,>(slug: string) => cmsGet<T>(`/api/globals/${slug}?depth=1`)
+const cmsList = <T>(slug: string) => cmsGet<List<T>>(`/api/${slug}?sort=order&limit=100&depth=1`).then((r) => r.docs)
+const cmsGlobal = <T>(slug: string) => cmsGet<T>(`/api/globals/${slug}?depth=1`)
 
 export const getPortfolio = cache(async (): Promise<Portfolio> => {
   const [profile, contact, navigation, settings, disciplines, experiences, projects, content] = await Promise.all([
-    global<Profile>('profile'), global<Contact>('contact'), global<Navigation>('navigation'), global<SiteSetting>('site-settings'),
-    list<Discipline>('disciplines'), list<Experience>('experiences'), list<Project>('projects'), list<Content>('content'),
+    cmsGlobal<Profile>('profile'), cmsGlobal<Contact>('contact'), cmsGlobal<Navigation>('navigation'), cmsGlobal<SiteSetting>('site-settings'),
+    cmsList<Discipline>('disciplines'), cmsList<Experience>('experiences'), cmsList<Project>('projects'), cmsList<Content>('content'),
   ])
   return toPortfolio({ profile, contact, navigation, settings, disciplines, experiences, projects, content }, cmsBaseUrl())
 })

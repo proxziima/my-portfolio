@@ -5,9 +5,13 @@ export const CURIOUS_TRIGGER_CLASS = 'curiosity-trigger'
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 export const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (c) => ESCAPES[c] ?? c)
 
-const SAFE_URL = /^(https?:\/\/|mailto:|\/|#)/i
-export const safeHref = (url: string | null | undefined): string | undefined =>
-  url && SAFE_URL.test(url.trim()) ? url.trim() : undefined
+// Keep in sync with apps/payload/src/fields/link-url.ts (the CMS-side validator).
+const SAFE_URL = /^(https?:\/\/|mailto:|\/(?![\/\\])|#)/i
+const FORBIDDEN_CHARS = /[\s\u0000-\u001f\u007f]/
+export const safeHref = (url: string | null | undefined): string | undefined => {
+  const value = url?.trim()
+  return value && !FORBIDDEN_CHARS.test(value) && SAFE_URL.test(value) ? value : undefined
+}
 export const isExternal = (href: string) => /^https?:\/\//i.test(href)
 
 export function chipLinkHtml(label: string, chip: string, url?: string | null): string {

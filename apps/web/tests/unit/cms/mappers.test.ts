@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Discipline as CmsDiscipline, Experience, Project } from '@repo/cms-types'
-import { filterByDiscipline, toDiscipline, toExperienceEntry, toProjectEntry } from '@/lib/cms/mappers'
+import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
+import { filterByDiscipline, mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
 
 const discipline = { id: 1, slug: 'se', title: 'Software engineer', order: 1, level: 'LV 9', figureCaption: 'Fig. 1', bio: { root: { children: [] } }, curiousNotes: [{ id: 'n', side: 'left', text: 'x', formula: null }], updatedAt: '', createdAt: '' } as unknown as CmsDiscipline
 
@@ -23,5 +23,72 @@ describe('mappers', () => {
       { id: '3', chip: 'C', label: 'c', meta: '', disciplines: ['ai'] },
     ]
     expect(filterByDiscipline(rows, 'se').map((r) => r.id)).toEqual(['1', '2'])
+  })
+})
+
+const BASE = 'http://cms.test'
+
+const snapshot = (overrides: Partial<CmsSnapshot> = {}): CmsSnapshot => ({
+  profile: { id: 1, name: 'N', headlineTail: 'and builder.', email: 'a@b.dev' } as Profile,
+  contact: { id: 1, links: [] } as unknown as Contact,
+  navigation: { id: 1, items: [] } as unknown as Navigation,
+  settings: {
+    id: 1,
+    seo: { title: 't', description: 'd', ogImage: null },
+    defaultDiscipline: null,
+    sectionLabels: { work: 'Work', projects: 'Projects', content: 'Content' },
+    pickerHint: 'h',
+    pageNotes: { headline: '', columnWidth: '', wallSwitch: '', sectionGap: '', chips: '', role: '' },
+  } as unknown as SiteSetting,
+  disciplines: [discipline],
+  experiences: [],
+  projects: [],
+  content: [],
+  ...overrides,
+})
+
+describe('toContentEntry', () => {
+  it('maps kind without a venue and the UTC year', () => {
+    const c = { id: 4, title: 'Post', kind: 'article', chip: 'P', venue: null, url: 'https://x.dev/p', date: '2024-01-01T00:00:00.000Z', disciplines: [], order: 1 } as unknown as Content
+    expect(toContentEntry(c)).toEqual({ id: '4', chip: 'P', label: 'Post', href: 'https://x.dev/p', meta: 'article', aside: '2024', disciplines: [] })
+  })
+})
+
+describe('toPortfolio', () => {
+  it('falls back to the first discipline when the configured default is not listed', () => {
+    const missing = { ...discipline, id: 9, slug: 'gone' } as unknown as CmsDiscipline
+    const settings = { ...snapshot().settings, defaultDiscipline: missing } as SiteSetting
+    expect(toPortfolio(snapshot({ settings }), BASE).defaultSlug).toBe('se')
+  })
+  it('uses the configured default when it is listed', () => {
+    const settings = { ...snapshot().settings, defaultDiscipline: discipline } as SiteSetting
+    expect(toPortfolio(snapshot({ settings }), BASE).defaultSlug).toBe('se')
+  })
+  it('has an empty default slug without disciplines', () => {
+    expect(toPortfolio(snapshot({ disciplines: [] }), BASE).defaultSlug).toBe('')
+  })
+  it('drops unsafe contact and nav links', () => {
+    const contact = { id: 1, links: [{ label: 'ok', chip: 'a', url: 'https://ok.dev' }, { label: 'bad', chip: 'b', url: 'javascript:alert(1)' }] } as unknown as Contact
+    const navigation = { id: 1, items: [{ label: 'ok', href: '#work' }, { label: 'bad', href: '//evil' }] } as unknown as Navigation
+    const p = toPortfolio(snapshot({ contact, navigation }), BASE)
+    expect(p.contactLinks).toEqual([{ label: 'ok', chip: 'a', href: 'https://ok.dev' }])
+    expect(p.nav).toEqual([{ label: 'ok', href: '#work', newTab: false }])
+  })
+  it('falls back to the bundled spline scene', () => {
+    expect(toPortfolio(snapshot(), BASE).settings.splineSceneUrl).toBe('/spline/scene.splinecode')
+  })
+})
+
+describe('mediaUrl', () => {
+  it('is undefined for ids, null and missing urls', () => {
+    expect(mediaUrl(5, BASE)).toBeUndefined()
+    expect(mediaUrl(null, BASE)).toBeUndefined()
+    expect(mediaUrl({ id: 1, alt: '', url: null } as unknown as Media, BASE)).toBeUndefined()
+  })
+  it('resolves relative urls against the base', () => {
+    expect(mediaUrl({ id: 1, alt: '', url: '/api/media/file/a.png' } as unknown as Media, BASE)).toBe('http://cms.test/api/media/file/a.png')
+  })
+  it('returns undefined instead of throwing on a malformed url', () => {
+    expect(mediaUrl({ id: 1, alt: '', url: 'http://[bad' } as unknown as Media, BASE)).toBeUndefined()
   })
 })

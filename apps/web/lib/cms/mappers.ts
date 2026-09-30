@@ -52,8 +52,14 @@ export const toContentEntry = (c: Content): Entry => ({
 export const filterByDiscipline = (rows: Entry[], slug: string): Entry[] =>
   rows.filter((r) => r.disciplines.length === 0 || r.disciplines.includes(slug))
 
-const mediaUrl = (m: number | Media | null | undefined, base: string): string | undefined =>
-  m && typeof m === 'object' && m.url ? new URL(m.url, base).toString() : undefined
+export const mediaUrl = (m: number | Media | null | undefined, base: string): string | undefined => {
+  if (!m || typeof m !== 'object' || !m.url) return undefined
+  try {
+    return new URL(m.url, base).toString()
+  } catch {
+    return undefined
+  }
+}
 
 const toLinks = (c: Contact): LinkItem[] =>
   (c.links ?? []).flatMap((l) => {
