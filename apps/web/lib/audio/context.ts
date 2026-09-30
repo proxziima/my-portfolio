@@ -15,5 +15,10 @@ export function audioContext(): AudioContext | null {
 export function safely(play: (ctx: AudioContext) => void): void {
   const c = audioContext()
   if (!c) return
-  try { play(c) } catch { /* audio is decoration; never break the interaction */ }
+  const run = () => {
+    try { play(c) } catch { /* audio is decoration; never break the interaction */ }
+  }
+  // A suspended context has a frozen clock: schedule only once it is running, or the sound is lost.
+  if (c.state === 'suspended') c.resume().then(run, () => {})
+  else run()
 }

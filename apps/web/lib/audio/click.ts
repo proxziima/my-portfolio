@@ -2,6 +2,12 @@ import { safely } from './context'
 
 const LENGTH = 0.065
 const SEED = 42
+/**
+ * Output level. The reference's peak gains (.115 / .105) peak at about -30 dBFS once the bandpass has
+ * thinned the noise, which is barely audible on laptop speakers. ×12 (+21.6 dB) peaks near -8 / -10 dBFS.
+ */
+const CLICK_VOLUME = 12
+const PEAK_GAIN = { light: 0.115 * CLICK_VOLUME, dark: 0.105 * CLICK_VOLUME }
 
 type Direction = 'light' | 'dark'
 
@@ -28,7 +34,7 @@ export function playClick(to: Direction): void {
     bp.frequency.exponentialRampToValueAtTime(u * 0.74, n + LENGTH)
     bp.Q.setValueAtTime(0.72, n)
     g.gain.setValueAtTime(1e-4, n)
-    g.gain.exponentialRampToValueAtTime(to === 'light' ? 0.115 : 0.105, n + 0.002)
+    g.gain.exponentialRampToValueAtTime(PEAK_GAIN[to], n + 0.002)
     g.gain.exponentialRampToValueAtTime(1e-4, n + LENGTH)
     src.connect(bp).connect(g).connect(t.destination)
     src.start(n)
