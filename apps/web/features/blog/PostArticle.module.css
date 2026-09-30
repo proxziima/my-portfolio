@@ -1,0 +1,26 @@
+.header {
+  margin-bottom: 32px;
+}
+
+.title {
+  font-weight: 620;
+}
+
+.meta {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.excerpt {
+  margin: 16px 0 0;
+  color: var(--ink-soft);
+}
+
+.hero {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 32px;
+  border-radius: 6px;
+}

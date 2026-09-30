@@ -72,6 +72,7 @@
       "name": "web",
       "version": "0.1.0",
       "dependencies": {
+        "@payloadcms/richtext-lexical": "3.90.2",
         "@splinetool/react-spline": "^4.1.0",
         "@splinetool/runtime": "^2.0.62",
         "next": "16.3.4",

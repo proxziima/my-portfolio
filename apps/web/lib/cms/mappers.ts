@@ -1,10 +1,10 @@
 import type {
-  Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Profile, Project, SiteSetting,
+  Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Post, Profile, Project, SiteSetting,
 } from '@repo/cms-types'
 import { formatPeriod } from '@/lib/format/period'
 import { safeHref } from '@/shared/ui/chip-markup'
 import { bioParagraphs } from './bio-html'
-import type { Discipline, Entry, LinkItem, NavItem, Portfolio, Settings } from './types'
+import type { Discipline, Entry, LinkItem, NavItem, Portfolio, PostView, Settings } from './types'
 
 type Related = number | CmsDiscipline
 
@@ -107,5 +107,21 @@ export function toPortfolio(snap: CmsSnapshot, base: string): Portfolio {
     contactLinks: toLinks(snap.contact),
     nav: toNav(snap.navigation),
     settings: toSettings(snap.settings, base),
+  }
+}
+
+/** Reads only public fields: author names come from `populatedAuthors`, never from the (private) users. */
+export function toPostView(p: Post, base: string): PostView {
+  const hero = typeof p.heroImage === 'object' ? p.heroImage : null
+  const heroUrl = mediaUrl(hero, base)
+  return {
+    title: p.title,
+    slug: p.slug ?? '',
+    ...(p.excerpt ? { excerpt: p.excerpt } : {}),
+    content: p.content,
+    ...(p.publishedAt ? { publishedAt: p.publishedAt } : {}),
+    authors: (p.populatedAuthors ?? []).flatMap((a) => (a.name?.trim() ? [a.name.trim()] : [])),
+    ...(hero && heroUrl ? { heroImage: { url: heroUrl, alt: hero.alt } } : {}),
+    status: p._status === 'published' ? 'published' : 'draft',
   }
 }

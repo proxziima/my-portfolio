@@ -1,3 +1,5 @@
+import type { Post } from '@repo/cms-types'
+
 export type Side = 'left' | 'right'
 
 export interface CuriousNote { side: Side; text: string; formula?: string }
@@ -49,4 +51,17 @@ export interface Portfolio {
   contactLinks: LinkItem[]
   nav: NavItem[]
   settings: Settings
+}
+
+/** A blog post as the page renders it. Author names only: emails never leave the CMS mapper. */
+export interface PostView {
+  title: string
+  slug: string
+  excerpt?: string
+  /** Lexical editor state, rendered by features/blog/PostBody. */
+  content: Post['content']
+  publishedAt?: string
+  authors: string[]
+  heroImage?: { url: string; alt: string }
+  status: 'draft' | 'published'
 }
