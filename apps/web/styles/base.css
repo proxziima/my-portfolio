@@ -64,6 +64,14 @@ h1 {
   color: var(--ink-soft);
 }
 
+/* the role drum sits inline with the tail */
+h1 .what {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-height: 40px;
+}
+
 .what .tail {
   white-space: pre;
   padding-left: 9px;
