@@ -9,9 +9,11 @@ export interface PreviewUrlArgs {
   path?: string | null
 }
 
+const webBase = (webUrl: string | null | undefined) => webUrl?.trim().replace(/\/+$/, '')
+
 /** `${webUrl}/api/preview?path=…&previewSecret=…`, or `null` (button hidden) when any part is missing. */
 export const buildPreviewUrl = ({ webUrl, secret, path }: PreviewUrlArgs): string | null => {
-  const base = webUrl?.trim().replace(/\/+$/, '')
+  const base = webBase(webUrl)
   if (!base || !secret || !path) return null
   const params = new URLSearchParams({ path, previewSecret: secret })
   return `${base}/api/preview?${params.toString()}`
@@ -28,6 +30,17 @@ export const postPreviewPath = (slug: unknown): string | null =>
 export const postLivePreviewPath = (id: unknown): string | null => {
   const key = typeof id === 'number' ? String(id) : typeof id === 'string' ? id.trim() : ''
   return key ? `/blog/preview/${encodeURIComponent(key)}` : null
+}
+
+/**
+ * `${webUrl}/blog/preview/<id>`, loaded straight into the Live Preview iframe, or `null` (no iframe) before
+ * the post exists. No /api/preview hop and no secret: the page checks the admin session on every request,
+ * because a draft-mode cookie set inside the iframe doesn't survive.
+ */
+export const postLivePreviewUrl = ({ webUrl, id }: { webUrl?: string | null; id: unknown }): string | null => {
+  const base = webBase(webUrl)
+  const path = postLivePreviewPath(id)
+  return base && path ? `${base}${path}` : null
 }
 
 /** Device sizes in the Live Preview toolbar (Payload adds "Responsive" itself). */

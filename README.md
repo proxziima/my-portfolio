@@ -52,7 +52,7 @@ The CMS has a full blog (posts, nested categories, drafts, scheduled publish, SE
 
 - **Drafts.** Posts autosave after a ~2s pause in typing; **Save draft** saves right away. The slug follows the title (Payload's core slug field) until you unlock and edit it.
 - **Preview.** The post's **Preview** button opens `WEB_URL/api/preview?path=/blog/<slug>&previewSecret=…`. The web app checks the secret, verifies the editor through the forwarded `payload-token` cookie, enables draft mode and redirects to the post's public URL, `/blog/<slug>`.
-- **Live preview.** The **Live Preview** tab loads the same entry route with the stable path `/blog/preview/<id>`, so the iframe doesn't move while the slug changes. The page re-renders after every save; until the draft is saved it shows "This draft isn't saved yet" and recovers on the next save.
+- **Live preview.** The **Live Preview** tab loads `WEB_URL/blog/preview/<id>` directly: no `/api/preview` hop, no secret in the URL and no draft-mode cookie (the browser drops one set inside the iframe). The page authenticates every request with the admin's `payload-token` cookie, checked against the CMS, and is a 404 without a valid session. Keyed by id, the URL doesn't move while the slug follows the title. The page re-renders after every save; until the draft is saved it shows "This draft isn't saved yet" and recovers on the next save.
 
 Details, including the production cookie-domain requirement, are in [apps/payload/README.md](apps/payload/README.md).
 

@@ -6,14 +6,13 @@ import { titleSlugField } from '../fields/slug'
 import { populateAuthors } from '../hooks/populate-authors'
 import { populatePublishedAt } from '../hooks/populate-published-at'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
-import { buildPreviewUrl, postLivePreviewPath, postPreviewPath } from '../plugins/preview-url'
+import { buildPreviewUrl, postLivePreviewUrl, postPreviewPath } from '../plugins/preview-url'
 
 const AUTOSAVE_INTERVAL_MS = 2000
 
-// Both run on the server, so the secret never reaches the admin bundle. `null` (no path or env) hides
-// the Preview button and the Live Preview tab.
-const webPreviewUrl = (path: string | null) =>
-  buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path })
+// Runs on the server, so the secret never reaches the admin bundle. `null` (no slug or env) hides the button.
+const postPreviewUrl = (slug: unknown) =>
+  buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: postPreviewPath(slug) })
 
 // The SEO plugin (tabbedUI) appends an "SEO" tab with the `meta` group to the tabs below.
 export const Posts: CollectionConfig<'posts'> = {
@@ -22,12 +21,12 @@ export const Posts: CollectionConfig<'posts'> = {
     useAsTitle: 'title',
     defaultColumns: ['title', 'slug', '_status', 'publishedAt'],
     group: 'Blog',
-    // The button opens the post's public URL, /blog/<slug>.
-    preview: (doc) => webPreviewUrl(postPreviewPath(doc.slug)),
-    // The Live Preview iframe enters through the same draft-preview route, but keyed by id: `data` is the
-    // unsaved form, and its slug changes with every title keystroke before autosave stores it. Then
-    // `RefreshRouteOnSave` on the web page re-renders it after every save. Breakpoints live in payload.config.ts.
-    livePreview: { url: ({ data }) => webPreviewUrl(postLivePreviewPath(data?.id)) },
+    // The button enters draft mode through /api/preview and lands on the post's public URL, /blog/<slug>.
+    preview: (doc) => postPreviewUrl(doc.slug),
+    // The Live Preview iframe loads /blog/preview/<id> directly; the web page checks the admin session itself.
+    // Keyed by id: `data` is the unsaved form, whose slug changes with every title keystroke before autosave
+    // stores it. `RefreshRouteOnSave` on the page re-renders it after every save. Breakpoints: payload.config.ts.
+    livePreview: { url: ({ data }) => postLivePreviewUrl({ webUrl: process.env.WEB_URL, id: data?.id }) },
   },
   access: {
     read: publishedOrAuthenticated,

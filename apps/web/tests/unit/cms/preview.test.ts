@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Media, Post } from '@repo/cms-types'
 import { toPostView } from '@/lib/cms/mappers'
-import { getPreviewUser, isPreviewSecret, isSafePreviewPath, readCookie } from '@/lib/cms/preview'
+import { getEditor, getPreviewUser, isPreviewSecret, isSafePreviewPath, readCookie } from '@/lib/cms/preview'
 import { secretsMatch } from '@/lib/security/secrets'
 
 describe('isSafePreviewPath', () => {
@@ -80,6 +80,15 @@ describe('getPreviewUser', () => {
     expect(await getPreviewUser('payload-token=jwt')).toBeNull()
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED') }))
     expect(await getPreviewUser('payload-token=jwt')).toBeNull()
+  })
+  it('getEditor checks a bare token the same way, with a timeout, and skips the CMS without one', async () => {
+    const fetchMock = stubFetch({ user: { id: 2 } })
+    expect(await getEditor(undefined)).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(await getEditor('jwt')).toEqual({ id: '2' })
+    const [, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit]
+    expect(init).toMatchObject({ cache: 'no-store', headers: { cookie: 'payload-token=jwt' } })
+    expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 })
 

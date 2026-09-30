@@ -331,7 +331,7 @@ The scope covers:
 - `posts`, with:
   - drafts and autosave (debounced: it saves after a ~2s pause in typing, `interval: 2000`; a "Save draft" button saves right away)
   - a slug from Payload's core `slugField`, kept in sync with the title (formatted by our `formatSlug`) until the editor unlocks it
-  - draft preview at `/blog/<slug>` and live preview at `/blog/preview/<id>`, keyed by id so the iframe URL stays stable while the slug follows the title
+  - draft preview at `/blog/<slug>` and live preview at `/blog/preview/<id>`, keyed by id so the iframe URL stays stable while the slug follows the title, and authenticated by the admin's `payload-token` session on every request instead of draft mode (the iframe can't keep the draft-mode cookie)
   - scheduled publish via the jobs queue
   - published-only public reads
   - a Lexical editor with code, banner and media blocks

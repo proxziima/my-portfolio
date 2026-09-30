@@ -40,11 +40,10 @@ export function readCookie(cookieHeader: string | null | undefined, name: string
 export interface PreviewUser { id: string }
 
 /**
- * Asks the CMS who owns the admin session. Only the Payload token cookie is forwarded, never the
- * rest of the web app's cookies. Any failure (no cookie, CMS down, expired token) means "nobody".
+ * Asks the CMS who owns an admin session token. Only the Payload token cookie is forwarded, never the
+ * rest of the web app's cookies. Any failure (CMS down, expired or forged token) means "nobody".
  */
-export async function getPreviewUser(cookieHeader: string | null | undefined): Promise<PreviewUser | null> {
-  const token = readCookie(cookieHeader, PAYLOAD_TOKEN_COOKIE)
+export async function getEditor(token: string | undefined): Promise<PreviewUser | null> {
   if (!token) return null
   try {
     const res = await fetch(new URL('/api/users/me', cmsBaseUrl()), {
@@ -60,3 +59,7 @@ export async function getPreviewUser(cookieHeader: string | null | undefined): P
     return null
   }
 }
+
+/** The owner of the admin session in a raw `Cookie` header (see `getEditor`). */
+export const getPreviewUser = (cookieHeader: string | null | undefined): Promise<PreviewUser | null> =>
+  getEditor(readCookie(cookieHeader, PAYLOAD_TOKEN_COOKIE))

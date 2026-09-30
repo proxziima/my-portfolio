@@ -1,7 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Posts } from '@/collections/Posts'
-import { buildPreviewUrl, livePreviewBreakpoints, postLivePreviewPath, postPreviewPath } from '@/plugins/preview-url'
+import { buildPreviewUrl, livePreviewBreakpoints, postLivePreviewPath, postLivePreviewUrl, postPreviewPath } from '@/plugins/preview-url'
 
 describe('buildPreviewUrl', () => {
   it('points at the web preview route with an encoded path and secret', () => {
@@ -47,6 +47,19 @@ describe('postLivePreviewPath', () => {
   })
 })
 
+describe('postLivePreviewUrl', () => {
+  it('points straight at the id-keyed page on the web app', () => {
+    expect(postLivePreviewUrl({ webUrl: 'http://web.test/', id: 7 })).toBe('http://web.test/blog/preview/7')
+  })
+  it.each([
+    ['web url', { webUrl: undefined, id: 7 }],
+    ['blank web url', { webUrl: '  ', id: 7 }],
+    ['id', { webUrl: 'http://web.test', id: undefined }],
+  ])('returns null without a %s', (_, args) => {
+    expect(postLivePreviewUrl(args)).toBeNull()
+  })
+})
+
 describe('Posts admin.preview', () => {
   afterEach(() => vi.unstubAllEnvs())
 
@@ -84,24 +97,23 @@ describe('Posts admin.livePreview', () => {
     return url({ data, locale: { code: 'en', label: 'English' }, payload: {} as Payload, req: {} as PayloadRequest })
   }
 
-  it('loads the draft-preview entry route for the post id, not its slug', async () => {
+  it('loads the id-keyed page directly, without the /api/preview hop or the secret', async () => {
     vi.stubEnv('WEB_URL', 'http://web.test/')
     vi.stubEnv('PREVIEW_SECRET', 'test-secret')
-    expect(await livePreviewUrl({ id: 7, slug: 'first-post' })).toBe(
-      'http://web.test/api/preview?path=%2Fblog%2Fpreview%2F7&previewSecret=test-secret',
-    )
+    const url = await livePreviewUrl({ id: 7, slug: 'first-post' })
+    expect(url).toBe('http://web.test/blog/preview/7')
+    expect(url).not.toContain('previewSecret')
+    expect(url).not.toContain('test-secret')
   })
   it('keeps the same URL while the unsaved slug follows the title', async () => {
     vi.stubEnv('WEB_URL', 'http://web.test')
-    vi.stubEnv('PREVIEW_SECRET', 'test-secret')
     expect(await livePreviewUrl({ id: 7, slug: 't' })).toBe(await livePreviewUrl({ id: 7, slug: 'this-is' }))
   })
   it.each([
-    ['the post has no id yet', { slug: 'first-post' }, 'test-secret'],
-    ['the secret is not configured', { id: 7, slug: 'first-post' }, ''],
-  ])('is null (no iframe) when %s', async (_, data, secret) => {
-    vi.stubEnv('WEB_URL', 'http://web.test')
-    vi.stubEnv('PREVIEW_SECRET', secret)
+    ['the post has no id yet', { slug: 'first-post' }, 'http://web.test'],
+    ['WEB_URL is not configured', { id: 7, slug: 'first-post' }, ''],
+  ])('is null (no iframe) when %s', async (_, data, webUrl) => {
+    vi.stubEnv('WEB_URL', webUrl)
     expect(await livePreviewUrl(data)).toBeNull()
   })
 })
