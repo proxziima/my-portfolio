@@ -33,6 +33,7 @@ export interface Measurements {
 
 const GUTTER = 16, NOTE_W = 200, NOTE_OFFSET = 52, STAGGER = 35, FORMULA_STEP = 82, MIN_GAP = 20
 const SECTION_ORDER: SectionName[] = ['bio', 'figure', 'work', 'projects', 'content']
+const LIST_SECTIONS: SectionName[] = ['work', 'projects', 'content']
 
 /** A note's line box and where its leader sits in a line, mirroring `.note` (1.25rem Caveat, line-height 1.08, leader 0.65em). */
 const NOTE_LINE = 20 * 1.08, NOTE_LEADER = 20 * 0.65
@@ -92,10 +93,11 @@ export function computeGuides(m: Measurements, pageNotes: PageNotes, roleNotes: 
   note('right', m.main.top + 24, pageNotes.columnWidth.replaceAll('{w}', String(Math.round(colW))), 1)
   if (sw) note('right', sw.bottom + 14, pageNotes.wallSwitch, -0.8)
   if (role) pointAt('left', centreY(role), 'top', pageNotes.role, 1.1)
-  const work = m.sections.work
-  if (work) {
-    note('right', work.top - 42, pageNotes.sectionGap, 1.2)
-    note('left', work.top + 58, pageNotes.chips, -1)
+  // the first list on the page: a role can have no work, or no lists at all
+  const firstList = LIST_SECTIONS.map((s) => m.sections[s]).find(Boolean)
+  if (firstList) {
+    note('right', firstList.top - 42, pageNotes.sectionGap, 1.2)
+    note('left', firstList.top + 58, pageNotes.chips, -1)
   }
 
   if (m.figure) {

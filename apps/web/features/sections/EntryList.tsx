@@ -1,6 +1,6 @@
 'use client'
 import type { Entry } from '@/lib/cms/types'
-import { filterByDiscipline } from '@/lib/cms/mappers'
+import { filterByDiscipline } from '@/lib/cms/filter'
 import { useRole } from '@/features/role/RoleProvider'
 import { ChipLink } from '@/shared/ui/ChipLink'
 import { Section } from '@/shared/ui/Section'

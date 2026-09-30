@@ -6,7 +6,7 @@
 
 **Architecture:** `apps/payload` (package `cms`, port 3001) is a headless Payload 3 + SQLite CMS: collections for disciplines, experiences, projects, content; globals for profile, contact, navigation, site settings; MCP plugin. Types are generated into `packages/cms-types`. `apps/web` (Next 16, port 3000) fetches the CMS over REST in server components (tag `cms`, revalidated by a Payload hook), maps documents into view models, and renders client features (role drum + picker, word morph, wall switch, blowout, curious mode, Spline figure) that share state through small React contexts — no event bus.
 
-**Tech Stack:** Bun 1.3 workspaces, Turborepo 2.11, Next 16.3, React 19.2, TypeScript 7, CSS Modules, Payload 3.90 (SQLite, Lexical, plugin-mcp), Vitest 4, Playwright, `@splinetool/react-spline` 4.
+**Tech Stack:** Bun 1.3 workspaces, Turborepo 2.11, Next 16.3, React 19.2, TypeScript 7, CSS Modules, Payload 3.90 (SQLite, Lexical, plugin-mcp), Vitest 4, Playwright, `@splinetool/runtime` 2 (used directly, not through `@splinetool/react-spline`; see spec §6.8).
 
 **Spec:** `docs/superpowers/specs/2026-09-29-portfolio-rewrite-design.md` — read it first. QA findings Q1–Q6 are referenced below.
 

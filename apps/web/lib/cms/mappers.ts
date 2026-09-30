@@ -49,9 +49,6 @@ export const toContentEntry = (c: Content): Entry => ({
   disciplines: slugsOf(c.disciplines),
 })
 
-export const filterByDiscipline = (rows: Entry[], slug: string): Entry[] =>
-  rows.filter((r) => r.disciplines.length === 0 || r.disciplines.includes(slug))
-
 export const mediaUrl = (m: number | Media | null | undefined, base: string): string | undefined => {
   if (!m || typeof m !== 'object' || !m.url) return undefined
   try {

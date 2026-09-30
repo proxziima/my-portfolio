@@ -30,6 +30,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .guide {
+    animation-delay: 0ms;
+  }
+}
+
 /* lines */
 .rail {
   border-left: 1px dashed color-mix(in srgb, var(--accent) 42%, transparent);

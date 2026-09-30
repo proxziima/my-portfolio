@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
-import { filterByDiscipline, mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
+import { mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
 
 const discipline = { id: 1, slug: 'se', title: 'Software engineer', order: 1, level: 'LV 9', figureCaption: 'Fig. 1', bio: { root: { children: [] } }, curiousNotes: [{ id: 'n', side: 'left', text: 'x', formula: null }], updatedAt: '', createdAt: '' } as unknown as CmsDiscipline
 
@@ -15,14 +15,6 @@ describe('mappers', () => {
   it('maps a project', () => {
     const p = { id: 3, name: 'Sonda', chip: 'S', url: 'https://x.dev', summary: 'Sampler', disciplines: [], order: 1 } as unknown as Project
     expect(toProjectEntry(p)).toEqual({ id: '3', chip: 'S', label: 'Sonda', href: 'https://x.dev', meta: 'Sampler', disciplines: [] })
-  })
-  it('filters entries: empty disciplines means everywhere', () => {
-    const rows = [
-      { id: '1', chip: 'A', label: 'a', meta: '', disciplines: ['se'] },
-      { id: '2', chip: 'B', label: 'b', meta: '', disciplines: [] },
-      { id: '3', chip: 'C', label: 'c', meta: '', disciplines: ['ai'] },
-    ]
-    expect(filterByDiscipline(rows, 'se').map((r) => r.id)).toEqual(['1', '2'])
   })
 })
 

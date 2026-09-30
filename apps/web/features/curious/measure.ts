@@ -11,6 +11,8 @@ const rectOf = (anchor: string): PageRect | undefined => {
 
 /** Blocks whose vertical gaps get a marker, in page order. */
 const GAP_CHAIN = ['links', 'work', 'projects', 'content']
+/** How far the rails run past the end of `main`. */
+const DOC_TAIL = 40
 
 /**
  * Reads everything the guides hang off. Null while `main` has no width (not laid out yet, or hidden):
@@ -26,7 +28,8 @@ export function measure(): Measurements | null {
 
   return {
     main,
-    docHeight: Math.max(document.documentElement.scrollHeight, main.bottom + 40),
+    // not scrollHeight: the overlay itself inflates it, so the rails could only ever grow (the footer is in main)
+    docHeight: main.bottom + DOC_TAIL,
     sections: {
       bio: rectOf('bio'), figure: rectOf('figure'), work: rectOf('work'), projects: rectOf('projects'), content: rectOf('content'),
     },

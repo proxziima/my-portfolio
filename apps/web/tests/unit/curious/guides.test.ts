@@ -69,6 +69,16 @@ describe('computeGuides', () => {
     })
   })
 
+  it('hangs the list notes off the first list section present', () => {
+    const noWork = computeGuides({ ...m, sections: { projects: r(1264, 150), content: r(1500, 90) } }, notes, [])
+    expect(byText(noWork, 'g').top).toBe(1264 - 42)
+    expect(byText(noWork, 'c').top).toBe(1264 + 58)
+    const onlyContent = computeGuides({ ...m, sections: { content: r(1500, 90) } }, notes, [])
+    expect(byText(onlyContent, 'c').top).toBe(1500 + 58)
+    const none = computeGuides({ ...m, sections: {} }, notes, [])
+    expect(none.some((g) => g.label === 'g' || g.label === 'c')).toBe(false)
+  })
+
   it('gives every guide a unique key', () => {
     expect(new Set(guides.map((g) => g.key)).size).toBe(guides.length)
   })

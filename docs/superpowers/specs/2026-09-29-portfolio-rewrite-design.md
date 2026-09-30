@@ -129,7 +129,8 @@ app/
   api/revalidate/route.ts   POST, secret-checked, revalidateTag('cms')
   error.tsx, globals.css  (imports styles/tokens.css + styles/base.css)
 lib/
-  cms/     client.ts (typed fetch), queries.ts (getPortfolio), mappers.ts, bio-html.ts, types.ts (view models)
+  cms/     client.ts (typed fetch), queries.ts (getPortfolio), mappers.ts, filter.ts (client-safe
+           filterByDiscipline, so the lists don't pull in the mappers), bio-html.ts, types.ts (view models)
   audio/   context.ts (lazy shared AudioContext), click.ts, bulb.ts, thud.ts, poof.ts
   dom/     page-rect.ts, reduced-motion.ts (usePrefersReducedMotion)
   format/  period.ts ("2021–23", "2023–")
@@ -140,9 +141,10 @@ features/
   theme/     ThemeProvider, ThemeScript, theme-storage.ts, transition.ts, WallSwitch/{WallSwitch,useRocker,rocker-atlas.ts}
   blowout/   useBlowout (click window + flicker level), physics.ts (pure), sequence.ts (DOM choreography), Blowout.module.css
   curious/   CuriousProvider, CuriousToggle (delegated inside the bio), CuriousOverlay, guides.ts (pure measure→guides), useSelfHealingLayout
-  figure/    Figure (caption + lazy SplineScene), SplineScene (client, next/dynamic ssr:false)
+  figure/    Figure (caption + lazy SplineScene), SplineScene (client, next/dynamic ssr:false;
+             `@splinetool/runtime` directly with the WebGL renderer, see §6.8)
   sections/  EntryList (generic chip/title/meta/aside row), WorkSection, ProjectsSection, ContentSection, ContactLinks, FooterNav
-shared/ui/   Chip, ChipLink, Section
+shared/ui/   Chip, ChipLink, Section, motion.module.css (the shared `enter` entrance, composed by lists and caption)
 styles/      tokens.css (light/dark palette, 3-state theme selectors, metrics), base.css
 ```
 
@@ -226,8 +228,13 @@ properties. Components use the tokens and never hard-code these values.
    the current discipline. When the role changes, the lists cross-fade (opacity
    and blur, ~240ms), so all text on the page moves with the role. The Content
    section renders only when it has entries.
-8. **Figure (Spline).** The three.js plate is replaced by a
-   `@splinetool/react-spline` scene. The scene URL comes from
+8. **Figure (Spline).** The three.js plate is replaced by a Spline scene,
+   driven through `@splinetool/runtime`'s `Application` directly with
+   `renderer: 'webgl'`, not through `@splinetool/react-spline`: the wrapper
+   can't select the renderer (on the auto-selected WebGPU pipeline this scene
+   logs validation errors and drops draws) and has no error callback (it
+   rethrows a failed load during render), so the figure couldn't collapse to
+   its caption. The scene URL comes from
    `site-settings.figure.splineSceneUrl`; `public/spline/scene.splinecode` is
    the default when that field is empty. The scene is lazy-mounted when near
    the viewport and loaded client-only. A skeleton frame of the same height
