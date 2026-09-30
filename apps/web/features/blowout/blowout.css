@@ -129,4 +129,14 @@
   .bo-veil {
     transition: none;
   }
+
+  /* the template keeps these two fades under reduced motion: win over the global
+     0.01ms rule in styles/base.css for exactly these transitions */
+  .bo-fall.out {
+    transition-duration: 0.5s !important;
+  }
+
+  :root[data-blackout] main > :not([data-anchor='switch']) {
+    transition-duration: 0.5s !important;
+  }
 }

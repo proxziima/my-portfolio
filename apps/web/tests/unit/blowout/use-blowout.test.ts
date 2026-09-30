@@ -85,6 +85,23 @@ describe('useBlowout', () => {
     expect(leftovers()).toBe(0)
   })
 
+  it('frees the switch and puts the room back when the sequence fails to start', async () => {
+    html.setAttribute('data-theme', 'light')
+    mount()
+    const switchEl = document.querySelector<HTMLElement>('[data-anchor="switch"]')!
+    vi.spyOn(switchEl, 'cloneNode').mockImplementation(() => { throw new Error('boom') })
+    click(10)
+    await act(async () => {})
+    expect(api.isActive()).toBe(false)
+    expect(leftovers()).toBe(0)
+    expect(switchEl.style.opacity).toBe('')
+    expect(html.getAttribute('data-theme')).toBe('light')
+    expect(html.hasAttribute('data-blackout')).toBe(false)
+    vi.mocked(switchEl.cloneNode).mockRestore()
+    click(10)
+    expect(api.isActive()).toBe(true)
+  })
+
   it('removes every leftover when unmounted mid-sequence', async () => {
     html.setAttribute('data-theme', 'light')
     mount()

@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { preloadBulb } from '@/lib/audio/bulb'
 import { createClickWindow } from './click-window'
 import { runBlowout } from './sequence'
@@ -12,7 +12,7 @@ const FLICKER_MS = 420
  * The consumer imports `blowout.css` (global: the sequence creates its elements imperatively).
  */
 export function useBlowout(switchRef: RefObject<HTMLElement | null>, reduce: boolean) {
-  const clicks = useRef(createClickWindow())
+  const [clicks] = useState(createClickWindow)
   const active = useRef(false)
   const run = useRef<AbortController | null>(null)
   const flickerTimer = useRef(0)
@@ -28,7 +28,7 @@ export function useBlowout(switchRef: RefObject<HTMLElement | null>, reduce: boo
   const register = useCallback(() => {
     const switchEl = switchRef.current
     if (active.current || !switchEl) return
-    const result = clicks.current.register(performance.now())
+    const result = clicks.register(performance.now())
     // from the 2nd fast click on, so a failed decode gets another go (the reference retries too)
     if (result.kind === 'preload' || result.kind === 'flicker') preloadBulb()
     if (result.kind === 'flicker') flicker(result.level)
@@ -36,11 +36,19 @@ export function useBlowout(switchRef: RefObject<HTMLElement | null>, reduce: boo
     active.current = true
     const controller = new AbortController()
     run.current = controller
-    void runBlowout({ switchEl, reduce, signal: controller.signal }).finally(() => {
+    const done = () => {
       if (run.current === controller) run.current = null
       active.current = false
-    })
-  }, [switchRef, reduce, flicker])
+    }
+    let sequence: Promise<void>
+    try {
+      sequence = runBlowout({ switchEl, reduce, signal: controller.signal })
+    } catch (error) {
+      sequence = Promise.reject(error)
+    }
+    // the blowout is decoration: a failure puts the room back (runBlowout does) and frees the switch
+    void sequence.catch(() => {}).finally(done)
+  }, [switchRef, clicks, reduce, flicker])
 
   // unmounting mid-sequence still removes every leftover and puts the room back
   useEffect(() => () => {

@@ -5,7 +5,7 @@ import { playThud } from '@/lib/audio/thud'
 import { applyTheme, explicitTheme } from '@/features/theme/theme-dom'
 import { stepBody, stepShard, type Body } from './physics'
 import { createScope, type Scope } from './scope'
-import { detachGhost, fadeShards, overlay, placeGhost, placeShard, puff, remount, restoreSwitch, spawnShards, type ShardEl } from './sequence-dom'
+import { detachGhost, fadeShards, overlay, placeGhost, placeShard, puff, remount, restoreSwitch, spawnShards, type Point, type ShardEl } from './sequence-dom'
 
 const RECOVER_AT_MS = 3300
 const PHYSICS_MS = 3600
@@ -21,7 +21,10 @@ interface RunOptions {
   signal?: AbortSignal
 }
 
-/** Resolves once everything it created is gone (about 4.8s, or right away when aborted). */
+/**
+ * Resolves once everything it created is gone (about 4.8s, or right away when aborted).
+ * Rejects, with the room already put back, if the setup throws.
+ */
 export function runBlowout({ switchEl, reduce, signal }: RunOptions): Promise<void> {
   if (signal?.aborted) return Promise.resolve()
   const root = document.documentElement
@@ -37,18 +40,17 @@ export function runBlowout({ switchEl, reduce, signal }: RunOptions): Promise<vo
     applyTheme(previous, false)
   }
 
-  // the bulb goes
-  playBulb()
-  const flash = overlay(scope, 'bo-flash', center)
-  const veil = overlay(scope, 'bo-veil', center)
-  applyTheme('dark', false)
-  root.setAttribute('data-blackout', '')
-  scope.frame(() => { flash.classList.add('in'); veil.classList.add('in') })
-
-  // the switch comes off the wall, and the glass with it
-  const ghost = detachGhost(scope, switchEl, rect)
-  const shards = reduce ? [] : spawnShards(scope, center)
-  simulate(scope, ghost, shards, rect, reduce)
+  // a setup that throws half-way must not leave the room dark and the switch hidden
+  let stage: Stage
+  try {
+    stage = blackout(scope, switchEl, rect, center, reduce)
+  } catch (error) {
+    scope.dispose()
+    restoreSwitch(switchEl)
+    restoreRoom()
+    return Promise.reject(error)
+  }
+  const { veil, ghost, shards } = stage
 
   return new Promise((resolve) => {
     const finish = () => {
@@ -71,6 +73,22 @@ export function runBlowout({ switchEl, reduce, signal }: RunOptions): Promise<vo
       scope.later(finish, CLEANUP_MS)
     }, RECOVER_AT_MS)
   })
+}
+
+interface Stage { veil: HTMLElement; ghost: HTMLElement; shards: ShardEl[] }
+
+/** The bulb goes, the dark closes in, and the switch comes off the wall with the glass. */
+function blackout(scope: Scope, switchEl: HTMLElement, rect: DOMRect, center: Point, reduce: boolean): Stage {
+  playBulb()
+  const flash = overlay(scope, 'bo-flash', center)
+  const veil = overlay(scope, 'bo-veil', center)
+  applyTheme('dark', false)
+  document.documentElement.setAttribute('data-blackout', '')
+  scope.frame(() => { flash.classList.add('in'); veil.classList.add('in') })
+  const ghost = detachGhost(scope, switchEl, rect)
+  const shards = reduce ? [] : spawnShards(scope, center)
+  simulate(scope, ghost, shards, rect, reduce)
+  return { veil, ghost, shards }
 }
 
 /** Real physics for the ghost and the shards, for 3.6s; under reduced motion the ghost just lies on the floor. */

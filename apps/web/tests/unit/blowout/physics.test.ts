@@ -22,6 +22,12 @@ describe('stepBody', () => {
     const hard = stepBody(body({ y: 800, vy: 5000 }), 0.001, bounds, () => 0.5)
     expect(hard.impact).toBe(1)
   })
+  it('keeps 72% of vx on a bounce and 82% while sliding', () => {
+    const bounce = stepBody(body({ y: 800, vy: 800, vx: 100 }), 0.001, bounds, () => 0.5)
+    expect(bounce.body.vx).toBeCloseTo(72)
+    const slide = stepBody(body({ y: 800, vy: 10, vx: 100 }), 0.001, bounds, () => 0.5)
+    expect(slide.body.vx).toBeCloseTo(82)
+  })
   it('bounces off walls at half speed', () => {
     const { body: b } = stepBody(body({ x: 0, vx: -100 }), 0.001, bounds, () => 0.5)
     expect(b.x).toBe(2)
