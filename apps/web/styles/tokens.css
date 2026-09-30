@@ -1,0 +1,90 @@
+/* Design tokens. Values measured from the reference site (docs/template-portfolio/CONTEXT.md §3).
+   Theme has three states: light (default), OS dark (unless the user forced light), forced dark. */
+
+:root {
+  /* palette: light */
+  --paper: #fbfaf7;
+  --ink: #171716;
+  --ink-link: #292927;
+  --ink-soft: #686863;
+  --rule: #c4c4be;
+  --rule-soft: #e4e2dc;
+  --chip: #edebe5;
+  --accent: #3155ff;
+  --glow-a: rgba(255, 255, 255, 0.76);
+  --glow-b: rgba(176, 142, 91, 0.06);
+  --glow-c: rgba(55, 52, 45, 0.035);
+  --wall-contact: #26221c5c;
+  --wall-cast: #312c2421;
+  --flick: rgba(0, 0, 0, 0.28);
+  color-scheme: light;
+
+  /* metrics */
+  --column: 600px;
+  --gutter: 16px;
+  --section-gap: 64px;
+  --body-size: 15px;
+  --body-line: 24px;
+  --h1-size: 28px;
+  --chip-size: 16px;
+  --row-gap: 14px;
+  --underline: 2px;
+  --underline-offset: 2.7px;
+  --picker-row: 42px;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 0.84, 0.26, 1);
+  --ease-snap: cubic-bezier(0.2, 0.9, 0.25, 1);
+  --theme-fade: 380ms;
+
+  /* Colour transition, off by default. Anything that sets a colour uses
+     `transition: var(--theme-transition)` (or appends it to its own list). */
+  --theme-transition: color 0s;
+}
+
+/* palette: dark, following the OS unless the user forced light */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #141513;
+    --ink: #f0efea;
+    --ink-link: #e2e1db;
+    --ink-soft: #9a9a93;
+    --rule: #3e3e38;
+    --rule-soft: #2a2a26;
+    --chip: #26261f;
+    --accent: #8fa4ff;
+    --glow-a: rgba(255, 255, 255, 0.035);
+    --glow-b: rgba(176, 142, 91, 0.07);
+    --glow-c: rgba(0, 0, 0, 0.25);
+    --wall-contact: #00000085;
+    --wall-cast: #00000038;
+    --flick: rgba(255, 236, 200, 0.1);
+    color-scheme: dark;
+  }
+}
+
+/* palette: dark, forced (same values, so an explicit choice always wins) */
+:root[data-theme='dark'] {
+  --paper: #141513;
+  --ink: #f0efea;
+  --ink-link: #e2e1db;
+  --ink-soft: #9a9a93;
+  --rule: #3e3e38;
+  --rule-soft: #2a2a26;
+  --chip: #26261f;
+  --accent: #8fa4ff;
+  --glow-a: rgba(255, 255, 255, 0.035);
+  --glow-b: rgba(176, 142, 91, 0.07);
+  --glow-c: rgba(0, 0, 0, 0.25);
+  --wall-contact: #00000085;
+  --wall-cast: #00000038;
+  --flick: rgba(255, 236, 200, 0.1);
+  color-scheme: dark;
+}
+
+/* set for ~380ms around a theme change by stampThemeTransition() */
+:root[data-theme-transition] {
+  --theme-transition:
+    color 0.38s ease, background-color 0.38s ease, border-color 0.38s ease,
+    text-decoration-color 0.38s ease, box-shadow 0.38s ease;
+}
