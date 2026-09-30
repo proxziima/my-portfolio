@@ -1,0 +1,164 @@
+/* Curious mode (template globals.css, "curious mode"). Positions come from guides.ts in page
+   coordinates, so the overlay spans the document from its top-left corner. */
+
+.overlay {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: clip;
+  opacity: 0;
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.overlay[data-visible='true'] {
+  opacity: 1;
+}
+
+.guide {
+  display: block;
+  position: absolute;
+  color: var(--accent);
+  transform: rotate(var(--note-rotation, 0deg));
+  animation: guideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) var(--guide-delay, 0ms) both;
+}
+
+@keyframes guideIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) rotate(var(--note-rotation, 0deg));
+  }
+}
+
+/* lines */
+.rail {
+  border-left: 1px dashed color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.width,
+.section {
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 46%, transparent);
+}
+
+.width::before,
+.width::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  width: 1px;
+  height: 7px;
+  background: currentColor;
+}
+
+.width::before { left: 0; }
+.width::after { right: 0; }
+
+.gap {
+  width: 0;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.gap::before,
+.gap::after {
+  content: '';
+  position: absolute;
+  left: -3px;
+  width: 7px;
+  height: 1px;
+  background: currentColor;
+}
+
+.gap::before { top: 0; }
+.gap::after { bottom: 0; }
+
+/* measurement labels: monospace tags sitting on the lines */
+.label {
+  position: absolute;
+  padding: 0.12em 0.28em;
+  background: var(--paper);
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.width .label { left: 50%; top: -8.8px; transform: translateX(-50%); }
+.section .label { left: 8px; top: -6px; transform: translateY(-100%); }
+.gap .label { left: -8px; top: 50%; transform: translate(-100%, -50%); }
+
+/* handwritten notes, with a small leader pointing at the column */
+.note,
+.formula {
+  width: 12.5rem;
+  color: color-mix(in srgb, var(--ink-soft) 82%, var(--accent));
+  font-family: var(--font-caveat), Caveat, 'Segoe Print', cursive;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: 0.005em;
+  white-space: pre-line;
+}
+
+.note .label,
+.formula .label {
+  position: static;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  white-space: inherit;
+}
+
+.formula {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.note::before,
+.note::after,
+.formula::before,
+.formula::after {
+  content: '';
+  position: absolute;
+  top: 0.65em;
+  height: 1.5px;
+  background: color-mix(in srgb, var(--accent) 58%, transparent);
+}
+
+.note::before,
+.formula::before { width: 1.1rem; }
+
+.note::after,
+.formula::after {
+  width: 0.4rem;
+  transform: rotate(68deg);
+  transform-origin: 50% center;
+}
+
+.guide[data-side='right']::before { right: calc(100% + 0.55rem); }
+.guide[data-side='right']::after { right: calc(100% + 1.5rem); }
+.guide[data-side='left'] { text-align: right; }
+.guide[data-side='left']::before { left: calc(100% + 0.55rem); }
+.guide[data-side='left']::after { left: calc(100% + 1.5rem); }
+
+.fm {
+  display: block;
+  margin-top: 0.15em;
+  color: var(--accent);
+  font-family: 'Times New Roman', Georgia, serif;
+  font-size: 1.02rem;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+@media (max-width: 1040px) {
+  .note,
+  .formula {
+    display: none;
+  }
+}
