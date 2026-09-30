@@ -14,6 +14,7 @@ import { Contact } from './globals/Contact'
 import { Navigation } from './globals/Navigation'
 import { Profile } from './globals/Profile'
 import { SiteSettings } from './globals/SiteSettings'
+import { portfolioMcp } from './mcp/mcp-plugin'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -23,6 +24,7 @@ export default buildConfig({
   globals: [Profile, Contact, Navigation, SiteSettings],
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URL ?? '' } }),
   editor: lexicalEditor(),
+  plugins: [portfolioMcp],
   secret: process.env.PAYLOAD_SECRET ?? '',
   sharp,
   typescript: {
