@@ -19,11 +19,17 @@ import { Profile } from './globals/Profile'
 import { SiteSettings } from './globals/SiteSettings'
 import { portfolioMcp } from './mcp/mcp-plugin'
 import { blogPlugins } from './plugins/blog-plugins'
+import { livePreviewBreakpoints } from './plugins/preview-url'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default buildConfig({
-  admin: { user: Users.slug, importMap: { baseDir: dirname } },
+  admin: {
+    user: Users.slug,
+    importMap: { baseDir: dirname },
+    // Shared by every collection that sets `admin.livePreview.url` (today: posts).
+    livePreview: { breakpoints: livePreviewBreakpoints },
+  },
   collections: [Disciplines, Experiences, Projects, Content, Posts, Categories, Media, Users],
   globals: [Profile, Contact, Navigation, SiteSettings],
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URL ?? '' } }),

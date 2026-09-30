@@ -20,3 +20,10 @@ export const buildPreviewUrl = ({ webUrl, secret, path }: PreviewUrlArgs): strin
 /** "/blog/<slug>", or `null` while the post has no slug yet. */
 export const postPreviewPath = (slug: unknown): string | null =>
   typeof slug === 'string' && slug.trim() ? `/blog/${encodeURIComponent(slug.trim())}` : null
+
+/** Device sizes in the Live Preview toolbar (Payload adds "Responsive" itself). */
+export const livePreviewBreakpoints = [
+  { name: 'mobile', label: 'Mobile', width: 375, height: 667 },
+  { name: 'tablet', label: 'Tablet', width: 768, height: 1024 },
+  { name: 'desktop', label: 'Desktop', width: 1440, height: 900 },
+]

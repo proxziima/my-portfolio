@@ -1,7 +1,7 @@
-import type { PayloadRequest } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Posts } from '@/collections/Posts'
-import { buildPreviewUrl, postPreviewPath } from '@/plugins/preview-url'
+import { buildPreviewUrl, livePreviewBreakpoints, postPreviewPath } from '@/plugins/preview-url'
 
 describe('buildPreviewUrl', () => {
   it('points at the web preview route with an encoded path and secret', () => {
@@ -58,5 +58,48 @@ describe('Posts admin.preview', () => {
     vi.stubEnv('WEB_URL', 'http://web.test')
     vi.stubEnv('PREVIEW_SECRET', '')
     expect(await preview({ slug: 'first-post' })).toBeNull()
+  })
+})
+
+describe('Posts admin.livePreview', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  const livePreviewUrl = (data: Record<string, unknown>) => {
+    const url = Posts.admin?.livePreview?.url
+    if (typeof url !== 'function') throw new Error('Posts.admin.livePreview.url is not a function')
+    return url({ data, locale: { code: 'en', label: 'English' }, payload: {} as Payload, req: {} as PayloadRequest })
+  }
+
+  it('loads the draft-preview entry route for the post in the iframe', async () => {
+    vi.stubEnv('WEB_URL', 'http://web.test/')
+    vi.stubEnv('PREVIEW_SECRET', 'test-secret')
+    expect(await livePreviewUrl({ slug: 'first-post' })).toBe(
+      'http://web.test/api/preview?path=%2Fblog%2Ffirst-post&previewSecret=test-secret',
+    )
+  })
+  it('matches the Preview button URL', async () => {
+    vi.stubEnv('WEB_URL', 'http://web.test')
+    vi.stubEnv('PREVIEW_SECRET', 'test-secret')
+    const preview = Posts.admin?.preview
+    const doc = { slug: 'same' }
+    expect(await livePreviewUrl(doc)).toBe(await preview?.(doc, { locale: 'en', req: {} as PayloadRequest, token: null }))
+  })
+  it.each([
+    ['the post has no slug yet', { slug: '' }, 'test-secret'],
+    ['the secret is not configured', { slug: 'first-post' }, ''],
+  ])('is null (no iframe) when %s', async (_, data, secret) => {
+    vi.stubEnv('WEB_URL', 'http://web.test')
+    vi.stubEnv('PREVIEW_SECRET', secret)
+    expect(await livePreviewUrl(data)).toBeNull()
+  })
+})
+
+describe('livePreviewBreakpoints', () => {
+  it('offers mobile, tablet and desktop sizes', () => {
+    expect(livePreviewBreakpoints.map(({ name, width, height }) => [name, width, height])).toEqual([
+      ['mobile', 375, 667],
+      ['tablet', 768, 1024],
+      ['desktop', 1440, 900],
+    ])
   })
 })

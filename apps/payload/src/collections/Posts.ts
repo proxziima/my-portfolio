@@ -8,6 +8,11 @@ import { populatePublishedAt } from '../hooks/populate-published-at'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
 import { buildPreviewUrl, postPreviewPath } from '../plugins/preview-url'
 
+// Both run on the server, so the secret never reaches the admin bundle. `null` (no slug or env) hides
+// the Preview button and the Live Preview tab.
+const postPreviewUrl = (slug: unknown) =>
+  buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: postPreviewPath(slug) })
+
 // The SEO plugin (tabbedUI) appends an "SEO" tab with the `meta` group to the tabs below.
 export const Posts: CollectionConfig<'posts'> = {
   slug: 'posts',
@@ -15,9 +20,10 @@ export const Posts: CollectionConfig<'posts'> = {
     useAsTitle: 'title',
     defaultColumns: ['title', 'slug', '_status', 'publishedAt'],
     group: 'Blog',
-    // Runs on the server, so the secret never reaches the admin bundle. `null` (no slug or env) hides the button.
-    preview: (doc) =>
-      buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: postPreviewPath(doc.slug) }),
+    preview: (doc) => postPreviewUrl(doc.slug),
+    // The Live Preview iframe enters through the same draft-preview route, then `RefreshRouteOnSave` on
+    // the web page re-renders it after every autosave. Breakpoints live in payload.config.ts.
+    livePreview: { url: ({ data }) => postPreviewUrl(data.slug) },
   },
   access: {
     read: publishedOrAuthenticated,
@@ -33,6 +39,7 @@ export const Posts: CollectionConfig<'posts'> = {
     afterRead: [populateAuthors],
   },
   versions: {
+    // A 100ms autosave keeps Live Preview close to real time; each save triggers one draft re-render on the web.
     drafts: { autosave: { interval: 100 }, schedulePublish: true },
     maxPerDoc: 50,
   },
