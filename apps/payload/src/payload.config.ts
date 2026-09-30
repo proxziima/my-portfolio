@@ -19,6 +19,7 @@ import { Navigation } from './globals/Navigation'
 import { Profile } from './globals/Profile'
 import { SiteSettings } from './globals/SiteSettings'
 import { portfolioMcp } from './mcp/mcp-plugin'
+import { migrations } from './migrations'
 import { blogPlugins } from './plugins/blog-plugins'
 import { livePreviewBreakpoints } from './plugins/preview-url'
 
@@ -35,7 +36,10 @@ export default buildConfig({
   globals: [Profile, Contact, Navigation, SiteSettings],
   // The web origin loads uploads (the Spline scene) from the browser, so file responses need CORS.
   cors: process.env.WEB_URL ? [process.env.WEB_URL] : [],
-  db: sqliteAdapter({ client: { url: process.env.DATABASE_URL ?? '' } }),
+  // Development pushes the schema on start; production (NODE_ENV=production) never pushes and runs any
+  // pending migration from src/migrations instead. After a schema change, create one before deploying:
+  // `bun run --cwd apps/payload payload migrate:create <name>`.
+  db: sqliteAdapter({ client: { url: process.env.DATABASE_URL ?? '' }, prodMigrations: migrations }),
   editor: lexicalEditor(),
   // Runs the queue that scheduled publishing writes to. Needs a long-running server (not serverless).
   jobs: { autoRun: [{ cron: '* * * * *', queue: 'default' }], access: { run: canRunJobs } },

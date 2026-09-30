@@ -7,6 +7,12 @@ declare global {
       WEB_URL?: string
       REVALIDATE_SECRET?: string
       CRON_SECRET?: string
+      PREVIEW_SECRET?: string
+      /** Parent domain for the admin cookie in production, e.g. `.example.com`. */
+      COOKIE_DOMAIN?: string
+      /** Upload directories; default to `public/media` and `public/scenes` in the app. */
+      MEDIA_DIR?: string
+      SCENES_DIR?: string
     }
   }
 }

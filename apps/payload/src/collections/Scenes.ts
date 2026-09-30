@@ -1,11 +1,8 @@
 import type { CollectionConfig } from 'payload'
-import path from 'path'
-import { fileURLToPath } from 'url'
 import { publicContentAccess } from '../access/public-read'
 import { requireSplineFile } from '../hooks/require-spline-file'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
-
-const dirname = path.dirname(fileURLToPath(import.meta.url))
+import { uploadStaticDir } from '../uploads/static-dir'
 
 /**
  * Spline exports for the desk figure, picked in Site settings → Figure → Scene.
@@ -24,7 +21,7 @@ export const Scenes: CollectionConfig = {
     { name: 'notes', type: 'textarea' },
   ],
   upload: {
-    staticDir: path.resolve(dirname, '../../public/scenes'),
+    staticDir: uploadStaticDir('SCENES_DIR', 'scenes'),
     // Image-only tools: hide them for binaries.
     crop: false,
     focalPoint: false,

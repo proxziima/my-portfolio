@@ -15,7 +15,16 @@ export const Users: CollectionConfig = {
     defaultColumns: ['name', 'email'],
     useAsTitle: 'name',
   },
-  auth: true,
+  auth: {
+    // Unset in development, so the defaults hold (host-only cookie, SameSite=Lax, not Secure). In
+    // production `COOKIE_DOMAIN=.example.com` shares the admin session with the web app on the parent
+    // domain, which draft preview and live preview need; Secure means the admin must be served over HTTPS.
+    cookies: {
+      domain: process.env.COOKIE_DOMAIN || undefined,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax',
+    },
+  },
   fields: [
     {
       name: 'name',
