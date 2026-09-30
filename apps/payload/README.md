@@ -39,7 +39,7 @@ Access: public `read` on all portfolio collections and globals; writes need an a
 
 ## Blog
 
-The CMS is ready to author a blog (following Payload's [website/blog guide](https://payloadcms.com/posts/blog/how-to-build-a-website-blog-or-portfolio-with-nextjs)). The web app does not read posts yet.
+The CMS is ready to author a blog (following Payload's [website/blog guide](https://payloadcms.com/posts/blog/how-to-build-a-website-blog-or-portfolio-with-nextjs)). The public blog is not launched yet: the web app renders posts only as draft previews for signed-in editors.
 
 | Slug | Fields |
 |---|---|
@@ -54,6 +54,7 @@ The CMS is ready to author a blog (following Payload's [website/blog guide](http
 - **Authors:** `users` is private, so post responses expose author names through `populatedAuthors`, never emails.
 - **SEO:** the generated title is `<post title> | <profile name>` and the URL is `WEB_URL/blog/<slug>`.
 - Posts, categories, search and redirects are not exposed over MCP.
+- **Preview:** the post editor's **Preview** button opens `WEB_URL/api/preview?path=/blog/<slug>&previewSecret=…` (built in `src/plugins/preview-url.ts`; hidden until the post has a slug and `WEB_URL` + `PREVIEW_SECRET` are set). The web app checks the secret, verifies you through your `payload-token` admin cookie (cookies are per host, not per port, so the localhost cookie reaches the web app), enables Next draft mode and shows the latest draft at `/blog/<slug>`. `PREVIEW_SECRET` must match in `apps/payload/.env` and `apps/web/.env.local`. Exit through the banner link (`/api/exit-preview`). Without draft mode, `/blog/*` is a 404.
 
 ## MCP
 

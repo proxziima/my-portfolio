@@ -6,11 +6,19 @@ import { slugField } from '../fields/slug'
 import { populateAuthors } from '../hooks/populate-authors'
 import { populatePublishedAt } from '../hooks/populate-published-at'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
+import { buildPreviewUrl, postPreviewPath } from '../plugins/preview-url'
 
 // The SEO plugin (tabbedUI) appends an "SEO" tab with the `meta` group to the tabs below.
 export const Posts: CollectionConfig<'posts'> = {
   slug: 'posts',
-  admin: { useAsTitle: 'title', defaultColumns: ['title', 'slug', '_status', 'publishedAt'], group: 'Blog' },
+  admin: {
+    useAsTitle: 'title',
+    defaultColumns: ['title', 'slug', '_status', 'publishedAt'],
+    group: 'Blog',
+    // Runs on the server, so the secret never reaches the admin bundle. `null` (no slug or env) hides the button.
+    preview: (doc) =>
+      buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: postPreviewPath(doc.slug) }),
+  },
   access: {
     read: publishedOrAuthenticated,
     readVersions: authenticated,
