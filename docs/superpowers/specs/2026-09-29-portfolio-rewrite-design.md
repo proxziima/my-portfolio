@@ -302,3 +302,19 @@ properties. Components use the tokens and never hard-code these values.
    no header.
 8. **Package name.** `apps/payload` becomes the `cms` package.
 9. **Role persistence.** Kept (localStorage + hash), applied before paint (Q4).
+
+## 11. Addendum (2026-09-30): Blog, CMS only
+
+The user asked for the Payload blog feature to be ready, following Payload's "How to build a website, blog or portfolio with Next.js" guide. The blog is not linked to the portfolio yet.
+
+The scope covers:
+- `posts`, with:
+  - drafts and autosave
+  - scheduled publish via the jobs queue
+  - published-only public reads
+  - a Lexical editor with code, banner and media blocks
+  - categories, authors (names only, never emails), related posts and `publishedAt`
+- nested `categories`
+- plugins: SEO (posts), search (posts) and redirects (posts)
+
+The database changes must be additive only, and the database is backed up first. No content is written. MCP is not extended; the user paused that work. See plan Task 27.

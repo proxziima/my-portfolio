@@ -3321,3 +3321,86 @@ test.describe('without javascript', () => {
 - [ ] **Step 1:** From the repo root: `bun run check-types`, `bun run lint`, `bun run --cwd apps/web test`, `bun run --cwd apps/payload test:int`, and `bun run build`. All must pass. Paste the outputs in the report.
 - [ ] **Step 2:** Update the root `README.md` with a short architecture section (apps, ports, `bun run dev`, the seed, MCP), linking the spec.
 - [ ] **Step 3:** Commit `docs: architecture and runbook`.
+
+---
+
+# Phase E — Blog (CMS only, added 2026-09-30 at the user's request)
+
+### Task 27: Payload blog feature (not linked to the web yet)
+
+**Goal:** the CMS is fully ready to author a blog, following https://payloadcms.com/posts/blog/how-to-build-a-website-blog-or-portfolio-with-nextjs. The web app does **not** consume posts yet.
+
+**Reference (read it, don't copy it wholesale):** the website template this repo started from. It is in git history at commit `13f5468`, and `git show 13f5468:<path>` prints a file:
+- `apps/payload/src/collections/Posts/index.ts`
+- `.../Posts/hooks/populateAuthors.ts`
+- `apps/payload/src/collections/Categories.ts`
+- `apps/payload/src/hooks/populatePublishedAt.ts`
+- `apps/payload/src/access/authenticatedOrPublished.ts`
+- `apps/payload/src/blocks/{Code,Banner,MediaBlock}/config.ts`
+- `apps/payload/src/plugins/index.ts`
+- `apps/payload/src/fields/defaultLexical.ts`
+
+Also read the Payload skill at `apps/payload/.claude/skills/payload/`.
+
+**Files:**
+- Create:
+  - `src/access/published-or-authenticated.ts`
+  - `src/blocks/{code,banner,media-block}.ts`
+  - `src/editor/post-editor.ts`
+  - `src/fields/slug.ts`
+  - `src/hooks/{populate-published-at,populate-authors}.ts`
+  - `src/collections/{Posts,Categories}.ts`
+  - `src/plugins/blog-plugins.ts`
+  - `tests/int/blog.int.spec.ts`
+- Modify:
+  - `src/collections/Users.ts` (add a required `name` field; it's the display name for authors)
+  - `src/payload.config.ts`
+  - `package.json` (add `@payloadcms/plugin-seo`, `plugin-search`, `plugin-redirects` and `plugin-nested-docs` at **3.90.2**)
+  - `README.md` (a Blog section)
+
+**Requirements:**
+
+1. `categories` collection:
+   - `title` (required) and a unique `slug`
+   - nested via `plugin-nested-docs` (`parent`, `breadcrumbs`), with `generateURL` building the path from the slugs
+   - public read, authenticated write
+2. `posts` collection. Fields:
+   - `title`, required
+   - a unique `slug`, generated from the title when empty by a `slugField()` factory in `fields/slug.ts` that lowercases, strips diacritics and uses dashes; unit-test the formatter
+   - `excerpt` (textarea)
+   - `heroImage` (upload → media)
+   - `content` (richText, `post-editor.ts`)
+   - `categories` (hasMany → categories)
+   - `authors` (hasMany → users, defaulting to the current user)
+   - `populatedAuthors` (read-only array of `{ id, name }`, filled by an `afterRead` hook). Never expose author emails, because the users collection is not public.
+   - `relatedPosts` (hasMany → posts, filtered to exclude itself)
+   - `publishedAt` (date, sidebar; set by a `beforeChange` hook the first time the post is published)
+
+   Behaviour:
+   - `versions: { drafts: { autosave: { interval: 100 }, schedulePublish: true }, maxPerDoc: 50 }`
+   - access: `read` = authenticated **or** `_status` equals `published` (`published-or-authenticated.ts`); create, update and delete are authenticated only
+   - admin: `useAsTitle: 'title'`, `defaultColumns: ['title', 'slug', '_status', 'publishedAt']`
+   - hooks: `revalidateCollectionHooks` (reused)
+3. `post-editor.ts`: Lexical with paragraph, headings h2–h4, bold, italic, underline, strikethrough, inline code, link (internal to posts plus external URLs), ordered/unordered lists, blockquote, horizontal rule, upload (media), and `BlocksFeature({ blocks: [Code, Banner, MediaBlock] })`, plus the fixed and inline toolbars.
+   - `Code` block: `language` select (typescript, javascript, tsx, bash, json, css, go, python, sql) and `code` (a code field).
+   - `Banner` block: `style` select (info, warning, error, success) and `content` (minimal Lexical).
+   - `MediaBlock`: `media` (upload, required).
+4. Plugins in `plugins/blog-plugins.ts`, exported as one array and spread into the config:
+   - `nestedDocsPlugin({ collections: ['categories'] })`
+   - `seoPlugin({ collections: ['posts'], uploadsCollection: 'media', generateTitle: ({ doc }) => \`${doc.title} | <profile name or 'Blog'>\`, generateURL })`, where `generateURL` uses `WEB_URL` + `/blog/<slug>`. Put the SEO fields in a `meta` tab or group on posts, following the plugin's documented `tabbedUI` or `fields` pattern.
+   - `searchPlugin({ collections: ['posts'], defaultPriorities: { posts: 10 } })`, syncing `title`, `slug`, `excerpt` and the categories' titles. Posts search only.
+   - `redirectsPlugin({ collections: ['posts'] })`
+5. Scheduled publishing needs the jobs queue. Add
+   `jobs: { autoRun: [{ cron: '* * * * *', queue: 'default' }], access: { run: ({ req }) => Boolean(req.user) || req.headers.get('authorization') === \`Bearer ${process.env.CRON_SECRET}\` } }`,
+   and confirm the exact shape against the installed Payload docs and types.
+6. The MCP plugin is **not** extended to posts. The user has paused MCP work.
+7. **Database safety (mandatory):**
+   - Before starting or restarting the CMS dev server with the new schema, copy `apps/payload/payload.db` to `apps/payload/payload.db.pre-blog-<timestamp>.bak`.
+   - Never delete or recreate `payload.db`. The schema change is additive: new tables plus a nullable `users.name` column.
+   - Because `name` is required, add it to the Users collection with `required: true` for new users. If Payload's SQLite push refuses to add a NOT NULL column to the existing user row, make `name` optional in the DB (`required: false`, validated in a `beforeValidate` hook) rather than touching data.
+   - Don't write any content (no sample posts).
+   - If the dev server's schema push prompts about data loss, stop and report. Never accept data loss.
+8. Integration tests (pure, no DB): the slug formatter, the `published-or-authenticated` access function (with a user it returns `true`; without one it returns a `{ _status: { equals: 'published' } }` where-clause), and the `populate-authors` hook mapping (it drops emails).
+9. Regenerate types (`generate:types` → `packages/cms-types`) and the import map. `check-types`, `lint` (if it runs) and `test:int` must be green. Boot check: `/admin` returns 200, and `GET /api/posts` returns `{ docs: [] }` publicly.
+
+- [ ] Implement, test, verify, then commit as `feat(cms): blog — posts, categories, drafts, scheduled publish, seo, search, redirects`.
