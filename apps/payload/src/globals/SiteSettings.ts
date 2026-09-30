@@ -32,6 +32,15 @@ export const SiteSettings: GlobalConfig = {
       type: 'group',
       fields: [
         {
+          name: 'scene',
+          type: 'upload',
+          relationTo: 'scenes',
+          admin: {
+            description:
+              'Upload a new Spline export (.spline / .splinecode) to replace the desk model. Takes precedence over the URL below.',
+          },
+        },
+        {
           ...urlField('splineSceneUrl'),
           admin: { description: 'Spline → Export → Code → copy the .splinecode URL. Empty = /spline/scene.splinecode.' },
         },

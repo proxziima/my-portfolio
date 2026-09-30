@@ -75,6 +75,7 @@ export interface Config {
     posts: Post;
     categories: Category;
     media: Media;
+    scenes: Scene;
     users: User;
     search: Search;
     redirects: Redirect;
@@ -94,6 +95,7 @@ export interface Config {
     posts: PostsSelect<false> | PostsSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    scenes: ScenesSelect<false> | ScenesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     search: SearchSelect<false> | SearchSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
@@ -437,6 +439,24 @@ export interface Category {
   createdAt: string;
 }
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "scenes".
+ */
+export interface Scene {
+  id: number;
+  title: string;
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+/**
  * This is a collection of automatically created search results. These results are used by the global site search and will be updated automatically as documents in the CMS are created or updated.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -770,6 +790,10 @@ export interface PayloadLockedDocument {
         value: number | Media;
       } | null)
     | ({
+        relationTo: 'scenes';
+        value: number | Scene;
+      } | null)
+    | ({
         relationTo: 'users';
         value: number | User;
       } | null)
@@ -974,6 +998,23 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "scenes_select".
+ */
+export interface ScenesSelect<T extends boolean = true> {
+  title?: T;
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1255,6 +1296,10 @@ export interface SiteSetting {
   defaultDiscipline?: (number | null) | Discipline;
   figure?: {
     /**
+     * Upload a new Spline export (.spline / .splinecode) to replace the desk model. Takes precedence over the URL below.
+     */
+    scene?: (number | null) | Scene;
+    /**
      * Spline → Export → Code → copy the .splinecode URL. Empty = /spline/scene.splinecode.
      */
     splineSceneUrl?: string | null;
@@ -1346,6 +1391,7 @@ export interface SiteSettingsSelect<T extends boolean = true> {
   figure?:
     | T
     | {
+        scene?: T;
         splineSceneUrl?: T;
       };
   sectionLabels?:

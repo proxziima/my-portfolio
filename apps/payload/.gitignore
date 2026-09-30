@@ -22,3 +22,6 @@ node_modules/
 
 # TypeScript
 *.tsbuildinfo
+
+# Spline scene uploads
+public/scenes/

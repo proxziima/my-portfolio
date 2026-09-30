@@ -12,6 +12,7 @@ import { Experiences } from './collections/Experiences'
 import { Media } from './collections/Media'
 import { Posts } from './collections/Posts'
 import { Projects } from './collections/Projects'
+import { Scenes } from './collections/Scenes'
 import { Users } from './collections/Users'
 import { Contact } from './globals/Contact'
 import { Navigation } from './globals/Navigation'
@@ -30,8 +31,10 @@ export default buildConfig({
     // Shared by every collection that sets `admin.livePreview.url` (today: posts).
     livePreview: { breakpoints: livePreviewBreakpoints },
   },
-  collections: [Disciplines, Experiences, Projects, Content, Posts, Categories, Media, Users],
+  collections: [Disciplines, Experiences, Projects, Content, Posts, Categories, Media, Scenes, Users],
   globals: [Profile, Contact, Navigation, SiteSettings],
+  // The web origin loads uploads (the Spline scene) from the browser, so file responses need CORS.
+  cors: process.env.WEB_URL ? [process.env.WEB_URL] : [],
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URL ?? '' } }),
   editor: lexicalEditor(),
   // Runs the queue that scheduled publishing writes to. Needs a long-running server (not serverless).
