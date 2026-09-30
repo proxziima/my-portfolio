@@ -3404,3 +3404,56 @@ Also read the Payload skill at `apps/payload/.claude/skills/payload/`.
 9. Regenerate types (`generate:types` → `packages/cms-types`) and the import map. `check-types`, `lint` (if it runs) and `test:int` must be green. Boot check: `/admin` returns 200, and `GET /api/posts` returns `{ docs: [] }` publicly.
 
 - [ ] Implement, test, verify, then commit as `feat(cms): blog — posts, categories, drafts, scheduled publish, seo, search, redirects`.
+
+### Task 28: Draft preview for posts (user request, 2026-09-30)
+
+**Reference:** https://github.com/payloadcms/payload/tree/3.x/examples/draft-preview. The key files are `src/app/(app)/preview/route.ts`, `src/app/(app)/exit-preview/route.ts`, `src/collections/Pages/index.ts` (`admin.preview`) and `src/app/(app)/[slug]/page.tsx` (`draftMode` → `draft: true`). Fetch the raw files from `raw.githubusercontent.com/payloadcms/payload/3.x/examples/draft-preview/src/...`.
+
+**Architecture adaptation:** the example is a monolith that calls `payload.auth` in-process. Here the frontend is `apps/web` (port 3000) and the CMS is separate (port 3001), so the preview routes live in the web app. They authenticate by forwarding the admin's `payload-token` cookie to the CMS. Cookies are host-scoped, not port-scoped, so a localhost cookie reaches :3000. The blog stays **unlinked**: `/blog/[slug]` renders only in draft mode and 404s otherwise, until the blog launches.
+
+**Files:**
+- CMS:
+  - modify `apps/payload/src/collections/Posts.ts` to add `admin.preview`
+  - create `apps/payload/src/plugins/preview-url.ts` (pure URL builder, unit-tested)
+  - update the README's Blog section
+- Web:
+  - create `app/api/preview/route.ts` and `app/api/exit-preview/route.ts`
+  - create `lib/cms/preview.ts`, containing `isSafePreviewPath`, the secret check and `getPreviewUser(cookieHeader)`
+  - create `lib/cms/posts.ts` with `getPostBySlug(slug, { draft, token })`
+  - create `app/blog/[slug]/page.tsx`, `features/blog/PostBody.tsx` (Lexical renderer) and `features/blog/PreviewBanner.tsx`, with CSS modules
+  - add tests under `tests/unit/cms/preview.test.ts`
+  - update `.env.example`
+
+**Requirements:**
+1. `admin.preview: (doc) => buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: \`/blog/${doc.slug}\` })`. It returns `null` when the slug, WEB_URL or secret is missing, so the button is hidden. It produces `${WEB_URL}/api/preview?path=…&previewSecret=…` with `URLSearchParams`. `PREVIEW_SECRET` already exists in `apps/payload/.env`; copy the value to `apps/web/.env.local` without printing it.
+2. `GET /api/preview`:
+   - 403 unless `previewSecret` equals `PREVIEW_SECRET` (constant-time: a sha256 digest and `timingSafeEqual`, same as `app/api/revalidate/route.ts`; extract a shared `secretsMatch(a, b)` helper into `lib/security/secrets.ts` and reuse it in both routes)
+   - 400 unless `path` is a safe relative path (starts with a single `/`, not `//` or `/\`, no scheme; reuse `safeHref` rules plus the `getSafeRedirect` semantics)
+   - verify the user by calling `${CMS_URL}/api/users/me` with the incoming `cookie` header, `cache: 'no-store'`; 403 and `draftMode().disable()` if there's no user
+   - otherwise `(await draftMode()).enable()` and `redirect(path)`
+3. `GET /api/exit-preview`: disables draft mode and redirects to `/`. Also accept `?path=` validated the same way.
+4. `getPostBySlug`:
+   - Draft mode: `fetch(\`${CMS_URL}/api/posts?where[slug][equals]=…&draft=true&depth=2&limit=1\`, { headers: { Authorization: \`JWT ${token}\` }, cache: 'no-store' })`, where the token is read from the `payload-token` cookie via `cookies()`. Check the actual cookie name, since Payload uses `${cookiePrefix}-token` with the default prefix `payload`.
+   - Not in draft mode: the published fetch tagged `cms`.
+   - Map it to a small `PostView` view model (title, excerpt, content, publishedAt, populatedAuthors names, heroImage url) in the mappers style. Never pass author emails.
+5. `/blog/[slug]`:
+   - `notFound()` unless draft mode is enabled. Add a comment saying the public blog launches later.
+   - `metadata.robots = { index: false, follow: false }`
+   - renders `PreviewBanner` ("Preview: you're viewing a draft", with an exit link to `/api/exit-preview?path=/`), the title, meta (date and authors) and `PostBody`
+   - `PostBody` uses `@payloadcms/richtext-lexical/react` `RichText` with JSX converters for the `code`, `banner` and `mediaBlock` blocks and uploads (install `@payloadcms/richtext-lexical@3.90.2` in apps/web)
+   - Styled with the existing tokens (600px column, Inter). Keep it quiet and minimal; this is a preview surface.
+6. CMS DB safety: `admin.preview` is config-only with no schema change, so no DB write is needed. Still back up `payload.db` before restarting the CMS if you restart it. Never reset it.
+7. Tests (unit):
+   - `buildPreviewUrl`
+   - `isSafePreviewPath`: rejects `//evil`, `/\evil`, `https://x`, `javascript:` and empty; accepts `/blog/a`
+   - `secretsMatch`
+   - the post mapper, confirming it drops emails
+8. Verification:
+   - `curl` `/api/preview` with a wrong secret → 403
+   - `curl` with a bad path → 400
+   - the right secret without a cookie → 403
+   - `/blog/anything` without draft mode → 404
+   - A logged-in end-to-end check isn't possible without the user's credentials; say so. Never create a user or sign in.
+   - `check-types`, `lint`, `test` and `build` are green for web and cms.
+
+- [ ] Commit as `feat: draft preview for posts` (split cms/web commits if clearer).
