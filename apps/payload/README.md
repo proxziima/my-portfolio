@@ -22,6 +22,7 @@ Copy `.env.example` to `.env` first. `WEB_URL` and `REVALIDATE_SECRET` let the C
 | `projects` | Portfolio | `name`, `chip`, `url`?, `summary`, `disciplines` (hasMany), `order` |
 | `content` | Content & community | `title`, `kind` (article / talk / podcast / open-source / community), `venue`?, `url`, `date`, `disciplines` (hasMany; empty = every role), `order` |
 | `media` | Media | upload (alt required) |
+| `scenes` | Spline scenes (group Site) | upload (`.spline` / `.splinecode` only), `title`, `notes`? |
 | `users` | Users | auth, `name` (required display name, shown as the post author) |
 
 The bio's inline blocks are `chipLink` { `label`, `chip`, `url`? } and `curiousToggle` { `word`, default "curious" }. Keep the same sentence skeleton across disciplines and change only the vocabulary: the page animates just the words that differ.
@@ -33,9 +34,31 @@ The bio's inline blocks are `chipLink` { `label`, `chip`, `url`? } and `curiousT
 | `profile` | `name`, `headlineTail` ("and builder."), `email`, `location`?, `avatar`? (media) |
 | `contact` | `links[]` { `label`, `chip`, `url` }: the row under the figure (message, LinkedIn, GitHub) |
 | `navigation` | `items[]` { `label`, `href`, `newTab` }: rendered as a quiet footer nav; section anchors (`#work`, `#projects`, `#content`) are valid hrefs |
-| `site-settings` | `seo` { `title`, `description`, `ogImage`? }, `defaultDiscipline` (relation), `figure` { `splineSceneUrl`? }, `sectionLabels` { `work`, `projects`, `content` }, `pickerHint`, `pageNotes` { `headline`, `columnWidth` (supports `{w}`), `wallSwitch`, `sectionGap`, `chips`, `role` } |
+| `site-settings` | `seo` { `title`, `description`, `ogImage`? }, `defaultDiscipline` (relation), `figure` { `scene`? (scenes upload, wins over the URL), `splineSceneUrl`? }, `sectionLabels` { `work`, `projects`, `content` }, `pickerHint`, `pageNotes` { `headline`, `columnWidth` (supports `{w}`), `wallSwitch`, `sectionGap`, `chips`, `role` } |
 
 Access: public `read` on all portfolio collections and globals; writes need an authenticated user.
+
+## Updating the desk model
+
+The web app's figure is a Spline scene, uploaded to the `scenes` collection and picked in Site settings.
+
+1. In Spline, export the scene (**Export → Code**, which downloads a `.splinecode`) or save the editor file (`.spline`).
+2. In the admin, open **Site → Spline scenes → Create new**, give it a title (and optional notes) and upload the file.
+3. Open **Site settings → Figure → Scene**, pick it and save.
+4. The save revalidates the web app within seconds (`WEB_URL` + `REVALIDATE_SECRET`). Hard-refresh the page.
+
+How it works:
+
+- **Accepted files.** Spline files are msgpack binaries with no standard MIME type (browsers send `application/octet-stream` or nothing), so the collection sets no `mimeTypes`: with a list set, Payload's sniffing finds no type and its extension fallback calls them `text/plain`. Instead the `requireSplineFile` hook (`src/hooks/require-spline-file.ts`) accepts only `.spline` / `.splinecode` names (`isSplineFile` in `src/uploads/spline-file.ts`). Payload's own restricted-type check (`.html`, `.exe`…) still runs. There are no image sizes, and Payload hands only images to sharp, so the file is stored as-is.
+- **Storage and URL.** Files are stored in `public/scenes/` (git-ignored) and served by `/api/scenes/file/<filename>` as `application/octet-stream`. The web app resolves that path against `CMS_URL`.
+- **CORS.** The Spline runtime fetches the scene from the browser, on the web origin. `cors` in `src/payload.config.ts` is `[WEB_URL]`, so `WEB_URL` must be the web app's exact origin, with no trailing slash. Check it after an upload:
+
+  ```bash
+  curl -s -o /dev/null -D - -H "Origin: http://localhost:3000" http://localhost:3001/api/scenes/file/<filename>
+  # expect: 200, Content-Type: application/octet-stream, Access-Control-Allow-Origin: http://localhost:3000
+  ```
+
+- **Fallbacks.** Without an uploaded scene the web app uses **Spline scene URL**, then the static `apps/web/public/spline/scene.splinecode`. `docs/assets/interactive_workspace.spline` is only a working copy; nothing reads it.
 
 ## Blog
 

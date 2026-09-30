@@ -73,6 +73,7 @@ and the MCP plugin.
 | `projects` | Portfolio | `name`, `chip`, `url`?, `summary`, `disciplines` (hasMany), `order` |
 | `content` | Content & community | `title`, `kind` (article / talk / podcast / open-source / community), `venue`?, `url`, `date`, `disciplines` (hasMany; empty = every role), `order` |
 | `media` | Media | upload (alt required) |
+| `scenes` | Spline scenes | upload (`.spline` / `.splinecode` only, checked by extension), `title`, `notes`? (added 2026-09-30) |
 | `users` | Users | auth |
 
 The bio's inline blocks are `chipLink` { `label`, `chip`, `url`? } and
@@ -87,7 +88,7 @@ same sentence skeleton across disciplines and change only the vocabulary.
 | `profile` | `name`, `headlineTail` ("and builder."), `email`, `location`?, `avatar`? (media) |
 | `contact` | `links[]` { `label`, `chip`, `url` }: the row under the figure (message, LinkedIn, GitHub) |
 | `navigation` | `items[]` { `label`, `href`, `newTab` }: rendered as a quiet footer nav; section anchors (`#work`, `#projects`, `#content`) are valid hrefs |
-| `site-settings` | `seo` { `title`, `description`, `ogImage`? }, `defaultDiscipline` (relation), `figure` { `splineSceneUrl`? }, `sectionLabels` { `work`, `projects`, `content` }, `pickerHint`, `pageNotes` { `headline`, `columnWidth` (supports `{w}`), `wallSwitch`, `sectionGap`, `chips`, `role` } |
+| `site-settings` | `seo` { `title`, `description`, `ogImage`? }, `defaultDiscipline` (relation), `figure` { `scene`? (scenes upload), `splineSceneUrl`? }, `sectionLabels` { `work`, `projects`, `content` }, `pickerHint`, `pageNotes` { `headline`, `columnWidth` (supports `{w}`), `wallSwitch`, `sectionGap`, `chips`, `role` } |
 
 Access: public `read` on all portfolio collections and globals; writes need an
 authenticated user. `afterChange`/`afterDelete` hooks on every portfolio
@@ -234,9 +235,10 @@ properties. Components use the tokens and never hard-code these values.
    can't select the renderer (on the auto-selected WebGPU pipeline this scene
    logs validation errors and drops draws) and has no error callback (it
    rethrows a failed load during render), so the figure couldn't collapse to
-   its caption. The scene URL comes from
-   `site-settings.figure.splineSceneUrl`; `public/spline/scene.splinecode` is
-   the default when that field is empty. The scene is lazy-mounted when near
+   its caption. The scene is the upload picked in
+   `site-settings.figure.scene` (served by the CMS with CORS for `WEB_URL`),
+   then `site-settings.figure.splineSceneUrl`, then
+   `public/spline/scene.splinecode`. The scene is lazy-mounted when near
    the viewport and loaded client-only. The frame is 3:2 at the column's
    width (600×400 on desktop, scaling down on mobile), not the template's
    216px strip: at 216px (and even 16:9) the scene's framing crops the lamp
