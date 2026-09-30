@@ -31,5 +31,6 @@ let transitionTimer = 0
 export function stampThemeTransition(): void {
   window.clearTimeout(transitionTimer)
   root().dataset.themeTransition = 'true'
+  void root().offsetWidth // force a reflow so the transition is live before the theme attribute flips
   transitionTimer = window.setTimeout(() => delete root().dataset.themeTransition, TRANSITION_MS)
 }

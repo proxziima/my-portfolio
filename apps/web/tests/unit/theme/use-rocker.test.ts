@@ -91,4 +91,17 @@ describe('useRocker', () => {
     act(() => api.flipTo(1))
     expect(raf).toHaveBeenCalledTimes(1)
   })
+
+  it('snaps a running flip to its end before starting the next one', async () => {
+    const cancel = vi.mocked(globalThis.cancelAnimationFrame)
+    raf.mockReturnValueOnce(11).mockReturnValueOnce(12)
+    await mount()
+    act(() => api.flipTo(1))
+    ctx.drawImage.mockClear()
+    act(() => api.flipTo(0))
+    expect(cancel).toHaveBeenCalledWith(11)
+    // the interrupted flip is drawn at frame 16 (col 1, row 3) before the new flip starts
+    expect(ctx.drawImage.mock.calls[0]).toEqual([expect.anything(), 212, 840, 212, 280, 0, 0, 212, 280])
+    expect(raf).toHaveBeenCalledTimes(2)
+  })
 })

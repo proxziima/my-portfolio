@@ -1,11 +1,12 @@
-import type { Theme } from '@/features/theme/theme-dom'
 import { safely } from './context'
 
 const LENGTH = 0.065
 const SEED = 42
 
+type Direction = 'light' | 'dark'
+
 /** The wall switch click: 65ms of LCG noise (seed 42) with a two-spike envelope through a bandpass. */
-export function playClick(to: Theme): void {
+export function playClick(to: Direction): void {
   safely((t) => {
     const n = t.currentTime
     const buf = t.createBuffer(1, Math.ceil(t.sampleRate * LENGTH), t.sampleRate)

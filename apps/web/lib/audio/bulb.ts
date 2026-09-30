@@ -1,4 +1,5 @@
 import { audioContext, safely } from './context'
+import { thump } from './thump'
 
 const BULB_URL = '/sound/bulb-explode.mp3'
 
@@ -34,15 +35,6 @@ export function playBulb(): void {
         void a.play().catch(() => {})
       } catch { /* the thump below still plays */ }
     }
-    const o = t.createOscillator()
-    const og = t.createGain()
-    o.type = 'sine'
-    o.frequency.setValueAtTime(100, n)
-    o.frequency.exponentialRampToValueAtTime(36, n + 0.26)
-    og.gain.setValueAtTime(0.32, n)
-    og.gain.exponentialRampToValueAtTime(1e-4, n + 0.32)
-    o.connect(og).connect(t.destination)
-    o.start(n)
-    o.stop(n + 0.34)
+    thump(t, n)
   })
 }

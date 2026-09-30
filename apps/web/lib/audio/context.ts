@@ -3,9 +3,13 @@ let ctx: AudioContext | null = null
 /** Lazily created on the first user gesture and shared by every sound (autoplay policy). */
 export function audioContext(): AudioContext | null {
   if (typeof window === 'undefined' || !('AudioContext' in window)) return null
-  ctx ??= new AudioContext()
-  if (ctx.state === 'suspended') void ctx.resume()
-  return ctx
+  try {
+    ctx ??= new AudioContext()
+    if (ctx.state === 'suspended') void ctx.resume()
+    return ctx
+  } catch {
+    return null // audio is decoration; a browser that refuses a context just stays silent
+  }
 }
 
 export function safely(play: (ctx: AudioContext) => void): void {
