@@ -10,12 +10,17 @@ import { Experiences } from './collections/Experiences'
 import { Media } from './collections/Media'
 import { Projects } from './collections/Projects'
 import { Users } from './collections/Users'
+import { Contact } from './globals/Contact'
+import { Navigation } from './globals/Navigation'
+import { Profile } from './globals/Profile'
+import { SiteSettings } from './globals/SiteSettings'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default buildConfig({
   admin: { user: Users.slug, importMap: { baseDir: dirname } },
   collections: [Disciplines, Experiences, Projects, Content, Media, Users],
+  globals: [Profile, Contact, Navigation, SiteSettings],
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URL ?? '' } }),
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET ?? '',

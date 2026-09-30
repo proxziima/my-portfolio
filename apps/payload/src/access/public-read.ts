@@ -9,3 +9,5 @@ export const publicContentAccess = {
   update: authenticated,
   delete: authenticated,
 }
+
+export const publicGlobalAccess = { read: publicRead, update: authenticated }

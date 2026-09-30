@@ -31,3 +31,5 @@ export const revalidateCollectionHooks = {
   afterChange: [revalidateAfterChange],
   afterDelete: [revalidateAfterDelete],
 }
+
+export const revalidateGlobalHooks = { afterChange: [revalidateGlobal] }
