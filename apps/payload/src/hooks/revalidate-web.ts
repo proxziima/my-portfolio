@@ -26,3 +26,8 @@ export const revalidateGlobal: GlobalAfterChangeHook = async ({ doc, req }) => {
   await notifyWeb(req)
   return doc
 }
+
+export const revalidateCollectionHooks = {
+  afterChange: [revalidateAfterChange],
+  afterDelete: [revalidateAfterDelete],
+}
