@@ -1,0 +1,132 @@
+/* the blowout: flick the switch too fast and the bulb goes (template globals.css, "the blowout").
+   Global on purpose: every class here is created imperatively by sequence-dom.ts.
+   The #flick layer itself and --flick live in styles/base.css and styles/tokens.css. */
+
+/* the filament complains: a keyframe on the full-screen layer, never a filter on the page */
+:root[data-flicker] #flick {
+  animation: boFlicker 0.42s steps(1, end) both;
+}
+
+:root[data-flicker='1'] #flick {
+  animation-duration: 0.5s;
+}
+
+:root[data-flicker='3'] #flick,
+:root[data-flicker='4'] #flick {
+  animation-name: boFlickerHard;
+}
+
+@keyframes boFlicker {
+  0% { opacity: 0; }
+  30% { opacity: 0.6; }
+  42% { opacity: 0; }
+  70% { opacity: 0.35; }
+  100% { opacity: 0; }
+}
+
+@keyframes boFlickerHard {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  22% { opacity: 0; }
+  38% { opacity: 0.8; }
+  50% { opacity: 0; }
+  74% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+/* the bulb goes: a warm flash centred on the switch */
+.bo-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at var(--x) var(--y), rgba(255, 246, 222, 1) 0, rgba(255, 236, 190, 0.92) 7%, rgba(255, 228, 168, 0) 36%);
+}
+
+.bo-flash.in {
+  animation: boFlash 0.55s ease-out both;
+}
+
+@keyframes boFlash {
+  0% { opacity: 0; }
+  6% { opacity: 1; }
+  30% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+/* the dark closes in from the switch */
+.bo-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 97;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at var(--x) var(--y), rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0.82) 14%, rgba(0, 0, 0, 0.965) 42%, #000 72%);
+  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.bo-veil.in {
+  opacity: 1;
+}
+
+.bo-veil.out {
+  opacity: 0;
+  transition-duration: 0.75s;
+}
+
+:root[data-blackout] main > :not([data-anchor='switch']) {
+  filter: brightness(0.5) saturate(0.85);
+  transition: filter 0.5s ease;
+}
+
+/* the switch off the wall; the physics rotates it about its centre */
+.bo-fall {
+  position: fixed;
+  z-index: 99;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  filter: brightness(0.72);
+}
+
+.bo-fall > button {
+  position: absolute;
+  inset: 0;
+}
+
+.bo-fall.out {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.bo-puff {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  border-radius: 50%;
+  will-change: transform, opacity;
+  background: radial-gradient(circle at 45% 42%, rgba(214, 210, 200, 0.95), rgba(190, 186, 176, 0.75) 45%, rgba(170, 166, 156, 0) 72%);
+}
+
+.bo-shard {
+  position: fixed;
+  z-index: 99;
+  pointer-events: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: #e6e2d8;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bo-flash.in {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  .bo-veil {
+    transition: none;
+  }
+}
