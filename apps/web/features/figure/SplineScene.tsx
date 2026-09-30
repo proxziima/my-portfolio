@@ -2,6 +2,7 @@
 import { Application } from '@splinetool/runtime'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useFitScale } from './use-fit-scale'
+import { useHideSplineTextProxy } from './use-hide-spline-text-proxy'
 import styles from './SplineScene.module.css'
 
 /** The frame the scene is composed for: the desktop column at 3:2. */
@@ -28,6 +29,7 @@ export function SplineScene({ url, onFail }: { url: string; onFail: () => void }
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [loaded, setLoaded] = useState(false)
   const fit = useFitScale(stageRef, STAGE.width)
+  useHideSplineTextProxy()
 
   useEffect(() => {
     const canvas = canvasRef.current

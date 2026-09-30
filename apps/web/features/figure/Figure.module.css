@@ -32,3 +32,14 @@
   font-variant-numeric: tabular-nums;
   transition: var(--theme-transition);
 }
+
+/* the Spline runtime's proxy textarea for in-scene typing (use-hide-spline-text-proxy.ts): hidden,
+   but still in the DOM and focusable so it keeps receiving the keystrokes */
+:global(.spline-text-proxy) {
+  opacity: 0 !important;
+  color: transparent !important;
+  caret-color: transparent !important;
+  border: 0 !important;
+  background: transparent !important;
+  clip-path: inset(50%) !important;
+}
