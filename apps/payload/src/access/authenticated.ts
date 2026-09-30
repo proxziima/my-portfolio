@@ -1,9 +1,4 @@
-import type { AccessArgs } from 'payload'
+import type { PayloadRequest } from 'payload'
 
-import type { User } from '@/payload-types'
-
-type isAuthenticated = (args: AccessArgs<User>) => boolean
-
-export const authenticated: isAuthenticated = ({ req: { user } }) => {
-  return Boolean(user)
-}
+// Returns a plain boolean so it fits both collection `access` and `admin` access slots.
+export const authenticated = ({ req }: { req: PayloadRequest }): boolean => Boolean(req.user)
