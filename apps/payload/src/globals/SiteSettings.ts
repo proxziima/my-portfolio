@@ -1,8 +1,9 @@
 import type { GlobalConfig } from 'payload'
 import { publicGlobalAccess } from '../access/public-read'
+import { urlField } from '../fields/link-url'
 import { revalidateGlobalHooks } from '../hooks/revalidate-web'
 
-const text = (name: string, defaultValue: string, description?: string) => ({
+const requiredText = (name: string, defaultValue: string, description?: string) => ({
   name,
   type: 'text' as const,
   required: true,
@@ -20,8 +21,8 @@ export const SiteSettings: GlobalConfig = {
       name: 'seo',
       type: 'group',
       fields: [
-        text('title', 'Vinicius Queiroz — engineer and builder'),
-        text('description', 'One letter, three disciplines.'),
+        requiredText('title', 'Vinicius Queiroz — engineer and builder'),
+        requiredText('description', 'One letter, three disciplines.'),
         { name: 'ogImage', type: 'upload', relationTo: 'media' },
       ],
     },
@@ -31,8 +32,7 @@ export const SiteSettings: GlobalConfig = {
       type: 'group',
       fields: [
         {
-          name: 'splineSceneUrl',
-          type: 'text',
+          ...urlField('splineSceneUrl'),
           admin: { description: 'Spline → Export → Code → copy the .splinecode URL. Empty = /spline/scene.splinecode.' },
         },
       ],
@@ -40,20 +40,20 @@ export const SiteSettings: GlobalConfig = {
     {
       name: 'sectionLabels',
       type: 'group',
-      fields: [text('work', 'Work'), text('projects', 'Projects'), text('content', 'Content & community')],
+      fields: [requiredText('work', 'Work'), requiredText('projects', 'Projects'), requiredText('content', 'Content & community')],
     },
-    text('pickerHint', 'scroll to change class'),
+    requiredText('pickerHint', 'scroll to change class'),
     {
       name: 'pageNotes',
       type: 'group',
       admin: { description: 'Handwritten notes shown in curious mode.' },
       fields: [
-        text('headline', 'Inter, everywhere. One family keeps the page quiet.'),
-        text('columnWidth', '{w}px. Narrow enough to read; wide enough to breathe.', '{w} is replaced by the measured column width.'),
-        text('wallSwitch', 'A real rocker, 17 frames. Flick it ten times and see what happens.'),
-        text('sectionGap', '64px between sections. Separate, not disconnected.'),
-        text('chips', '16px chips: enough character without becoming a logo wall.'),
-        text('role', 'Hover the role. It rolls, the letter rewrites itself — only the words that change.'),
+        requiredText('headline', 'Inter, everywhere. One family keeps the page quiet.'),
+        requiredText('columnWidth', '{w}px. Narrow enough to read; wide enough to breathe.', '{w} is replaced by the measured column width.'),
+        requiredText('wallSwitch', 'A real rocker, 17 frames. Flick it ten times and see what happens.'),
+        requiredText('sectionGap', '64px between sections. Separate, not disconnected.'),
+        requiredText('chips', '16px chips: enough character without becoming a logo wall.'),
+        requiredText('role', 'Hover the role. It rolls, the letter rewrites itself — only the words that change.'),
       ],
     },
   ],
