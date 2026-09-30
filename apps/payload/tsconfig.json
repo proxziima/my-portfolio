@@ -41,7 +41,6 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    "next.config.js",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [

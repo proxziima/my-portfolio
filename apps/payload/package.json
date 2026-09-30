@@ -1,7 +1,7 @@
 {
   "name": "cms",
   "version": "1.0.0",
-  "description": "Website template for Payload",
+  "description": "Headless Payload CMS for the portfolio",
   "license": "MIT",
   "type": "module",
   "scripts": {
