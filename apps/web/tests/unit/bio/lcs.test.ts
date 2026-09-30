@@ -10,4 +10,9 @@ describe('lcsKeep', () => {
   it('handles empty input', () => {
     expect(lcsKeep([], ['a']).keepB.size).toBe(0)
   })
+  it('keeps nothing when the next paragraph is empty', () => {
+    const { keepA, keepB } = lcsKeep(['a', 'b'], [])
+    expect(keepA.size).toBe(0)
+    expect(keepB.size).toBe(0)
+  })
 })

@@ -38,11 +38,14 @@ export function useWordMorph(
     if (!el || shown.current === paragraphs) return
     const prev = shown.current
     shown.current = paragraphs
+    // a new array with the same content (e.g. a refetch) is not a role change
+    if (prev.join('\u0000') === paragraphs.join('\u0000')) return
 
     // a morph still in flight is flushed first, so fast switching never leaves a half-rewritten bio
     if (pending.current) {
       window.clearTimeout(pending.current.timer)
       el.innerHTML = renderParagraphs(pending.current.paragraphs)
+      onRenderRef.current()
       pending.current = null
     }
     if (!animate || reduce) {
