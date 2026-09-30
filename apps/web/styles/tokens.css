@@ -17,6 +17,9 @@
   --wall-contact: #26221c5c;
   --wall-cast: #312c2421;
   --flick: rgba(0, 0, 0, 0.28);
+  --switch-track: #e4e1d9;
+  --switch-border: #827e74;
+  --switch-thumb: #fbfaf7;
   color-scheme: light;
 
   /* metrics */
@@ -59,6 +62,9 @@
     --wall-contact: #00000085;
     --wall-cast: #00000038;
     --flick: rgba(255, 236, 200, 0.1);
+    --switch-track: #2a2a26;
+    --switch-border: #6b6b64;
+    --switch-thumb: #e6e5df;
     color-scheme: dark;
   }
 }
@@ -79,6 +85,9 @@
   --wall-contact: #00000085;
   --wall-cast: #00000038;
   --flick: rgba(255, 236, 200, 0.1);
+  --switch-track: #2a2a26;
+  --switch-border: #6b6b64;
+  --switch-thumb: #e6e5df;
   color-scheme: dark;
 }
 
