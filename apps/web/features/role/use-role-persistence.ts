@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useLayoutEffect, useRef } from 'react'
+import { resolveInitialSlug } from './initial-slug'
 
 const STORAGE_KEY = 'role'
 
@@ -28,7 +29,7 @@ export function useRolePersistence({ slugs, currentSlug, hydrate, select }: Opti
 
   // Before first paint: apply the hash or stored role without animation (Q4).
   useLayoutEffect(() => {
-    const initial = [location.hash.slice(1), readStored()].find((s) => s && slugs.includes(s)) ?? null
+    const initial = resolveInitialSlug(location.hash, readStored(), slugs)
     target.current = initial
     if (initial) hydrate(initial)
     ready.current = true

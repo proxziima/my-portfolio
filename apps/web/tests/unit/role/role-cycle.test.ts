@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mod, shortestDelta } from '@/features/role/role-cycle'
+import { mod, optionOffsets, shortestDelta } from '@/features/role/role-cycle'
 
 describe('role-cycle', () => {
   it('mod is always positive', () => {
@@ -15,5 +15,17 @@ describe('role-cycle', () => {
   it('handles a single role', () => {
     expect(mod(5, 1)).toBe(0)
     expect(shortestDelta(0, 0, 1)).toBe(0)
+  })
+})
+
+describe('optionOffsets', () => {
+  it('offers every visible row when the roles are all distinct', () => {
+    expect([...optionOffsets(7, 3)].sort()).toEqual([-1, 0, 1])
+  })
+  it('drops the visible duplicate with two roles', () => {
+    expect([...optionOffsets(0, 2)].sort()).toEqual([-1, 0])
+  })
+  it('offers only the current row with one role', () => {
+    expect([...optionOffsets(-4, 1)]).toEqual([0])
   })
 })
