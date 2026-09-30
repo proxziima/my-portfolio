@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
 import { cookies, draftMode } from 'next/headers'
 import { notFound } from 'next/navigation'
+import { cmsAdminOrigin } from '@/lib/cms/client'
 import { PAYLOAD_TOKEN_COOKIE } from '@/lib/cms/preview'
 import { getPostBySlug } from '@/lib/cms/posts'
 import { PostArticle } from '@/features/blog/PostArticle'
 import { PreviewBanner } from '@/features/blog/PreviewBanner'
 import { PreviewNotice } from '@/features/blog/PreviewNotice'
+import { RefreshRouteOnSave } from '@/features/blog/RefreshRouteOnSave'
 
 export const metadata: Metadata = { title: 'Draft preview', robots: { index: false, follow: false } }
 
@@ -33,6 +35,8 @@ export default async function PostPreviewPage({ params }: PageProps<'/blog/[slug
     <main>
       <PreviewBanner />
       <PostArticle post={post} />
+      {/* Inside the CMS Live Preview iframe, re-renders this page after every (auto)save. */}
+      <RefreshRouteOnSave cmsOrigin={cmsAdminOrigin()} />
     </main>
   )
 }
