@@ -3457,3 +3457,42 @@ Also read the Payload skill at `apps/payload/.claude/skills/payload/`.
    - `check-types`, `lint`, `test` and `build` are green for web and cms.
 
 - [ ] Commit as `feat: draft preview for posts` (split cms/web commits if clearer).
+
+### Task 29: Live preview for posts (user request, 2026-09-30)
+
+**References:**
+- https://payloadcms.com/docs/live-preview/overview
+- https://payloadcms.com/docs/live-preview/server
+- https://github.com/payloadcms/payload/tree/3.x/examples/live-preview. The key files are `src/app/(app)/[slug]/RefreshRouteOnSave.tsx`, `src/app/(app)/[slug]/page.tsx`, `src/collections/Pages/index.ts` (`admin.livePreview.url`) and `src/payload.config.ts` (`admin.livePreview.breakpoints`).
+
+**Approach: server-side live preview on top of Task 28.** The admin's live-preview iframe loads the *draft-preview entry route*, `WEB_URL/api/preview?path=/blog/<slug>&previewSecret=…`. That route authenticates the admin through the forwarded `payload-token` cookie, enables `draftMode` and redirects. The iframe's origin is same-site in dev (localhost), so the cookie is sent. In production the CMS and web must share a cookie domain, as the README documents.
+
+On `/blog/[slug]`, in draft mode, the page renders a client `RefreshRouteOnSave`. It wraps `@payloadcms/live-preview-react`'s `RefreshRouteOnSave` with `refresh={() => router.refresh()}` and `serverURL={process.env.NEXT_PUBLIC_CMS_URL}`, which must be the admin origin because it is checked against the `postMessage` origin. Each autosave re-renders the server component, which re-fetches the draft with `no-store`.
+
+**Files:**
+- CMS:
+  - `src/collections/Posts.ts`: `admin.livePreview.url: ({ data }) => buildPreviewUrl({ webUrl: process.env.WEB_URL, secret: process.env.PREVIEW_SECRET, path: postPreviewPath(data?.slug) })`. When it returns null, live preview is unavailable for unsaved or slug-less docs; check how Payload treats a null or empty url, and return something harmless if it's required.
+  - `src/payload.config.ts`: `admin.livePreview.breakpoints` for mobile 375×667, tablet 768×1024 and desktop 1440×900.
+  - Keep `versions.drafts.autosave.interval` at 100, which is already responsive. Document the choice.
+  - Tests: extend `tests/int/preview.int.spec.ts` to cover the livePreview url wiring.
+- Web:
+  - `bun add --cwd apps/web @payloadcms/live-preview-react@3.90.2`
+  - create `features/blog/RefreshRouteOnSave.tsx` (`'use client'`)
+  - render it in `app/blog/[slug]/page.tsx` only when draft mode is on and a post was found
+  - add `NEXT_PUBLIC_CMS_URL=http://localhost:3001` to `.env.example` and `.env.local`
+  - add a unit or render test that the refresher calls `router.refresh` (mock `next/navigation` and the live-preview component), or at least that the page includes it only in draft mode
+- README (CMS Blog section): a "Live preview" bullet explaining how to open a post, the Live Preview tab, the breakpoints and the same-site cookie requirement.
+
+**Constraints:**
+- No DB writes and no content. The config change is admin-only, with no schema change.
+- If the CMS must be restarted, back up the DB first.
+- Never sign in or create users.
+- Don't kill the running servers: the CMS on 3001, web on 3000 and the template on 3002. Next hot-reloads.
+- Don't run `next build` in `apps/web` while its dev server is running. The final gate builds.
+
+**Verification:**
+- `test`, `check-types` and `lint` pass for web and cms.
+- `curl` the CMS admin config endpoint, or unit-test the url function.
+- Say that the in-iframe end-to-end check needs the user's login.
+
+- [ ] Commit as `feat: live preview for posts`.
