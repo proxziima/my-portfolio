@@ -1,0 +1,34 @@
+/* template globals.css: .plate, .platebox, .plate figcaption */
+
+.plate {
+  margin: 30px 0 0;
+  touch-action: pan-y;
+}
+
+/* 3:2, not the template's 216px strip: at 600×216 (and even 16:9) the scene's framing crops the lamp
+   and the plant. The ratio scales with the column on mobile. */
+.box {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+}
+
+/* once the scene is up, its own in-scene cursor is the only one; loading or failed keeps the normal one */
+.box:has(canvas[data-loaded='true']) {
+  cursor: none;
+}
+
+.box canvas[data-loaded='true'] {
+  cursor: none !important; /* the runtime writes an inline cursor on the canvas as it hovers objects */
+}
+
+.caption {
+  composes: enter from '../../shared/ui/motion.module.css';
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+  transition: var(--theme-transition);
+}

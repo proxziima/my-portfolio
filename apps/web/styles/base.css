@@ -1,0 +1,217 @@
+/* Base styles: page ground, typography, and the global classes shared by React
+   components and the CMS-serialized bio HTML (.fav, .chip, .who, .what, .tail). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--paper);
+  color: var(--ink);
+  background-image:
+    radial-gradient(1088px 608px at -8% -4%, var(--glow-a), rgba(0, 0, 0, 0) 64%),
+    radial-gradient(864px 992px at 108% 32%, var(--glow-b), rgba(0, 0, 0, 0) 72%),
+    radial-gradient(992px 672px at 18% 108%, var(--glow-c), rgba(0, 0, 0, 0) 70%);
+  background-attachment: fixed;
+  font-family:
+    var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: var(--body-size);
+  line-height: var(--body-line);
+  -webkit-font-smoothing: antialiased;
+  transition: var(--theme-transition);
+}
+
+main {
+  position: relative;
+  max-width: calc(var(--column) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 88px 108px;
+}
+
+@media (max-width: 640px) {
+  main {
+    padding-block: 56px 72px;
+  }
+}
+
+/* headline: name over role */
+h1 {
+  margin: 0;
+  font-size: var(--h1-size);
+  line-height: 1.22;
+  font-weight: 400;
+  letter-spacing: -0.012em;
+  transition: var(--theme-transition);
+}
+
+.who,
+.what {
+  display: block;
+  transition: var(--theme-transition);
+}
+
+.who {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.what {
+  font-weight: 430;
+  color: var(--ink-soft);
+}
+
+/* the role drum sits inline with the tail; a gap, not padding, so a wrapped tail isn't indented */
+h1 .what {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 9px;
+  min-height: 40px;
+}
+
+.what .tail {
+  white-space: pre;
+}
+
+@media (max-width: 520px) {
+  h1 {
+    --h1-size: 24px;
+  }
+}
+
+/* sections */
+section {
+  margin-top: var(--section-gap);
+}
+
+h2 {
+  margin: 0 0 24px;
+  font-size: var(--body-size);
+  font-weight: 500;
+  color: var(--ink-soft);
+  transition: var(--theme-transition);
+}
+
+/* chip links: <a class="fav"><i class="chip">A</i><span>Label</span></a> */
+.fav {
+  color: var(--ink-link);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: var(--theme-transition);
+}
+
+.fav > span {
+  text-decoration: underline;
+  text-decoration-thickness: var(--underline);
+  text-underline-offset: var(--underline-offset);
+  text-decoration-color: var(--rule);
+  transition: var(--theme-transition);
+}
+
+.fav:hover > span {
+  text-decoration-color: var(--ink-soft);
+}
+
+.chip {
+  display: inline-block;
+  width: var(--chip-size);
+  height: var(--chip-size);
+  margin-right: 4.5px;
+  border-radius: 3px;
+  vertical-align: -3.2px;
+  background: var(--chip);
+  color: var(--ink-soft);
+  font-style: normal;
+  font-size: 9.5px;
+  line-height: var(--chip-size);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: center;
+  transition: var(--theme-transition);
+}
+
+/* contact links */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-top: 12px;
+  font-size: var(--body-size);
+}
+
+/* footer */
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 20px;
+  margin-top: var(--section-gap);
+  padding-bottom: 64px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  transition: var(--theme-transition);
+}
+
+.site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+
+.site-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: var(--ink);
+}
+
+/* visible focus ring everywhere */
+:where(:focus-visible) {
+  outline: 2px solid var(--ink-soft);
+  outline-offset: 2px;
+}
+
+.fav:focus-visible {
+  border-radius: 2px;
+}
+
+/* visually hidden, still announced */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* full-screen layer the blowout flickers (the animation lives with the blowout) */
+#flick {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  pointer-events: none;
+  background: var(--flick);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

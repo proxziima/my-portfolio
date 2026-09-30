@@ -1,0 +1,44 @@
+/* template globals.css: ol.list, .pos, .desc, .years */
+
+.list {
+  composes: enter from '../../shared/ui/motion.module.css';
+  display: grid;
+  row-gap: var(--row-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.meta,
+.aside {
+  color: var(--ink-soft);
+  transition: var(--theme-transition);
+}
+
+.aside {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .aside {
+    font-size: 14px;
+  }
+}

@@ -1,0 +1,95 @@
+/* the wall switch: the reference's atlas-driven rocker; --wall-contact / --wall-cast live in tokens.css */
+.switcher {
+  position: absolute;
+  top: 36px;
+  right: -4px;
+  width: 2.8rem;
+  height: 3.7rem;
+  z-index: 9;
+  user-select: none;
+}
+
+@media (max-width: 900px) {
+  .switcher {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+  }
+}
+
+.toggle {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  background: none;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--ink-soft);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.stage {
+  display: block;
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 0.075rem 0.045rem var(--wall-contact))
+    drop-shadow(0.025rem 0.24rem 0.22rem var(--wall-cast));
+}
+
+.image {
+  object-fit: contain;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+/* the two <img>s are the fallback until the atlas is decoded and valid */
+.state {
+  transition: none;
+}
+
+.light {
+  opacity: 1;
+}
+
+.dark,
+:global(:root[data-theme='dark']) .light {
+  opacity: 0;
+}
+
+:global(:root[data-theme='dark']) .dark {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(:root:not([data-theme='light'])) .light {
+    opacity: 0;
+  }
+
+  :global(:root:not([data-theme='light'])) .dark {
+    opacity: 1;
+  }
+}
+
+.motion {
+  visibility: hidden;
+}
+
+.stage[data-motion-ready='true'] .motion {
+  visibility: visible;
+}
+
+.stage[data-motion-ready='true'] .state {
+  visibility: hidden;
+}

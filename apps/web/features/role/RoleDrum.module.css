@@ -1,0 +1,96 @@
+/* The role drum set into the headline (template globals.css: .reel). */
+.drum {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  perspective: 240px;
+  touch-action: manipulation;
+  transition: opacity 0.18s ease;
+}
+
+/* width only animates for a user change, never for the pre-paint hydrate */
+.drum[data-animate='true'] {
+  transition:
+    width 0.5s var(--ease-out),
+    opacity 0.18s ease;
+}
+
+/* the picker is open over it */
+.drum[aria-expanded='true'] {
+  opacity: 0.12;
+}
+
+/* dashed underline */
+.drum::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 2px;
+  bottom: 2px;
+  height: 2px;
+  background: var(--rule);
+  opacity: 0.85;
+  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 10px);
+  mask-image: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 10px);
+  transition: var(--theme-transition);
+}
+
+.drum:hover::after,
+.drum:focus-visible::after {
+  background: var(--ink-soft);
+}
+
+.drum:focus-visible {
+  outline: 2px solid var(--ink-soft);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.sizer {
+  display: block;
+  padding-right: 2px;
+  line-height: 36px;
+  white-space: nowrap;
+  visibility: hidden;
+}
+
+.prism {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--drum-radius) * -1)) rotateX(var(--drum-angle));
+}
+
+.drum[data-animate='true'] .prism {
+  transition: transform 0.62s var(--ease-out);
+}
+
+.face {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 36px;
+  line-height: 36px;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  backface-visibility: hidden;
+  transform: rotateX(var(--face-angle)) translateZ(var(--drum-radius));
+  transition: var(--theme-transition);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drum,
+  .drum[data-animate='true'],
+  .drum[data-animate='true'] .prism {
+    transition: none;
+  }
+}

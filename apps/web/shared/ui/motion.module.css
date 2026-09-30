@@ -1,0 +1,19 @@
+/* Shared entrances (template globals.css, "enter"). Compose a class instead of redefining the keyframes. */
+
+.enter {
+  animation: enter 0.24s ease both;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(0.2em);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter {
+    animation: none;
+  }
+}

@@ -36,3 +36,9 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Payload SQLite database
+*.db
+*.db-journal
+*.db.bak
+*.db.*.bak

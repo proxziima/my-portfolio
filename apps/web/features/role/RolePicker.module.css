@@ -1,0 +1,167 @@
+/* The picker wheel: the role becomes a short list (template globals.css: #wheel). */
+.wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overscroll-behavior: contain;
+}
+
+.wheel {
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  z-index: 30;
+  display: block;
+  width: 300px;
+  margin-top: -63px;
+  padding: 0;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  box-shadow:
+    0 20px 40px -26px rgba(40, 38, 32, 0.6),
+    0 2px 5px -3px rgba(40, 38, 32, 0.22);
+  overscroll-behavior: contain;
+  transition: var(--theme-transition);
+}
+
+.wheel[hidden] {
+  display: none;
+}
+
+.window {
+  position: relative;
+  display: block;
+  height: calc(var(--picker-row) * 3);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  border-radius: 12px;
+  -webkit-mask-image: linear-gradient(transparent 0, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(transparent 0, #000 16%, #000 84%, transparent 100%);
+  cursor: ns-resize;
+  touch-action: none;
+  animation: wheel-in 0.26s cubic-bezier(0.2, 1.1, 0.3, 1) both;
+}
+
+@keyframes wheel-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* the slot the current role sits in */
+.selection {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: var(--picker-row);
+  height: var(--picker-row);
+  border-radius: 8px;
+  background: var(--chip);
+  border: 1px solid var(--rule-soft);
+  pointer-events: none;
+  transition: var(--theme-transition);
+}
+
+/* offset -1, 0, 1 fill the three slots; ±2 wait just outside, masked */
+.row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--picker-row);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  cursor: pointer;
+  user-select: none;
+  transform: translateY(calc((var(--offset) + 1) * var(--picker-row)));
+}
+
+.row[data-animate='true'] {
+  transition: transform 0.28s var(--ease-snap);
+}
+
+.name {
+  font-size: 23px;
+  font-weight: 430;
+  letter-spacing: -0.012em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  opacity: 0.5;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+/* during a theme change the name joins the page's colour fade */
+:global(:root[data-theme-transition]) .name {
+  transition: var(--theme-transition);
+}
+
+.meta {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    var(--theme-transition);
+}
+
+.row[data-current='true'] .name {
+  color: var(--ink);
+  opacity: 1;
+}
+
+.row[data-current='true'] .meta {
+  opacity: 0.75;
+}
+
+.row:hover .name {
+  opacity: 0.8;
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 0 8px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  opacity: 0.55;
+  border-top: 1px solid var(--rule-soft);
+  transition: var(--theme-transition);
+}
+
+@media (max-width: 520px) {
+  .wheel {
+    width: 260px;
+  }
+
+  .name {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .row[data-animate='true'] {
+    transition: none;
+  }
+
+  .window {
+    animation: none;
+  }
+}

@@ -1,0 +1,53 @@
+# Production stack for an Easypanel "Compose" service (docs/deploy-easypanel.md).
+# - No host ports: Easypanel routes each domain to a service's container port (web -> 3000, cms -> 3001).
+# - No secrets here: every ${VAR} comes from the service's Environment tab (template: .env.deploy.example).
+services:
+  cms:
+    build:
+      context: .
+      dockerfile: apps/payload/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3001"
+    environment:
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET:?set PAYLOAD_SECRET}
+      NEXT_PUBLIC_SERVER_URL: ${CMS_PUBLIC_URL:?set CMS_PUBLIC_URL}
+      # The web app's exact public origin: the only CORS origin, and where the CMS posts revalidations.
+      WEB_URL: ${WEB_PUBLIC_URL:?set WEB_PUBLIC_URL}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:?set REVALIDATE_SECRET}
+      PREVIEW_SECRET: ${PREVIEW_SECRET:?set PREVIEW_SECRET}
+      CRON_SECRET: ${CRON_SECRET:-}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+    volumes:
+      # SQLite database (/data/payload.db) and uploads (/data/media, /data/scenes).
+      - cms-data:/data
+    # A public global: 200 once Payload has started and applied its migrations.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/api/globals/profile').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      # The CMS's public URL: the web fetches it server-side and builds browser URLs (uploads) from it.
+      CMS_URL: ${CMS_PUBLIC_URL:?set CMS_PUBLIC_URL}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:?set REVALIDATE_SECRET}
+      PREVIEW_SECRET: ${PREVIEW_SECRET:?set PREVIEW_SECRET}
+    depends_on:
+      cms:
+        condition: service_healthy
+
+volumes:
+  cms-data:

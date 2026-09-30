@@ -1,0 +1,34 @@
+.notice {
+  padding: 20px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 620;
+}
+
+.body {
+  margin: 8px 0 16px;
+  color: var(--ink-soft);
+}
+
+.exit {
+  color: var(--ink-link);
+  font-size: 13px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: var(--underline-offset);
+  text-decoration-color: var(--rule);
+}
+
+.exit:hover {
+  text-decoration-color: var(--ink-soft);
+}
+
+.exit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

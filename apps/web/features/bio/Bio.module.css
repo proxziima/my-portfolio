@@ -1,0 +1,118 @@
+/* The bio is CMS-authored HTML rewritten imperatively by the word morph, so
+   everything inside is styled through :global selectors (template globals.css). */
+.bio {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+  color: var(--ink-soft);
+  transition: var(--theme-transition);
+}
+
+.bio p {
+  margin: 0;
+}
+
+.bio :global(strong) {
+  font-weight: 500;
+  color: var(--ink);
+  transition: var(--theme-transition);
+}
+
+/* word-level morph */
+.bio :global(.w) {
+  display: inline-block;
+  transition:
+    opacity 0.28s ease,
+    transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.28s ease,
+    var(--theme-transition);
+}
+
+.bio :global(.w.out) {
+  opacity: 0;
+  transform: translateY(-0.32em);
+  filter: blur(2px);
+}
+
+.bio :global(.w.in) {
+  opacity: 0;
+  transform: translateY(0.32em);
+  filter: blur(2px);
+}
+
+/* curious toggle pill */
+.bio :global(.curiosity-trigger) {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  vertical-align: baseline;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bio :global(.curiosity-trigger:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.bio :global(.curiosity-word) {
+  cursor: inherit;
+}
+
+.bio :global(.curiosity-switch-track) {
+  position: relative;
+  flex: 0 0 auto;
+  width: 1.625rem;
+  height: 1.125rem;
+  border-radius: 999px;
+  border: 1px solid var(--switch-border);
+  background: var(--switch-track);
+  transition:
+    border-color 0.14s ease-out,
+    background-color 0.14s ease-out;
+}
+
+.bio :global(.curiosity-switch-thumb) {
+  position: absolute;
+  top: 50%;
+  left: 0.0625rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  z-index: 1;
+  border: 1px solid var(--switch-border);
+  background: var(--switch-thumb);
+  transform: translateY(-50%);
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bio :global(.curiosity-trigger:hover .curiosity-switch-track) {
+  background: color-mix(in srgb, var(--switch-track) 92%, var(--ink));
+}
+
+.bio :global(.curiosity-trigger[aria-checked='true'] .curiosity-switch-track) {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.bio :global(.curiosity-trigger[aria-checked='true'] .curiosity-switch-thumb) {
+  background: var(--paper);
+  border: 0;
+  transform: translate(0.5rem, -50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bio :global(.w),
+  .bio :global(.curiosity-switch-track),
+  .bio :global(.curiosity-switch-thumb) {
+    transition: none;
+  }
+}
