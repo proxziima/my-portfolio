@@ -1,0 +1,26 @@
+# Build context is the repo root (see docker-compose.yml). Keep it to sources: dependencies are
+# installed and apps are built inside the image.
+.git
+**/node_modules
+docs/template-portfolio/node_modules
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/test-results
+**/playwright-report
+**/coverage
+
+# Databases, their journals and backups (payload.db, payload.db-journal, payload.db.*.bak)
+**/*.db*
+
+# Env files hold secrets; only the examples go in
+**/.env*
+!**/.env.example
+
+# Local uploads: production keeps them on the /data volume
+apps/payload/public/media
+apps/payload/public/scenes
+
+**/.DS_Store
+**/*.pem
+**/.vercel
