@@ -86,6 +86,9 @@
     "packages/cms-types": {
       "name": "@repo/cms-types",
       "version": "0.0.0",
+      "devDependencies": {
+        "@repo/typescript-config": "*",
+      },
     },
     "packages/eslint-config": {
       "name": "@repo/eslint-config",

@@ -27,7 +27,7 @@ export const disciplines: DisciplineSeed[] = [
     ],
   },
   {
-    slug: 'ai', title: 'AI engineer', order: 2, level: 'LV 4 · applied ml',
+    slug: 'ai', title: 'AI engineer', order: 2, level: 'LV 4 · applied ML',
     figureCaption: 'Fig. 2 — a network above the loss surface it descends',
     bio: richText([
       ['Hi, I’m Vinicius, a 🇧🇷 Brazilian ', b('AI engineer'), ' and builder, though most weeks that just means ', b('eval janitor'), '. I love the early stage of a system, when the ', b('dataset'), ' is still messy and there is a lot to figure out. Apparently, ambiguity is my idea of fun.'],

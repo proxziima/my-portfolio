@@ -9,7 +9,12 @@ const ids = new Map<string, number>()
 for (const d of seed.disciplines) {
   ids.set(d.slug, await upsert(payload, 'disciplines', { slug: { equals: d.slug } }, d))
 }
-const rel = (slugs: string[]) => slugs.map((s) => ids.get(s)).filter((v) => v !== undefined)
+const rel = (slugs: string[]) =>
+  slugs.map((slug) => {
+    const id = ids.get(slug)
+    if (id === undefined) throw new Error(`Seed references unknown discipline slug "${slug}"`)
+    return id
+  })
 
 for (const e of seed.experiences) {
   await upsert(payload, 'experiences', { and: [{ company: { equals: e.company } }, { title: { equals: e.title } }] }, { ...e, disciplines: rel(e.disciplines) })
