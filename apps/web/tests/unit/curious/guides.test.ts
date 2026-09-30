@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { computeGuides, type Measurements } from '@/features/curious/guides'
+import { computeGuides, leaderY, type Guide, type Measurements } from '@/features/curious/guides'
 
 const r = (top: number, height: number, left = 400, width = 632) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const m: Measurements = {
   main: r(0, 1600), docHeight: 1700,
   sections: { bio: r(200, 400), figure: r(640, 250), work: r(1000, 200), projects: r(1264, 150) },
   gaps: [{ from: r(900, 36), to: r(1000, 200) }],
-  anchors: { headline: r(90, 70), switch: r(36, 60), role: r(130, 36) },
+  anchors: { name: r(88, 34), switch: r(36, 60), role: r(124, 36) },
   figure: r(640, 216),
 }
+const byText = (gs: Guide[], label: string) => gs.find((g) => g.label === label)!
 const notes = { headline: 'h', columnWidth: '{w}px wide', wallSwitch: 's', sectionGap: 'g', chips: 'c', role: 'r' }
 
 describe('computeGuides', () => {
@@ -50,6 +51,24 @@ describe('computeGuides', () => {
     expect(bare.filter((g) => g.kind === 'note').map((g) => g.label)).toEqual(['600px wide', 'g', 'c'])
     expect(bare.some((g) => g.kind === 'formula')).toBe(false)
   })
+  describe('the two left notes', () => {
+    const headline = byText(guides, 'h')
+    const role = byText(guides, 'r')
+
+    it('points the headline note at the name line, from its last line', () => {
+      expect(headline.anchor).toBe('bottom')
+      expect(leaderY(headline)).toBeCloseTo(88 + 34 / 2)
+    })
+    it('points the role note at the drum, from its first line', () => {
+      expect(role.anchor).toBe('top')
+      expect(leaderY(role)).toBeCloseTo(124 + 36 / 2)
+    })
+    it('keeps them apart: the headline note ends above where the role note starts', () => {
+      // a bottom-anchored note's `top` is its bottom edge
+      expect(headline.top).toBeLessThan(role.top)
+    })
+  })
+
   it('gives every guide a unique key', () => {
     expect(new Set(guides.map((g) => g.key)).size).toBe(guides.length)
   })

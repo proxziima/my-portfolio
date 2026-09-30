@@ -31,7 +31,7 @@ export function measure(): Measurements | null {
       bio: rectOf('bio'), figure: rectOf('figure'), work: rectOf('work'), projects: rectOf('projects'), content: rectOf('content'),
     },
     gaps,
-    anchors: { headline: rectOf('headline'), switch: rectOf('switch'), role: rectOf('role') },
+    anchors: { name: rectOf('name'), switch: rectOf('switch'), role: rectOf('role') },
     figure: rectOf('figure-box'),
   }
 }

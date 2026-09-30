@@ -47,6 +47,7 @@ export function CuriousOverlay({ pageNotes }: { pageNotes: PageNotes }) {
           key={g.key}
           className={`${styles.guide} ${styles[g.kind]}`}
           data-side={g.side}
+          data-note-anchor={g.anchor}
           style={{
             left: g.left, top: g.top, width: g.width, height: g.height,
             '--guide-delay': `${g.delay}ms`, '--note-rotation': `${g.rotation ?? 0}deg`,

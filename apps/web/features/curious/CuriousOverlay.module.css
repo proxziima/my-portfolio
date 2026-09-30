@@ -19,14 +19,14 @@
   display: block;
   position: absolute;
   color: var(--accent);
-  transform: rotate(var(--note-rotation, 0deg));
+  transform: translateY(var(--note-shift, 0px)) rotate(var(--note-rotation, 0deg));
   animation: guideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) var(--guide-delay, 0ms) both;
 }
 
 @keyframes guideIn {
   from {
     opacity: 0;
-    transform: translateY(4px) rotate(var(--note-rotation, 0deg));
+    transform: translateY(calc(var(--note-shift, 0px) + 4px)) rotate(var(--note-rotation, 0deg));
   }
 }
 
@@ -89,9 +89,11 @@
 .section .label { left: 8px; top: -6px; transform: translateY(-100%); }
 .gap .label { left: -8px; top: 50%; transform: translate(-100%, -50%); }
 
-/* handwritten notes, with a small leader pointing at the column */
+/* handwritten notes, with a small leader pointing at the column. guides.ts mirrors the note's
+   font size, line height and leader offset to aim the leader. */
 .note,
 .formula {
+  --leader-y: 0.65em;
   width: 12.5rem;
   color: color-mix(in srgb, var(--ink-soft) 82%, var(--accent));
   font-family: var(--font-caveat), Caveat, 'Segoe Print', cursive;
@@ -124,7 +126,7 @@
 .formula::after {
   content: '';
   position: absolute;
-  top: 0.65em;
+  top: var(--leader-y);
   height: 1.5px;
   background: color-mix(in srgb, var(--accent) 58%, transparent);
 }
@@ -144,6 +146,14 @@
 .guide[data-side='left'] { text-align: right; }
 .guide[data-side='left']::before { left: calc(100% + 0.55rem); }
 .guide[data-side='left']::after { left: calc(100% + 1.5rem); }
+
+/* a bottom-anchored note stands on its `top`: it grows upward and points from its last line */
+.guide[data-note-anchor='bottom'] { --note-shift: -100%; }
+.guide[data-note-anchor='bottom']::before,
+.guide[data-note-anchor='bottom']::after {
+  top: auto;
+  bottom: calc(1.08em - var(--leader-y) - 1.5px); /* the same spot, measured from the bar's top edge */
+}
 
 .fm {
   display: block;

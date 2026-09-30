@@ -17,8 +17,8 @@ export function RoleHeadline({ name, tail, hint }: Props) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <h1 data-anchor="headline">
-        <span className="who">{name}</span>
+      <h1>
+        <span className="who" data-anchor="name">{name}</span>
         <span className="what">
           <RolePicker drumRef={drumRef} open={open} onOpenChange={setOpen} hint={hint}>
             <RoleDrum ref={drumRef} expanded={open} />
