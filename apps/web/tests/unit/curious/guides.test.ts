@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeGuides, leaderY, type Guide, type Measurements } from '@/features/curious/guides'
+import { computeGuides, NOTE_METRICS, type Guide, type Measurements } from '@/features/curious/guides'
 
 const r = (top: number, height: number, left = 400, width = 632) => ({ left, top, width, height, right: left + width, bottom: top + height })
 const m: Measurements = {
@@ -56,17 +56,25 @@ describe('computeGuides', () => {
     const role = byText(guides, 'r')
 
     it('points the headline note at the name line, from its last line', () => {
+      // the name's centre is 88 + 34 / 2 = 105; a bottom note's top is one line (21.6) below, less the leader (13)
       expect(headline.anchor).toBe('bottom')
-      expect(leaderY(headline)).toBeCloseTo(88 + 34 / 2)
+      expect(headline.top).toBeCloseTo(105 + 21.6 - 13)
     })
     it('points the role note at the drum, from its first line', () => {
       expect(role.anchor).toBe('top')
-      expect(leaderY(role)).toBeCloseTo(124 + 36 / 2)
+      expect(role.top).toBeCloseTo(124 + 36 / 2 - 13)
     })
     it('keeps them apart: the headline note ends above where the role note starts', () => {
       // a bottom-anchored note's `top` is its bottom edge
       expect(headline.top).toBeLessThan(role.top)
     })
+  })
+
+  it('puts a bottom-anchored leader at y = 100 when its top is 100 + 21.6 - 13', () => {
+    // pinned in pixels, so a change to NOTE_METRICS (and so to the CSS) shows up here
+    expect(NOTE_METRICS).toEqual({ fontPx: 20, lineHeight: 1.08, leader: 0.65 })
+    const atHundred = computeGuides({ ...m, anchors: { name: r(83, 34) } }, notes, [])
+    expect(byText(atHundred, 'h').top).toBeCloseTo(108.6)
   })
 
   it('hangs the list notes off the first list section present', () => {

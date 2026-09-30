@@ -35,14 +35,15 @@ const GUTTER = 16, NOTE_W = 200, NOTE_OFFSET = 52, STAGGER = 35, FORMULA_STEP = 
 const SECTION_ORDER: SectionName[] = ['bio', 'figure', 'work', 'projects', 'content']
 const LIST_SECTIONS: SectionName[] = ['work', 'projects', 'content']
 
-/** A note's line box and where its leader sits in a line, mirroring `.note` (1.25rem Caveat, line-height 1.08, leader 0.65em). */
-const NOTE_LINE = 20 * 1.08, NOTE_LEADER = 20 * 0.65
+/**
+ * The single source for a note's type metrics: CuriousOverlay passes them to the CSS as custom properties,
+ * and the leader maths below uses them. `leader` is where the leader sits in a line, in em.
+ */
+export const NOTE_METRICS = { fontPx: 20, lineHeight: 1.08, leader: 0.65 } as const
+const NOTE_LINE = NOTE_METRICS.fontPx * NOTE_METRICS.lineHeight
+const NOTE_LEADER = NOTE_METRICS.fontPx * NOTE_METRICS.leader
 
-/** The page y a note's leader points at: on its first line when top-anchored, on its last when bottom-anchored. */
-export const leaderY = (g: Pick<Guide, 'top' | 'anchor'>): number =>
-  g.anchor === 'bottom' ? g.top - NOTE_LINE + NOTE_LEADER : g.top + NOTE_LEADER
-
-/** The `top` that puts a note's leader at `y`. */
+/** The `top` that puts a note's leader at `y`: on its first line when top-anchored, on its last when bottom-anchored. */
 const topForLeader = (y: number, anchor: NoteAnchor): number =>
   anchor === 'bottom' ? y + NOTE_LINE - NOTE_LEADER : y - NOTE_LEADER
 

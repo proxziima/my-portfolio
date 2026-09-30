@@ -249,6 +249,11 @@ properties. Components use the tokens and never hard-code these values.
    scene's limits. If the scene is missing or fails to load, the figure
    collapses to its caption and the page stays fully usable. The caption is
    per-role. Per-role scene actions are out of scope for this phase.
+   *GPU cost (accepted, 2026-09-30):* the stage always renders about
+   857×571 CSS px × `devicePixelRatio` (≈ 1714×1142 device px on a 2× screen),
+   even when it is scaled down into a narrow mobile box. The runtime has no
+   pixel-ratio option to cap that, and the fixed stage is what keeps the
+   framing, so the cost is accepted rather than worked around.
 9. **Accessibility.**
    - `role="status"` announces role changes
    - visible focus rings everywhere

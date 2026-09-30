@@ -14,6 +14,10 @@ const FRAME = { width: 600, height: 400 }
  * instead and is scaled into the box.
  */
 const SCENE_ZOOM = 0.7
+/**
+ * About 857×571 CSS px. It renders at that size × devicePixelRatio even when scaled down into a narrow
+ * box; the runtime has no pixel-ratio option to cap it. Accepted GPU cost (spec §6.8).
+ */
 const STAGE = { width: FRAME.width / SCENE_ZOOM, height: FRAME.height / SCENE_ZOOM }
 
 /**

@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import type { PageNotes } from '@/lib/cms/types'
 import { useRole } from '@/features/role/RoleProvider'
 import { useCurious } from './CuriousProvider'
-import { computeGuides, type Guide } from './guides'
+import { computeGuides, NOTE_METRICS, type Guide } from './guides'
 import { measure } from './measure'
 import { useLayoutSignal } from './use-layout-signal'
 import styles from './CuriousOverlay.module.css'
@@ -12,6 +12,13 @@ import styles from './CuriousOverlay.module.css'
 const RETRY_MS = 150
 /** the overlay's fade-out; guides are dropped after it so the next open staggers in again */
 const FADE_MS = 260
+
+/** The notes' type metrics, from the same constants guides.ts aims the leaders with. */
+const NOTE_VARS = {
+  '--note-font': `${NOTE_METRICS.fontPx}px`,
+  '--note-lh': String(NOTE_METRICS.lineHeight),
+  '--leader-y': `${NOTE_METRICS.leader}em`,
+} as CSSProperties
 
 interface Layout { guides: Guide[]; height: number }
 const EMPTY: Layout = { guides: [], height: 0 }
@@ -41,7 +48,7 @@ export function CuriousOverlay({ pageNotes }: { pageNotes: PageNotes }) {
   }, [on])
 
   return (
-    <div className={styles.overlay} data-visible={on} aria-hidden="true" style={{ height: layout.height }}>
+    <div className={styles.overlay} data-visible={on} aria-hidden="true" style={{ ...NOTE_VARS, height: layout.height }}>
       {layout.guides.map((g) => (
         <span
           key={g.key}

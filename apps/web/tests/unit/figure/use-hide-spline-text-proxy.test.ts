@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { TEXT_PROXY_CLASS, useHideSplineTextProxy } from '@/features/figure/use-hide-spline-text-proxy'
+import { TEXT_PROXY_CLASS, TEXT_PROXY_LABEL, useHideSplineTextProxy } from '@/features/figure/use-hide-spline-text-proxy'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -47,6 +47,17 @@ describe('useHideSplineTextProxy', () => {
     expect(t.classList.contains(TEXT_PROXY_CLASS)).toBe(true)
   })
 
+  it('labels it and takes it out of the Tab order, without hiding it from assistive tech', async () => {
+    act(() => root.render(createElement(Harness)))
+    const t = proxy()
+    document.body.append(t)
+    await flush()
+    expect(TEXT_PROXY_LABEL).toBe('Scene text input')
+    expect(t.getAttribute('aria-label')).toBe('Scene text input')
+    expect(t.getAttribute('tabindex')).toBe('-1')
+    expect(t.hasAttribute('aria-hidden')).toBe(false)
+  })
+
   it('marks a proxy that is already there when it mounts', () => {
     const t = proxy()
     document.body.append(t)
@@ -61,8 +72,11 @@ describe('useHideSplineTextProxy', () => {
     fixedOnly.style.position = 'fixed'
     document.body.append(plain, fixedOnly)
     await flush()
-    expect(plain.classList.contains(TEXT_PROXY_CLASS)).toBe(false)
-    expect(fixedOnly.classList.contains(TEXT_PROXY_CLASS)).toBe(false)
+    for (const t of [plain, fixedOnly]) {
+      expect(t.classList.contains(TEXT_PROXY_CLASS)).toBe(false)
+      expect(t.hasAttribute('aria-label')).toBe(false)
+      expect(t.hasAttribute('tabindex')).toBe(false)
+    }
   })
 
   it('stops watching once unmounted', async () => {
