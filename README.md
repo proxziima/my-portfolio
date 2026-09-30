@@ -30,6 +30,8 @@ bun run --cwd apps/payload seed
 
 Never delete or recreate `payload.db`. Schema changes are pushed when the CMS dev server starts; if it warns about data loss, stop and back up before you accept anything.
 
+Production never pushes: it runs the migrations in `apps/payload/src/migrations` on start. After any schema change, create one before deploying (`bun run --cwd apps/payload payload migrate:create <name>`, against a throwaway `DATABASE_URL`; see the deploy guide).
+
 **Checks.**
 
 ```bash
@@ -66,6 +68,10 @@ The CMS has a full blog (posts, nested categories, drafts, scheduled publish, SE
 - **Live preview.** The **Live Preview** tab loads `WEB_URL/blog/preview/<id>` directly: no `/api/preview` hop, no secret in the URL and no draft-mode cookie (the browser drops one set inside the iframe). The page authenticates every request with the admin's `payload-token` cookie, checked against the CMS, and is a 404 without a valid session. Keyed by id, the URL doesn't move while the slug follows the title. The page re-renders after every save; until the draft is saved it shows "This draft isn't saved yet" and recovers on the next save.
 
 Details, including the production cookie-domain requirement, are in [apps/payload/README.md](apps/payload/README.md).
+
+## Deploy
+
+Production is an Easypanel Compose service built from [`docker-compose.yml`](docker-compose.yml): `web` (port 3000) and `cms` (port 3001, SQLite and uploads on the `cms-data` volume). Variables are listed in [`.env.deploy.example`](.env.deploy.example). Step by step, including the first deploy, updates, backups and troubleshooting: [docs/deploy-easypanel.md](docs/deploy-easypanel.md).
 
 ## MCP
 
