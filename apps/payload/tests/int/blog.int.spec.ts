@@ -1,13 +1,13 @@
 import type { User } from '@repo/cms-types'
-import type { PayloadRequest } from 'payload'
-import { afterEach, describe, expect, it } from 'vitest'
+import type { CollectionAfterChangeHook, PayloadRequest } from 'payload'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { publishedOrAuthenticated } from '@/access/published-or-authenticated'
 import { canRunJobs } from '@/access/run-jobs'
 import { validateLinkUrl } from '@/fields/link-url'
 import { relationIds } from '@/fields/relation-ids'
 import { formatSlug } from '@/fields/slug'
 import { toPopulatedAuthors } from '@/hooks/populate-authors'
-import { isDraftOnlyChange } from '@/hooks/revalidate-web'
+import { isAutosave, revalidateAfterChange } from '@/hooks/revalidate-web'
 import { blogPostUrl, categoryPath, seoTitle } from '@/plugins/blog-urls'
 
 const user: User = { id: 1, name: 'Ada Lovelace', email: 'ada@example.com', updatedAt: '', createdAt: '', collection: 'users' }
@@ -24,6 +24,9 @@ describe('formatSlug', () => {
   })
   it('trims leading, trailing and repeated separators', () => {
     expect(formatSlug('  --Hello   World__  ')).toBe('hello-world')
+  })
+  it('transliterates letters NFKD cannot decompose', () => {
+    expect(formatSlug('Straße Ørsted Łódź Đakovo Æsir Œuvre')).toBe('strasse-orsted-lodz-dakovo-aesir-oeuvre')
   })
   it('returns an empty string when nothing is left', () => {
     expect(formatSlug('!!!')).toBe('')
@@ -60,13 +63,16 @@ describe('relationIds', () => {
 describe('canRunJobs', () => {
   const original = process.env.CRON_SECRET
   afterEach(() => {
-    process.env.CRON_SECRET = original
+    if (original === undefined) delete process.env.CRON_SECRET
+    else process.env.CRON_SECRET = original
   })
   it('accepts signed-in users and the cron secret only', () => {
     process.env.CRON_SECRET = 's3cret'
     expect(canRunJobs({ req: fakeReq(true) })).toBe(true)
     expect(canRunJobs({ req: fakeReq(false, 'Bearer s3cret') })).toBe(true)
     expect(canRunJobs({ req: fakeReq(false, 'Bearer nope') })).toBe(false)
+    expect(canRunJobs({ req: fakeReq(false, 'Bearer s3creX') })).toBe(false)
+    expect(canRunJobs({ req: fakeReq(false) })).toBe(false)
   })
   it('never matches when no secret is configured', () => {
     delete process.env.CRON_SECRET
@@ -96,11 +102,38 @@ describe('validateLinkUrl', () => {
   })
 })
 
-describe('isDraftOnlyChange', () => {
-  it('skips draft saves but not publishes or unpublishes', () => {
-    expect(isDraftOnlyChange({ _status: 'draft' }, { _status: 'draft' })).toBe(true)
-    expect(isDraftOnlyChange({ _status: 'published' }, { _status: 'draft' })).toBe(false)
-    expect(isDraftOnlyChange({ _status: 'draft' }, { _status: 'published' })).toBe(false)
-    expect(isDraftOnlyChange({}, undefined)).toBe(false)
+describe('revalidateAfterChange', () => {
+  const env = { WEB_URL: process.env.WEB_URL, REVALIDATE_SECRET: process.env.REVALIDATE_SECRET }
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    for (const [key, value] of Object.entries(env)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  })
+
+  const run = async (query: Record<string, unknown>) => {
+    process.env.WEB_URL = 'http://web.test'
+    process.env.REVALIDATE_SECRET = 'secret'
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const req = { query, context: {}, payload: { logger: { warn: vi.fn() } } } as unknown as PayloadRequest
+    // Unpublish after a draft edit: the stored doc and the previous one are both drafts.
+    const args = { doc: { _status: 'draft' }, previousDoc: { _status: 'draft' }, req }
+    await revalidateAfterChange(args as unknown as Parameters<CollectionAfterChangeHook>[0])
+    return fetchMock.mock.calls.length
+  }
+
+  it('revalidates an unpublish that follows a draft edit', async () => {
+    expect(await run({ draft: true })).toBe(1)
+  })
+  it('skips admin autosaves only', async () => {
+    expect(await run({ autosave: true, draft: true })).toBe(0)
+  })
+  it('recognises the autosave flag raw or parsed', () => {
+    expect(isAutosave({ query: { autosave: 'true' } })).toBe(true)
+    expect(isAutosave({ query: { autosave: true } })).toBe(true)
+    expect(isAutosave({ query: { autosave: 'false' } })).toBe(false)
+    expect(isAutosave({ query: {} })).toBe(false)
   })
 })

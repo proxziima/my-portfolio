@@ -23,6 +23,8 @@ const searchFields: Field[] = [
 ]
 
 const beforeSync: BeforeSync = async ({ originalDoc, req, searchDoc }) => {
+  // Drafts are never indexed (syncDrafts is off), so skip the category lookup.
+  if (originalDoc._status === 'draft') return searchDoc
   const ids = relationIds(originalDoc.categories)
   const { docs } = ids.length
     ? await req.payload.find({

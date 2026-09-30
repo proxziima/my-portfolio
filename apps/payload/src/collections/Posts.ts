@@ -11,7 +11,13 @@ import { revalidateCollectionHooks } from '../hooks/revalidate-web'
 export const Posts: CollectionConfig<'posts'> = {
   slug: 'posts',
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'slug', '_status', 'publishedAt'], group: 'Blog' },
-  access: { read: publishedOrAuthenticated, create: authenticated, update: authenticated, delete: authenticated },
+  access: {
+    read: publishedOrAuthenticated,
+    readVersions: authenticated,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
+  },
   defaultPopulate: { title: true, slug: true, excerpt: true, heroImage: true, categories: true, publishedAt: true },
   hooks: {
     ...revalidateCollectionHooks,

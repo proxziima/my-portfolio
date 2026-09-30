@@ -25,14 +25,18 @@ async function notifyWeb(req: PayloadRequest): Promise<void> {
   }
 }
 
-type Status = { _status?: string } | null | undefined
+/**
+ * True for admin autosaves (`PATCH …?autosave=true`, every few hundred ms while typing). They only
+ * write a draft version the web never shows. Payload's parseParams turns the flag into a boolean in place.
+ */
+export const isAutosave = (req: Pick<PayloadRequest, 'query'>): boolean => {
+  const flag: unknown = req.query?.autosave
+  return flag === true || flag === 'true'
+}
 
-/** Draft saves (autosave fires every few hundred ms) are invisible to the web, unless they unpublish. */
-export const isDraftOnlyChange = (doc: Status, previousDoc: Status): boolean =>
-  doc?._status === 'draft' && previousDoc?._status !== 'published'
-
-export const revalidateAfterChange: CollectionAfterChangeHook = async ({ doc, previousDoc, req }) => {
-  if (!isDraftOnlyChange(doc, previousDoc)) await notifyWeb(req)
+// Every other write revalidates, including unpublish (whose doc and previousDoc can both be drafts).
+export const revalidateAfterChange: CollectionAfterChangeHook = async ({ doc, req }) => {
+  if (!isAutosave(req)) await notifyWeb(req)
   return doc
 }
 export const revalidateAfterDelete: CollectionAfterDeleteHook = async ({ doc, req }) => {
