@@ -1,8 +1,8 @@
 /**
- * A tile of greyscale white noise as a PNG data URL, for the screen's static and the scene's film
- * grain (the reference drew both with video and a shader; one small tile stepped across in CSS is
- * enough at these opacities). Seeded with the same LCG as the click sound, so a seed always yields
- * the same tile. `null` where canvas 2D is unavailable (jsdom, old browsers): the layers then show nothing.
+ * A tile of greyscale white noise as a PNG data URL, for the screen's static (the reference looped a
+ * video; one small tile stepped across in CSS is enough at this opacity). Seeded with the same LCG
+ * as the click sound, so a seed always yields the same tile. `null` where canvas 2D is unavailable
+ * (jsdom, old browsers): the static then shows nothing.
  */
 export function noiseDataUrl(size = 128, seed = 7): string | null {
   if (typeof document === 'undefined') return null

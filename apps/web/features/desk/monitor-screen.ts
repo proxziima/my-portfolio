@@ -42,12 +42,17 @@ export interface MonitorScreen {
 }
 
 /**
- * The DOM the CSS3D object carries: a fixed-size dark slab with the iframe inset by `padding`, and
- * over both the CRT layers (`screen-fx.css`), which let the pointer through to the iframe.
+ * The DOM the CSS3D object carries: a fixed-size slab shaded like a powered-off tube, the iframe
+ * inset by `padding`, and over both the CRT layers (`screen-fx.css`), which let the pointer through
+ * to the iframe. The layers wait for the iframe's load: over the bare slab they read as a broken texture.
  */
 function createScreenElement(src: string, screen: ScreenSpec): { element: HTMLDivElement; iframe: HTMLIFrameElement } {
   const element = document.createElement('div')
-  Object.assign(element.style, { width: `${screen.width}px`, height: `${screen.height}px`, background: '#1d2e2f' })
+  Object.assign(element.style, {
+    width: `${screen.width}px`,
+    height: `${screen.height}px`,
+    background: 'radial-gradient(ellipse at center, #243436 0%, #121a1b 70%, #0b0f10 100%)',
+  })
   const iframe = document.createElement('iframe')
   iframe.src = src
   iframe.title = 'Desktop'
@@ -57,6 +62,8 @@ function createScreenElement(src: string, screen: ScreenSpec): { element: HTMLDi
   fx.className = 'screen-fx'
   fx.setAttribute('aria-hidden', 'true')
   fx.style.pointerEvents = 'none' // inline too: the iframe must stay clickable even before the stylesheet applies
+  fx.dataset.ready = 'false'
+  iframe.addEventListener('load', () => { fx.dataset.ready = 'true' }, { once: true })
   element.append(iframe, fx)
   return { element, iframe }
 }

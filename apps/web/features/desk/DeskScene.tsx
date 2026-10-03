@@ -120,14 +120,9 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
     else engine.stop()
   }, [engine, visible])
 
-  // one noise tile for the screen's static and the grain; the scene is client-only (no SSR), so `document` exists
+  // the noise tile for the screen's static (screen-fx.css); the scene is client-only (no SSR), so `document` exists
   const noise = useMemo(() => noiseDataUrl(), [])
   const hostStyle = useMemo(() => (noise ? ({ '--noise': `url(${noise})` }) as CSSProperties : undefined), [noise])
 
-  // the grain is a React child beside the engine's two layers: the engine appends them, it never replaces the host's children
-  return (
-    <div ref={hostRef} className={styles.host} style={hostStyle} data-loaded={loaded} data-anchor="desk-scene">
-      <div className={styles.grain} aria-hidden="true" />
-    </div>
-  )
+  return <div ref={hostRef} className={styles.host} style={hostStyle} data-loaded={loaded} data-anchor="desk-scene" />
 }

@@ -1,38 +1,8 @@
-/* Fills the figure box; the engine appends the CSS3D layer and the canvas inside. Isolated so the
-   grain's blend stays within the scene and its z-index cannot climb over the box's controls. */
+/* Fills the figure box; the engine appends the CSS3D layer and the canvas inside. */
 .host {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  isolation: isolate;
-}
-
-/* the reference's soft-light noise over the whole picture */
-.grain {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  opacity: 0.12;
-  mix-blend-mode: soft-light;
-  background-image: var(--noise, none);
-  background-size: 128px 128px;
-  animation: grain-shift 0.5s steps(5) infinite;
-}
-
-@keyframes grain-shift {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: 96px 64px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .grain {
-    animation: none;
-  }
 }
 
 /* the models fade in over the already-visible screen once the first frame with them is drawn */
