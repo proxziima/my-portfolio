@@ -55,21 +55,25 @@ Replaces the hand-rolled observer in `Figure.tsx` (DRY), which becomes
 - `MAX_PIXEL_RATIO = 2`: no visible gain above 2× for this scene, and it
   bounds the cost on large high-DPI screens.
 - `scenePixelRatio(devicePixelRatio, fit): number`, a pure function that
-  returns `Math.min(MAX_PIXEL_RATIO, devicePixelRatio * fit)`. A non-finite
-  or non-positive result falls back to `1`.
+  returns `devicePixelRatio * fit` rounded up to a 0.25 step and capped at
+  `MAX_PIXEL_RATIO`. The step makes a window drag resize the buffer a few
+  times rather than every frame; rounding up never renders below the screen's
+  density. A non-finite or non-positive result falls back to `1`.
 - `applyPixelRatio(app, ratio): void` is the only place that touches the
   runtime's internals. The public API has no pixel-ratio option, so it calls
-  `app._renderer?.setPixelRatio?.(ratio)` and then `app.requestRender()`. It
-  is feature-detected and does nothing if the internals are missing (e.g.
-  after a runtime upgrade). The runtime's later resizes go through
-  `renderer.setSize`, which keeps the ratio, so setting it once per `fit`
-  change is enough.
+  `app._renderer.setPixelRatio(ratio)` and then the runtime's own forced
+  resize, `app._resize(true)`. The forced resize is needed because the
+  renderer skips `setSize` when the size is unchanged, so a ratio change alone
+  leaves the drawing buffer as it was; `_resize(true)` resizes it, updates the
+  camera and requests a redraw (plain `requestRender()` does nothing in
+  `renderMode: 'auto'`). It is feature-detected and does nothing if either
+  internal is missing (e.g. after a runtime upgrade).
 
 **`features/figure/SplineScene.tsx`** (modified)
 - Holds the loaded `Application` in state (`app`, set when `load()`
   resolves) in place of the `loaded` boolean. `data-loaded` becomes
   `app !== null`.
-- Effect on `[app, fit]`: `applyPixelRatio(app, scenePixelRatio(devicePixelRatio, fit))`.
+- `pixelRatio = scenePixelRatio(devicePixelRatio, fit)` in render; effect on `[app, pixelRatio]`: `applyPixelRatio(app, pixelRatio)`, so it only fires when the quantized ratio changes.
 - `const visible = useInView(stageRef)`. Effect on `[app, visible]`: if
   `visible` and `app.isStopped`, `app.play()`; if not visible and not stopped,
   `app.stop()`.
@@ -82,7 +86,7 @@ Replaces the hand-rolled observer in `Figure.tsx` (DRY), which becomes
 Figure ── useInView(box, once, 200px) ──▶ mounts SplineScene
 SplineScene
   useFitScale(stage) ─▶ fit ─┐
-  load() resolves ─▶ app ────┼─▶ applyPixelRatio(app, min(2, dpr × fit))
+  load() resolves ─▶ app ────┼─▶ applyPixelRatio(app, ratio(dpr, fit))
   useInView(stage) ─▶ visible ┴─▶ app.play() / app.stop()
 ```
 
@@ -99,9 +103,10 @@ SplineScene
 Vitest unit tests (`tests/unit/**`, jsdom where React is involved), following
 `tests/unit/figure/use-fit-scale.test.ts`:
 
-- `scene-pixel-ratio.test.ts`: the cap, the fitted product, the fallback for
-  0/NaN/Infinity; `applyPixelRatio` calls `setPixelRatio` and
-  `requestRender`, and does not throw without `_renderer`.
+- `scene-pixel-ratio.test.ts`: the cap, the fitted product rounded up to 0.25
+  steps, the fallback for 0/NaN/Infinity; `applyPixelRatio` calls
+  `setPixelRatio` then `_resize(true)`, and does nothing (no throw, no calls)
+  when `_renderer`, `setPixelRatio` or `_resize` is missing.
 - `use-in-view.test.ts` (fake IntersectionObserver): toggles with
   intersection, latches and disconnects with `once`, passes `rootMargin`,
   disconnects on unmount.

@@ -36,6 +36,7 @@ export function SplineScene({ url, onFail }: { url: string; onFail: () => void }
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [app, setApp] = useState<Application | null>(null)
   const fit = useFitScale(stageRef, STAGE.width)
+  const pixelRatio = scenePixelRatio(window.devicePixelRatio, fit)
   const visible = useInView(stageRef)
   useHideSplineTextProxy()
 
@@ -62,8 +63,8 @@ export function SplineScene({ url, onFail }: { url: string; onFail: () => void }
   }, [url, onFail])
 
   useEffect(() => {
-    if (app) applyPixelRatio(app, scenePixelRatio(window.devicePixelRatio, fit))
-  }, [app, fit])
+    if (app) applyPixelRatio(app, pixelRatio)
+  }, [app, pixelRatio])
 
   // nothing to see off screen: stop the render loop (and its events) until the stage scrolls back
   useEffect(() => {
