@@ -36,8 +36,8 @@ interface RuntimeInternals {
  */
 export function applyPixelRatio(app: Application, ratio: number): void {
   const internals = app as unknown as RuntimeInternals
-  const setPixelRatio = internals._renderer?.setPixelRatio
-  if (typeof setPixelRatio !== 'function' || typeof internals._resize !== 'function') return
-  internals._renderer!.setPixelRatio!(ratio)
+  const renderer = internals._renderer
+  if (typeof renderer?.setPixelRatio !== 'function' || typeof internals._resize !== 'function') return
+  renderer.setPixelRatio(ratio)
   internals._resize(true)
 }
