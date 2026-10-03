@@ -27,6 +27,7 @@ export const CREDITS = (name: string): CreditSection[] => [
       ['Autodesk', 'AutoCAD Release 12 (1993)'],
       ['Adobe', 'Acrobat Reader for DOS (1993)'],
       ['id Software', 'DOOM (shareware)'],
+      ['FreeDOS CuteMouse', 'DOS mouse driver'],
       ['js-dos & DOSBox', 'DOS emulation'],
     ],
   },

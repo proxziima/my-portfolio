@@ -392,7 +392,21 @@ metrics, writes a PDF 1.0 using the Reader's built-in Helvetica fonts by name
 (WinAnsi, uncompressed streams, a classic xref), and swaps it into
 `public/resume.jsdos` as `ACRODOS/RESUME.PDF`. Text stays text, crisp at any
 zoom. The bundle is the Reader install (tour, registration card and VESA tools
-dropped; 1.7 MB) with an autoexec of `cd \ACRODOS` / `ACROBAT RESUME.PDF`.
+dropped; 1.7 MB) with an autoexec of `CTMOUSE /P` / `cd \ACRODOS` /
+`ACROBAT RESUME.PDF`.
+
+The mouse goes through FreeDOS CuteMouse 2.1b4 (`CTMOUSE.EXE` at the bundle
+root, GPL, credited) instead of js-dos's built-in INT 33h driver. The Reader
+moves its hand by the difference between the running mickey totals its event
+handler receives in SI/DI, as the Microsoft spec defines them. js-dos 0.73
+(and its current source) passes each event's motion instead and resets it, so
+the difference is about zero and the hand only twitched around the centre.
+CuteMouse hides the built-in driver and reads the emulated PS/2 port (`/P`, no
+serial probing), giving spec-compliant totals. It keeps the Microsoft defaults:
+small moves track 1:1 horizontally, faster ones accelerate up to 3×, and the
+vertical ratio is 16 mickeys per 8 pixels, so vertical motion is half speed, as
+on a real PC with this driver. Doom and AutoCAD read the mouse correctly
+through the built-in driver and stay on it.
 
 ### 3.15 Screen effects (added 2026-10-03)
 
