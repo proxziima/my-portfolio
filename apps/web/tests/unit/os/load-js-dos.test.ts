@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-type Loader = typeof import('@/features/os/apps/doom/load-js-dos')
+type Loader = typeof import('@/features/os/apps/dos/load-js-dos')
 
 /** A fresh module per test: the loader caches its promise at module scope. */
 let loadJsDos: Loader['loadJsDos']
@@ -11,7 +11,7 @@ const links = () => document.head.querySelectorAll('link[rel="stylesheet"][href=
 
 beforeEach(async () => {
   vi.resetModules()
-  ;({ loadJsDos } = await import('@/features/os/apps/doom/load-js-dos'))
+  ;({ loadJsDos } = await import('@/features/os/apps/dos/load-js-dos'))
 })
 
 afterEach(() => {

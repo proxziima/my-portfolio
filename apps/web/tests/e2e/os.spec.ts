@@ -51,16 +51,37 @@ test('a shortcut opens Credits on top, and close removes it', async ({ page }) =
   await expect(credits).toHaveCount(0)
 })
 
+const jsDosScripts = (page: Page) => page.locator('head script[src="/js-dos/js-dos.js"]')
+
+/** Double-clicks a DOS program's shortcut and waits for js-dos to put its canvas in the window. */
+async function openDosApp(page: Page, shortcut: string, title: string): Promise<void> {
+  await page.getByRole('button', { name: shortcut, exact: true }).dblclick()
+  const win = page.getByRole('dialog', { name: title, exact: true })
+  await expect(win).toBeVisible()
+  await expect(win.locator('footer span').first()).toHaveText('Powered by JSDOS & DOSBox')
+  await expect(jsDosScripts(page)).toHaveCount(1)
+  await expect(win.locator('[data-anchor="dos-player"] canvas').first()).toBeAttached({ timeout: 30_000 })
+}
+
+// DOSBox runs as WASM and the frames are drawn in software in headless Chromium: these allow it time
 test('the Doom shortcut boots the shareware bundle in js-dos', async ({ page }) => {
-  // DOSBox runs as WASM and the frames are drawn in software in headless Chromium: allow it time
   test.setTimeout(60_000)
   await openDesktop(page)
-  await page.getByRole('button', { name: 'Doom', exact: true }).dblclick()
-  const doom = page.getByRole('dialog', { name: 'Doom' })
-  await expect(doom).toBeVisible()
-  await expect(doom.locator('footer span').first()).toHaveText('Powered by JSDOS & DOSBox')
-  await expect(page.locator('head script[src="/js-dos/js-dos.js"]')).toHaveCount(1)
-  await expect(doom.locator('[data-anchor="dos-player"] canvas').first()).toBeAttached({ timeout: 30_000 })
+  await openDosApp(page, 'Doom', 'Doom')
+})
+
+test('the AutoCAD shortcut boots Release 12 in js-dos', async ({ page }) => {
+  test.setTimeout(60_000)
+  await openDesktop(page)
+  await openDosApp(page, 'AutoCAD', 'AutoCAD Release 12')
+})
+
+test('two DOS programs share one js-dos runtime', async ({ page }) => {
+  test.setTimeout(90_000)
+  await openDesktop(page)
+  await openDosApp(page, 'Doom', 'Doom')
+  await openDosApp(page, 'AutoCAD', 'AutoCAD Release 12')
+  await expect(jsDosScripts(page)).toHaveCount(1)
 })
 
 test('dragging the title bar moves the window', async ({ page }) => {

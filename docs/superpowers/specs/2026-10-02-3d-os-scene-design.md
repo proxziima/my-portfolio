@@ -343,6 +343,29 @@ renders bitmap icons for names listed in `BITMAPS`. Credits gain a "Games"
 section naming id Software and js-dos/DOSBox. Serving GPL binaries means
 offering their source: the Credits link to github.com/caiiiycuk/js-dos.
 
+### 3.14b AutoCAD Release 12 (added 2026-10-03)
+
+The owner installed and configured AutoCAD R12 in DOSBox (VGA display,
+Microsoft mouse driver, no plotter, file locking off) and supplied the
+installed `ACAD` folder with `ACADR12.BAT` and `CONFIG.SYS`. The bundle
+`public/autocad.jsdos` (6.6 MB) is that install minus what AutoCAD never loads
+at runtime (`SOURCE`, `TUTORIAL`, `R11SUPP`, ADS sources and docs) plus a
+`.jsdos/dosbox.conf` taken from the Doom bundle with a clean autoexec:
+`mount c .`, `c:`, `call ACADR12.BAT`.
+
+DRY: Doom and AutoCAD are the same thing — a bundle in `DosPlayer` on black —
+so `apps/doom/` (the loader and player) moves to `apps/dos/`, `apps/Doom.tsx`
+becomes `apps/dos-app.tsx` with `dosApp(bundleUrl, displayName)` returning the
+component, and the registry holds both, sharing one `DOS_CHROME`: AutoCAD as
+"AutoCAD Release 12" (shortcut "AutoCAD"), 650×538 so the content box is
+exactly its 640×480 VGA screen (the chrome is 10 px across and 58 px down), the
+same status and bar colour as Doom, and
+a pixel icon of the boot-screen mark (`public/os/icons/autocad.png`). Credits'
+"Games" section becomes "DOS software" with an Autodesk row.
+
+The startup banner shows the licensee the installed copy carries; this is
+AutoCAD's own screen and is not altered.
+
 ### 3.15 Screen effects (added 2026-10-03)
 
 The reference's smudge/static/shadow planes become CSS layers inside the

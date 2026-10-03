@@ -3,7 +3,7 @@ import type { Portfolio } from '@/lib/cms/types'
 import type { IconName } from './icons'
 import type { Size } from './window-geometry'
 import { Credits } from './apps/Credits'
-import { Doom } from './apps/Doom'
+import { dosApp } from './apps/dos-app'
 import { Showcase } from './apps/Showcase'
 
 export interface OsAppProps {
@@ -29,19 +29,23 @@ export interface OsApp {
 /** An app whose title has been resolved against the content, for the chrome that only shows text. */
 export type ResolvedApp = Omit<OsApp, 'title'> & { title: string }
 
+/** The chrome every DOS program shares, as the reference's Doom window. */
+const DOS_CHROME = { status: 'Powered by JSDOS & DOSBox', barColor: '#1c1c1c' } as const
+
 export const APPS: readonly OsApp[] = [
   // the reference's "Henry Heffernan - Showcase 2022", with our owner and this year
   { id: 'showcase', title: (data) => `${data.profile.name} - Showcase ${new Date().getFullYear()}`, shortcut: 'My Showcase', icon: 'folder', component: Showcase },
   { id: 'credits', title: 'Credits', shortcut: 'Credits', icon: 'document', component: Credits, size: { width: 1100, height: 800 } },
+  { id: 'doom', title: 'Doom', shortcut: 'Doom', icon: 'doom', component: dosApp('/doom.jsdos', 'Doom'), size: { width: 980, height: 670 }, ...DOS_CHROME },
+  // the window chrome is 10 px across and 58 px down: this leaves exactly its 640×480 VGA screen, unscaled
   {
-    id: 'doom',
-    title: 'Doom',
-    shortcut: 'Doom',
-    icon: 'doom',
-    component: Doom,
-    size: { width: 980, height: 670 },
-    status: 'Powered by JSDOS & DOSBox',
-    barColor: '#1c1c1c',
+    id: 'autocad',
+    title: 'AutoCAD Release 12',
+    shortcut: 'AutoCAD',
+    icon: 'autocad',
+    component: dosApp('/autocad.jsdos', 'AutoCAD'),
+    size: { width: 650, height: 538 },
+    ...DOS_CHROME,
   },
 ]
 

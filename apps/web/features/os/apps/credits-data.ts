@@ -22,8 +22,9 @@ export const CREDITS = (name: string): CreditSection[] => [
     ],
   },
   {
-    title: 'Games',
+    title: 'DOS software',
     rows: [
+      ['Autodesk', 'AutoCAD Release 12 (1993)'],
       ['id Software', 'DOOM (shareware)'],
       ['js-dos & DOSBox', 'DOS emulation'],
     ],
