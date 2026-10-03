@@ -13,7 +13,10 @@ declare global {
 class FakeIntersectionObserver {
   static last: FakeIntersectionObserver | undefined
   readonly observed: Element[] = []
-  readonly disconnect = vi.fn()
+  disconnected = false
+  readonly disconnect = vi.fn(() => {
+    this.disconnected = true
+  })
   constructor(
     readonly callback: IntersectionObserverCallback,
     readonly options?: IntersectionObserverInit,
@@ -24,8 +27,11 @@ class FakeIntersectionObserver {
     this.observed.push(target)
   }
   unobserve() {}
-  report(isIntersecting: boolean) {
-    this.callback([{ isIntersecting } as IntersectionObserverEntry], this as unknown as IntersectionObserver)
+  /** Delivers one batch with an entry per state, oldest first; like the real thing, silent once disconnected. */
+  report(...states: boolean[]) {
+    if (this.disconnected) return
+    const entries = states.map((isIntersecting) => ({ isIntersecting }) as IntersectionObserverEntry)
+    this.callback(entries, this as unknown as IntersectionObserver)
   }
 }
 
@@ -89,6 +95,16 @@ describe('useInView', () => {
     act(() => observer().report(true))
     expect(seen.at(-1)).toBe(true)
     expect(observer().disconnect).toHaveBeenCalledOnce()
+    act(() => observer().report(false))
+    expect(seen.at(-1)).toBe(true)
+  })
+
+  it('uses the latest of several batched entries', () => {
+    act(() => root.render(createElement(Harness)))
+    act(() => observer().report(true, false))
+    expect(seen.at(-1)).toBe(false)
+    act(() => observer().report(false, true))
+    expect(seen.at(-1)).toBe(true)
   })
 
   it('disconnects the observer on unmount', () => {
