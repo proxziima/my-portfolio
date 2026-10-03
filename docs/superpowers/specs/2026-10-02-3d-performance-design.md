@@ -44,8 +44,10 @@ few words), through WAAPI or scoped rAF, and respect
 **`lib/dom/use-in-view.ts`: `useInView(ref, { rootMargin?, once? }): boolean`**
 One IntersectionObserver hook for the app. Returns whether the element
 intersects the viewport (expanded by `rootMargin`). With `once`, the hook
-latches `true` and disconnects on first intersection. Starts `false`. If
-`IntersectionObserver` is missing, it returns `true` (render as before).
+latches `true` and disconnects on first intersection. Starts `false` (also on
+the server, so hydration matches). No fallback for a missing
+`IntersectionObserver`: every supported browser has it, and the current code
+already relies on it.
 Replaces the hand-rolled observer in `Figure.tsx` (DRY), which becomes
 `useInView(box, { rootMargin: NEAR_MARGIN, once: true })`.
 
@@ -89,8 +91,6 @@ SplineScene
 - Load failure is unchanged (`onFail` collapses the figure to its caption).
 - Missing runtime internals: `applyPixelRatio` does nothing and the scene
   renders at the runtime's default ratio, as today.
-- Missing `IntersectionObserver`: `useInView` returns `true`. The figure
-  mounts immediately and the scene never pauses, as today.
 - Unmount: `dispose()` as today. The play/stop effect only touches a live,
   loaded `app`.
 
@@ -104,7 +104,7 @@ Vitest unit tests (`tests/unit/**`, jsdom where React is involved), following
   `requestRender`, and does not throw without `_renderer`.
 - `use-in-view.test.ts` (fake IntersectionObserver): toggles with
   intersection, latches and disconnects with `once`, passes `rootMargin`,
-  disconnects on unmount, returns `true` without IntersectionObserver.
+  disconnects on unmount.
 
 Manual check in the running app: on a 3× mobile emulation, after load,
 `canvas.width / canvas.clientWidth ≈ dpr × fit`, not `dpr`. Scrolling the
