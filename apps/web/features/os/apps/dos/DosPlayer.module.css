@@ -1,7 +1,16 @@
-/* fills the window's content box; js-dos lays its canvas out inside and follows this box's size */
-.player {
+/* Fills the window's content box; js-dos lays its canvas out inside and follows this box's size.
+   `Dos(root)` adds its own utility classes to this element, among them `relative`, from a stylesheet
+   that loads after ours. Losing `absolute` lets the canvas size the box, and js-dos refits the canvas
+   to the box: the boot screen then "grows" a few pixels a frame until it fills the window. The doubled
+   class outranks the utility class without `!important`. */
+.player.player {
   position: absolute;
   inset: 0;
+}
+
+/* an inline canvas sits on the text baseline and adds a few pixels below it */
+.player canvas {
+  display: block;
 }
 
 .message {

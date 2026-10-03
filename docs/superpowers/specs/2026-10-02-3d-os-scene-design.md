@@ -356,13 +356,20 @@ passes its first argument to AutoCAD as the drawing to open, so AutoCAD starts
 on the bundled house floor plan (its saved view already fits the screen).
 Visitors' edits live in js-dos's in-memory drive and vanish on reload.
 
+Two player details apply to every DOS app. Mouse autolock is on (set after
+`run()`, which resets it from the bundle): a click captures the pointer and Esc
+releases it, so only the program's own cursor shows and it follows the hand.
+And the player's root keeps `position: absolute` against the `relative` utility
+class `Dos(root)` adds; without it the canvas sized its own container and the
+boot screen grew a few pixels a frame until it filled the window.
+
 DRY: Doom and AutoCAD are the same thing — a bundle in `DosPlayer` on black —
 so `apps/doom/` (the loader and player) moves to `apps/dos/`, `apps/Doom.tsx`
 becomes `apps/dos-app.tsx` with `dosApp(bundleUrl, displayName)` returning the
 component, and the registry holds both, sharing one `DOS_CHROME`: AutoCAD as
-"AutoCAD Release 12" (shortcut "AutoCAD"), 650×538 so the content box is
-exactly its 640×480 VGA screen (the chrome is 10 px across and 58 px down), the
-same status and bar colour as Doom, and
+"AutoCAD Release 12" (shortcut "AutoCAD"), 970×778 so the content box is
+1.5× its 640×480 VGA screen (the chrome is 10 px across and 58 px down; 1:1
+read too small), the same status and bar colour as Doom, and
 a pixel icon of the boot-screen mark (`public/os/icons/autocad.png`). Credits'
 "Games" section becomes "DOS software" with an Autodesk row.
 

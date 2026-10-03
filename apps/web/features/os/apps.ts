@@ -44,7 +44,8 @@ export const APPS: readonly OsApp[] = [
     shortcut: 'AutoCAD',
     icon: 'autocad',
     component: dosApp('/autocad.jsdos', 'AutoCAD'),
-    size: { width: 650, height: 538 },
+    // 1.5× its 640×480 VGA screen plus the window chrome (10 × 58): readable, and it fits the 1280×1024 desk
+    size: { width: 970, height: 778 },
     ...DOS_CHROME,
   },
 ]
