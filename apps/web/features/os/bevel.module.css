@@ -1,0 +1,20 @@
+/* The two 3D edges every OS surface is built from. Compose them; never redraw the borders. */
+.raised {
+  border: 1px solid;
+  border-color: var(--os-light) var(--os-dark) var(--os-dark) var(--os-light);
+  box-shadow: inset 1px 1px var(--os-face), inset -1px -1px var(--os-shadow);
+  background: var(--os-face);
+}
+
+.sunken {
+  border: 1px solid;
+  border-color: var(--os-shadow) var(--os-light) var(--os-light) var(--os-shadow);
+  box-shadow: inset 1px 1px var(--os-dark), inset -1px -1px var(--os-face);
+}
+
+.pressed {
+  border: 1px solid;
+  border-color: var(--os-dark) var(--os-light) var(--os-light) var(--os-dark);
+  box-shadow: inset 1px 1px var(--os-shadow);
+  background: var(--os-face);
+}

@@ -1,0 +1,79 @@
+/* Global for the OS root layout only: the portfolio's base.css never loads here. */
+@import './os-tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--os-desk);
+  color: var(--os-text);
+  font: 11px/1.35 var(--os-font);
+  -webkit-font-smoothing: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* `hidden` must beat a component's own `display`: minimised windows stay mounted */
+[hidden] {
+  display: none !important;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+a {
+  color: var(--os-link);
+}
+
+img,
+svg {
+  image-rendering: pixelated;
+}
+
+/* CMS-authored bio markup (see shared/ui/chip-markup.ts) rendered inside the Showcase */
+.fav {
+  color: var(--os-link);
+}
+
+.chip {
+  display: inline-block;
+  min-width: 14px;
+  padding: 0 3px;
+  margin-right: 3px;
+  border: 1px solid var(--os-shadow);
+  background: var(--os-face);
+  color: var(--os-text);
+  font-style: normal;
+  font-size: 9px;
+  line-height: 12px;
+  text-align: center;
+}
+
+/* the curious-mode toggle is a page feature: show its word, drop its switch */
+.curiosity-trigger {
+  all: unset;
+  display: inline;
+}
+
+.curiosity-switch-track {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

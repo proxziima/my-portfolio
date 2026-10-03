@@ -1,0 +1,16 @@
+/* The OS palette: the classic 4-grey chrome, a navy title bar and a teal desk. */
+:root {
+  --os-face: #c0c0c0;
+  --os-shadow: #808080;
+  --os-dark: #404040;
+  --os-light: #ffffff;
+  --os-title: #000080;
+  --os-title-inactive: #808080;
+  --os-desk: #008080;
+  --os-text: #000000;
+  --os-text-inverse: #ffffff;
+  --os-link: #0000ee;
+  --os-font: Tahoma, 'MS Sans Serif', Arial, sans-serif;
+  --os-mono: 'Courier New', Courier, monospace;
+  --os-taskbar: 32px;
+}
