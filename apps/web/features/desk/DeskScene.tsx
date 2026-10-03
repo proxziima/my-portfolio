@@ -39,6 +39,18 @@ export function DeskScene({ onFail }: { onFail: () => void }) {
     fit()
     const ro = new ResizeObserver(fit)
     ro.observe(host)
+    // a DPR change (window moved to another screen) does not resize the box: watch the media query
+    let dprQuery: MediaQueryList | null = null
+    function onDpr() {
+      fit()
+      watchDpr()
+    }
+    function watchDpr() {
+      dprQuery?.removeEventListener('change', onDpr)
+      dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+      dprQuery.addEventListener('change', onDpr)
+    }
+    watchDpr()
     const unwatch = watchScreen(engine.iframe, (want) => engine.goTo(want ? 'monitor' : 'desk'))
     const onMove = (e: PointerEvent) => {
       const r = host.getBoundingClientRect()
@@ -50,6 +62,7 @@ export function DeskScene({ onFail }: { onFail: () => void }) {
     return () => {
       live = false
       ro.disconnect()
+      dprQuery?.removeEventListener('change', onDpr)
       unwatch()
       host.removeEventListener('pointermove', onMove)
       setEngine(null)
