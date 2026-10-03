@@ -1,7 +1,9 @@
 import { expect, type Page } from '@playwright/test'
 import { collectErrors, test } from './support'
 
-const showcase = (page: Page) => page.getByRole('dialog', { name: 'Showcase' })
+// titled like the reference's window: "<owner> - Showcase <year>"
+const SHOWCASE = /^.+ - Showcase \d{4}$/
+const showcase = (page: Page) => page.getByRole('dialog', { name: SHOWCASE })
 
 /** `/os` boots on its own (the boot screen is a second or so); wait for the first window. */
 async function openDesktop(page: Page): Promise<void> {
@@ -12,16 +14,16 @@ async function openDesktop(page: Page): Promise<void> {
 test('boots to a desktop with the Showcase window and its taskbar tab', async ({ page }) => {
   const errors = collectErrors(page)
   await openDesktop(page)
-  await expect(page.getByRole('navigation', { name: 'Taskbar' }).getByRole('button', { name: 'Showcase' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('navigation', { name: 'Taskbar' }).getByRole('button', { name: SHOWCASE })).toHaveAttribute('aria-pressed', 'true')
   await expect(showcase(page).getByRole('heading', { level: 1 })).not.toBeEmpty()
   expect(errors()).toEqual([])
 })
 
 test('minimise hides the window and the tab restores it', async ({ page }) => {
   await openDesktop(page)
-  await page.getByRole('button', { name: 'Minimise Showcase' }).click()
+  await showcase(page).getByRole('button', { name: /^Minimise / }).click()
   await expect(showcase(page)).toBeHidden()
-  await page.getByRole('navigation', { name: 'Taskbar' }).getByRole('button', { name: 'Showcase' }).click()
+  await page.getByRole('navigation', { name: 'Taskbar' }).getByRole('button', { name: SHOWCASE }).click()
   await expect(showcase(page)).toBeVisible()
 })
 
@@ -30,8 +32,8 @@ test('a shortcut opens Credits on top, and close removes it', async ({ page }) =
   await page.getByRole('button', { name: 'Credits' }).first().dblclick()
   const credits = page.getByRole('dialog', { name: 'Credits' })
   await expect(credits).toBeVisible()
-  const z = async (name: string) => page.getByRole('dialog', { name }).evaluate((el) => Number(getComputedStyle(el).zIndex))
-  expect(await z('Credits')).toBeGreaterThan(await z('Showcase'))
+  const z = async (name: string | RegExp) => page.getByRole('dialog', { name }).evaluate((el) => Number(getComputedStyle(el).zIndex))
+  expect(await z('Credits')).toBeGreaterThan(await z(SHOWCASE))
 
   // the roll: the owner's section first, a click moves on, a dot ticks in every second
   const status = await credits.locator('footer span').first().textContent()
@@ -66,8 +68,28 @@ test('dragging the title bar moves the window', async ({ page }) => {
 
 test('the Showcase navigates between pages', async ({ page }) => {
   await openDesktop(page)
+  // the window carries the owner's name, as the Credits roll's status line does
+  const status = await showcase(page).locator('footer span').first().textContent()
+  const name = status?.match(/^© Copyright (\d{4}) (.+)$/)
+  expect(name).toBeTruthy()
+  await expect(showcase(page)).toHaveAccessibleName(`${name![2]} - Showcase ${name![1]}`)
+
   await showcase(page).getByRole('button', { name: 'About' }).click()
-  await expect(showcase(page).getByRole('heading', { name: 'About' })).toBeVisible()
-  await showcase(page).getByRole('navigation', { name: 'Showcase' }).getByRole('button', { name: 'Contact' }).click()
-  await expect(showcase(page).getByRole('heading', { name: 'Contact' })).toBeVisible()
+  await expect(showcase(page).getByRole('heading', { level: 1, name: 'Welcome' })).toBeVisible()
+  const nav = showcase(page).getByRole('navigation', { name: 'Showcase' })
+  await expect(nav.getByRole('button', { name: 'About' })).toHaveAttribute('aria-current', 'page')
+  await nav.getByRole('button', { name: 'Contact' }).click()
+  await expect(showcase(page).getByRole('heading', { level: 1, name: 'Contact', exact: true })).toBeVisible()
+})
+
+test('the Showcase lists projects as raised boxes, and those with a link open it in a new tab', async ({ page }) => {
+  await openDesktop(page)
+  await showcase(page).getByRole('button', { name: 'Projects' }).click()
+  const content = showcase(page).locator('.content')
+  await expect(content.getByRole('heading', { level: 1 }).first()).toBeVisible()
+  await expect(content.locator('.bigButton').first()).toBeVisible()
+  // the seed's projects carry no url yet: a box is a link only when its row has one
+  for (const link of await content.locator('a.bigButton').all()) {
+    await expect(link).toHaveAttribute('target', '_blank')
+  }
 })

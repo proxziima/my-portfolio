@@ -23,7 +23,8 @@ export interface OsApp {
 export type ResolvedApp = Omit<OsApp, 'title'> & { title: string }
 
 export const APPS: readonly OsApp[] = [
-  { id: 'showcase', title: 'Showcase', icon: 'folder', component: Showcase },
+  // the reference's "Henry Heffernan - Showcase 2022", with our owner and this year
+  { id: 'showcase', title: (data) => `${data.profile.name} - Showcase ${new Date().getFullYear()}`, icon: 'folder', component: Showcase },
   { id: 'credits', title: 'Credits', icon: 'document', component: Credits, size: { width: 1100, height: 800 } },
 ]
 

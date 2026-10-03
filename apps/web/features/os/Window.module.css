@@ -57,7 +57,9 @@
   border-color: var(--os-dark) var(--os-light) var(--os-light) var(--os-dark);
 }
 
+/* positioned: an app may fill it absolutely and scroll its own panes (the Showcase's fixed sidebar) */
 .content {
+  position: relative;
   flex: 1;
   min-height: 0;
   margin: 4px 0;

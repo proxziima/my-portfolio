@@ -1,0 +1,368 @@
+/*
+ * The Showcase as the reference site (portfolio-inner-site: index.css, App.css and the showcase
+ * components' inline styles), scoped under .showcase so none of it reaches the OS chrome.
+ * Every size and margin below is the reference's; only the display face is a stand-in (Ultra).
+ */
+
+/* .site-page: fills the window's content box; the page pane scrolls, the sidebar stays put */
+.showcase {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: var(--os-serif), 'Times New Roman', Times, serif;
+  font-size: 16px;
+  line-height: normal;
+  -webkit-font-smoothing: auto;
+}
+
+/* the reference's App.css makes every div a (row) flexbox; its inline styles rely on that */
+.showcase div {
+  display: flex;
+}
+
+.showcase p,
+.showcase h1,
+.showcase h2,
+.showcase h3,
+.showcase h4 {
+  margin: 0;
+}
+
+.showcase p {
+  font-family: var(--os-serif), 'Times New Roman', Times, serif;
+  font-size: 18px;
+}
+
+/* MillenniumBold in the reference: the same family at 700 here */
+.showcase p b {
+  font-family: var(--os-serif), 'Times New Roman', Times, serif;
+  font-weight: 700;
+}
+
+/* gastromond in the reference; Ultra ships one weight, so no synthetic bold */
+.showcase h1 {
+  font-family: var(--os-display), serif;
+  font-size: 64px;
+  font-weight: 400;
+}
+
+.showcase h2 {
+  font-family: var(--os-serif), 'Times New Roman', Times, serif;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.showcase h3 {
+  font-family: var(--os-serif), 'Times New Roman', Times, serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.showcase h4 {
+  font-family: var(--os-serif), 'Times New Roman', Times, serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.showcase li {
+  margin-bottom: 16px;
+}
+
+.showcase a {
+  color: var(--os-link);
+}
+
+.showcase a:visited {
+  color: purple;
+}
+
+.showcase .text-block {
+  margin-top: 16px;
+  margin-bottom: 32px;
+  flex-direction: column;
+  text-align: justify;
+}
+
+/* .site-page-content: the scrolling page right of the 300px sidebar */
+.showcase .content {
+  flex-direction: column;
+  width: 100%;
+  margin-left: 300px;
+  padding: 32px 64px 64px 16px;
+  overflow-y: scroll;
+}
+
+.showcase .captioned-image {
+  align-self: center;
+  align-items: center;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.showcase .captioned-image img {
+  width: 100%;
+}
+
+/* .big-button-container: the raised 3D bevel, pressed in on :active */
+.showcase .bigButton {
+  --button-highlight: #fff;
+  --button-face: #747474;
+  --button-shadow: #808080;
+  --window-frame: #2b2b2b;
+  --surface: #c0c0c0;
+  --surface-hover: #e9e9e9;
+  --border-raised-outer: inset -1px -1px var(--window-frame), inset 1px 1px var(--button-highlight);
+  --border-raised-inner: inset -2px -2px var(--button-shadow), inset 2px 2px var(--button-face);
+  display: flex;
+  box-shadow: var(--border-raised-outer), var(--border-raised-inner);
+  padding: 24px;
+  overflow: hidden;
+  color: #000;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.showcase a.bigButton:visited {
+  color: #000;
+}
+
+/* a row with no link has nowhere to go: no hand cursor promising one */
+.showcase div.bigButton {
+  cursor: default;
+}
+
+.showcase .bigButton:hover {
+  background-color: var(--surface-hover);
+}
+
+.showcase .bigButton:active {
+  box-shadow: var(--border-raised-inner), var(--border-raised-outer);
+  background-color: var(--surface);
+}
+
+/* VerticalNavbar: position fixed against the transformed .site-page = pinned to the window's left */
+.showcase .sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  height: 100%;
+  padding: 48px;
+  overflow: hidden;
+}
+
+.showcase .sidebarHeader {
+  flex-direction: column;
+  margin-bottom: 64px;
+}
+
+.showcase .sidebarHeader h1 {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.showcase .sidebarHeader h3 {
+  margin-top: 12px;
+}
+
+.showcase .sidebarLinks {
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.showcase .sidebarLinks .navLink {
+  margin-bottom: 32px;
+}
+
+.showcase .sidebarSpacer {
+  flex: 1;
+}
+
+/* Link: an <h4 class="router-link"> in a flex <a>; a button here, the page is state not a route */
+.showcase .navLink {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--os-link);
+  text-align: left;
+  cursor: pointer;
+}
+
+.showcase .navLinkText {
+  font-family: var(--os-serif), 'Times New Roman', Times, serif;
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-transform: uppercase;
+}
+
+.showcase .navLink[data-pressed='true'] .navLinkText {
+  color: red;
+}
+
+/* the here-indicator: 4×4 content + a 3px ring, as the reference's content-box div */
+.showcase .hereIndicator {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 3px solid rgb(85, 26, 139);
+  border-radius: 50%;
+}
+
+/* Home: no sidebar; the name, the role and the four links, centred in the window */
+.showcase .home {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.showcase .homeHeader {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 64px 0;
+  text-align: center;
+}
+
+.showcase .homeHeader h1 {
+  margin-bottom: 16px;
+  font-size: 72px;
+  line-height: 0.9;
+}
+
+.showcase .homeLinks {
+  justify-content: space-between;
+}
+
+.showcase .homeLinks .navLink {
+  padding: 16px;
+}
+
+/* the document icon's white page vanishes on a white page: a one-icon-pixel (3px at 48) black outline */
+.showcase .strip svg,
+.showcase .projectLinkLeft svg {
+  filter: drop-shadow(3px 0 0 #000) drop-shadow(-3px 0 0 #000) drop-shadow(0 3px 0 #000) drop-shadow(0 -3px 0 #000);
+}
+
+/* ResumeDownload: a white strip ruled top and bottom */
+.showcase .strip {
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #000;
+  border-right-width: 0;
+  border-left-width: 0;
+  background-color: #fff;
+}
+
+.showcase .strip svg {
+  flex-shrink: 0;
+  width: 56px;
+  height: 48px;
+  margin-right: 24px;
+}
+
+.showcase .stripText {
+  flex-direction: column;
+}
+
+/* Experience: company and site on one row, role and period on the next */
+.showcase .jobHeader {
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+}
+
+/* our rows carry no description, so the text block's 16 + 32px gap stands in for it */
+.showcase .jobHeader + .jobHeader {
+  margin-top: 48px;
+}
+
+.showcase .jobHeaderInner {
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.showcase .jobHeaderRow {
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+/* Projects: one raised row per entry */
+.showcase .projectLinks {
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+}
+
+.showcase .projectLink {
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.showcase .projectLinkLeft {
+  align-items: center;
+  min-width: 0;
+  margin-left: 16px;
+}
+
+.showcase .projectLinkLeft svg {
+  flex-shrink: 0;
+  margin-right: 38px;
+}
+
+.showcase .projectText {
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.showcase .projectText h1 {
+  font-size: 48px;
+}
+
+/* Contact: the heading with the social squares on its baseline */
+.showcase .contactHeader {
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.showcase .socials {
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+/* 4×4 content + 24px padding in the reference: a 52px square */
+.showcase .social {
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-left: 8px;
+  padding: 0;
+  font-family: var(--os-display), serif;
+  font-size: 24px;
+  line-height: 1;
+}
