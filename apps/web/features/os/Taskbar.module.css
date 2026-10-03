@@ -1,0 +1,94 @@
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--os-taskbar);
+  padding: 2px 3px;
+}
+
+.start {
+  position: relative;
+}
+
+.startButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px;
+}
+
+.menu {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  display: flex;
+  width: 200px;
+  padding: 2px;
+}
+
+.menuBand {
+  width: 24px;
+  background: var(--os-shadow);
+  color: var(--os-face);
+  font: 700 14px/1 var(--os-font);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding: 6px 4px;
+  letter-spacing: 1px;
+}
+
+.menuItem {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--os-title);
+  color: var(--os-text-inverse);
+}
+
+.tabs {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 160px;
+  max-width: 40%;
+  height: 24px;
+  padding: 0 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.tab[aria-pressed='true'] {
+  font-weight: 700;
+  background-image: repeating-conic-gradient(var(--os-light) 0 25%, var(--os-face) 0 50%);
+  background-size: 2px 2px;
+}
+
+.tray {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--os-face);
+}

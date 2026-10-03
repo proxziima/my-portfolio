@@ -1,0 +1,27 @@
+.shortcut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 72px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--os-text-inverse);
+}
+
+.label {
+  padding: 1px 3px;
+  text-align: center;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.shortcut:focus {
+  outline: none;
+}
+
+.shortcut:focus .label {
+  background: var(--os-title);
+  outline: 1px dotted var(--os-text-inverse);
+  text-shadow: none;
+}

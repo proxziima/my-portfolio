@@ -1,0 +1,25 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  padding: 24px 32px;
+  background: #000;
+  color: #c8c8c8;
+  font: 13px/1.5 var(--os-mono);
+  white-space: pre-wrap;
+  cursor: default;
+}
+
+.screen b {
+  color: #fff;
+}
+
+.cursor::after {
+  content: '_';
+  animation: blink 0.65s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
