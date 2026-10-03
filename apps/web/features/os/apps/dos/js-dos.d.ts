@@ -17,6 +17,8 @@ interface JsDosOptions {
 interface JsDosPlayer {
   run(bundleUrl: string, optionalChangesUrl?: string, optionalPersistKey?: string): Promise<unknown>
   stop(): Promise<void>
+  /** On: a click on the screen captures the pointer (Esc releases it) and the emulator gets relative motion. */
+  setAutolock(autolock: boolean): Promise<void>
 }
 
 interface Window {
