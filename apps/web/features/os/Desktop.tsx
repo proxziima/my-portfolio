@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useReducer, useRef, useState } from 'react'
 import type { Portfolio } from '@/lib/cms/types'
-import { APPS, BOOT_APP } from './apps'
+import { APPS, appTitle, BOOT_APP, type ResolvedApp } from './apps'
 import { Boot } from './Boot'
 import { Shortcut } from './Shortcut'
 import { Shutdown } from './Shutdown'
@@ -35,14 +35,17 @@ export function Desktop({ data }: { data: Portfolio }) {
   if (phase === 'shutdown') return <Shutdown onDone={reboot} />
 
   const active = activeWindow(wm)
+  const apps: readonly ResolvedApp[] = APPS.map((app) => ({ ...app, title: appTitle(app, data) }))
+  // the reference's status bar is a copyright line, not the window's name
+  const status = `© Copyright ${new Date().getFullYear()} ${data.profile.name}`
   return (
     <div ref={deskRef} className={styles.desktop} data-anchor="desktop">
       <div className={styles.shortcuts}>
-        {APPS.map((app) => (
+        {apps.map((app) => (
           <Shortcut key={app.id} icon={app.icon} label={app.title} onOpen={() => dispatch({ type: 'open', id: app.id })} />
         ))}
       </div>
-      {APPS.map((app) => {
+      {apps.map((app) => {
         const w = wm.windows[app.id]
         if (!w) return null
         const App = app.component
@@ -50,6 +53,7 @@ export function Desktop({ data }: { data: Portfolio }) {
           <Window
             key={app.id}
             title={app.title}
+            status={status}
             icon={app.icon}
             active={active === app.id}
             zIndex={w.zIndex}
@@ -64,7 +68,7 @@ export function Desktop({ data }: { data: Portfolio }) {
           </Window>
         )
       })}
-      <Taskbar apps={APPS} windows={wm} active={active} onTab={(id) => dispatch({ type: 'taskbar', id })} onShutdown={() => setPhase('shutdown')} />
+      <Taskbar apps={apps}windows={wm} active={active} onTab={(id) => dispatch({ type: 'taskbar', id })} onShutdown={() => setPhase('shutdown')} />
     </div>
   )
 }

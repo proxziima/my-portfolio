@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import type { OsApp } from './apps'
+import type { ResolvedApp } from './apps'
 import bevel from './bevel.module.css'
 import { Icon } from './icons'
 import type { WindowManager } from './window-manager'
@@ -20,7 +20,7 @@ function useClock(): string {
 }
 
 interface Props {
-  apps: readonly OsApp[]
+  apps: readonly ResolvedApp[]
   windows: WindowManager
   active: string | undefined
   onTab: (id: string) => void

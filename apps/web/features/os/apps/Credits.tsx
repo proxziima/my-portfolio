@@ -1,20 +1,58 @@
+'use client'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { OsAppProps } from '../apps'
+import { CREDITS, nextSection } from './credits-data'
+import styles from './Credits.module.css'
 
-/** What this desktop is and where it comes from. */
+/** Seconds a section stays before the next one; a click advances at once. */
+const HOLD_S = 5
+
+/** The host never changes while the page lives, so there is nothing to subscribe to. */
+const noSubscribe = () => () => {}
+const clientHost = () => window.location.host
+const serverHost = () => ''
+
+/** The reference's credits roll: one section at a time, a dot per second, click to continue. */
 export function Credits({ data }: OsAppProps) {
+  const sections = CREDITS(data.profile.name)
+  const [index, setIndex] = useState(0)
+  const [time, setTime] = useState(0)
+  const host = useSyncExternalStore(noSubscribe, clientHost, serverHost)
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTime((t) => t + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const advance = useCallback(() => {
+    setIndex((i) => nextSection(i, sections.length))
+    setTime(0)
+  }, [sections.length])
+
+  useEffect(() => {
+    if (time > HOLD_S) advance()
+  }, [time, advance])
+
+  const section = sections[index] ?? sections[0]!
   return (
-    <div style={{ padding: 16, lineHeight: 1.6 }}>
-      <h1 style={{ fontSize: 16, margin: '0 0 8px' }}>About this desktop</h1>
-      <p>
-        This is a web page shown on the monitor of a three.js scene on {data.profile.name}&rsquo;s site. The scene draws
-        baked models with WebGL; the screen is a CSS3D iframe of this very page, so what you are using is real.
-      </p>
-      <p>
-        The idea and the desk model follow{' '}
-        <a href="https://henryheffernan.com/" target="_blank" rel="noopener noreferrer">Henry Heffernan&rsquo;s portfolio</a>{' '}
-        (MIT licensed). Built with Next, React and three.js; content from a Payload CMS.
-      </p>
-      <p>Tip: hover the monitor to zoom in, move away to zoom out.</p>
+    <div className={styles.page} onPointerDown={advance}>
+      <h2>Credits</h2>
+      <p>{host}, {new Date().getFullYear()}</p>
+      <div className={styles.slide}>
+        <div key={section.title} className={styles.section}>
+          <h3 className={styles.sectionTitle}>{section.title}</h3>
+          {section.rows.map(([who, what]) => (
+            <div key={`${who}|${what}`} className={styles.row}>
+              <p>{who}</p>
+              <p>{what}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p>Click to continue...</p>
+      <div className={styles.dots} data-anchor="credits-dots" aria-hidden="true">
+        {Array.from({ length: time }, (_, i) => <span key={i}>.</span>)}
+      </div>
     </div>
   )
 }

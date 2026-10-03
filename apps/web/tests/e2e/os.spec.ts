@@ -32,6 +32,19 @@ test('a shortcut opens Credits on top, and close removes it', async ({ page }) =
   await expect(credits).toBeVisible()
   const z = async (name: string) => page.getByRole('dialog', { name }).evaluate((el) => Number(getComputedStyle(el).zIndex))
   expect(await z('Credits')).toBeGreaterThan(await z('Showcase'))
+
+  // the roll: the owner's section first, a click moves on, a dot ticks in every second
+  const status = await credits.locator('footer span').first().textContent()
+  const name = status?.match(/^© Copyright \d{4} (.+)$/)?.[1]
+  expect(name).toBeTruthy()
+  await expect(credits.getByRole('heading', { level: 2, name: 'Credits' })).toBeVisible()
+  await expect(credits.getByRole('heading', { level: 3, name: 'Engineering & Design' })).toBeVisible()
+  await expect(credits.getByText(name!, { exact: true })).toBeVisible()
+  await credits.getByRole('heading', { level: 2, name: 'Credits' }).click()
+  await expect(credits.getByRole('heading', { level: 3, name: 'Modeling & Texturing' })).toBeVisible()
+  await page.waitForTimeout(1200)
+  await expect(credits.locator('[data-anchor="credits-dots"] > span').first()).toBeAttached()
+
   await page.getByRole('button', { name: 'Close Credits' }).click()
   await expect(credits).toHaveCount(0)
 })

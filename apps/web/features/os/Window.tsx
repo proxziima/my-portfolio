@@ -8,6 +8,8 @@ import styles from './Window.module.css'
 
 interface Props {
   title: string
+  /** The status bar's text, like the reference's copyright line; defaults to the title. */
+  status?: string
   icon: IconName
   active: boolean
   zIndex: number
@@ -23,7 +25,7 @@ interface Props {
 
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
 
-export function Window({ title, icon, active, zIndex, hidden, size, bounds, onFocus, onMinimize, onClose, children }: Props) {
+export function Window({ title, status, icon,active, zIndex, hidden, size, bounds, onFocus, onMinimize, onClose, children }: Props) {
   const { style, maximized, onMoveStart, onResizeStart, toggleMaximize } = useWindowGeometry(size, bounds)
   return (
     <section
@@ -47,7 +49,7 @@ export function Window({ title, icon, active, zIndex, hidden, size, bounds, onFo
       </header>
       <div className={`${styles.content} ${bevel.sunken}`}>{children}</div>
       <footer className={styles.status}>
-        <span className={bevel.sunken}>{title}</span>
+        <span className={bevel.sunken}>{status ?? title}</span>
         <span className={`${styles.grip} ${bevel.sunken}`} onPointerDown={onResizeStart} aria-hidden="true" />
       </footer>
     </section>

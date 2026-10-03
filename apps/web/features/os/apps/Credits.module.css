@@ -1,0 +1,78 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100%;
+  padding: 64px 0;
+  background: #000;
+  color: #fff;
+  font-family: var(--os-serif, 'Times New Roman', Times, serif);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.page h2 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.page h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.page p {
+  margin: 0;
+  font-size: 18px;
+}
+
+.slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex: 1;
+  min-height: 320px;
+  margin-top: 72px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 32px;
+  animation: rise 0.5s ease both;
+}
+
+.sectionTitle {
+  margin-bottom: 32px !important;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  width: 600px;
+  max-width: 90%;
+}
+
+.dots {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  width: 64px;
+  height: 32px;
+  margin-top: 16px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section {
+    animation: none;
+  }
+}
