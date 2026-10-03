@@ -254,11 +254,79 @@ puts the 1280×1024 screen at the reference's scale.
   **Exit full screen** button sits top-right inside the box while `on`.
 - Nothing changes in the engine or the OS.
 
-### 3.10 Sound
+### 3.10 Sound (in scope since 2026-10-03)
 
-Out of this spec. The reference's keyboard, mouse, startup and ambience
-samples are a later, optional layer on `lib/audio` (synthesised, like the
-existing click); nothing here depends on it.
+As in the reference, sound belongs to the scene, not to the OS page: the
+`/os` page stays silent on its own.
+
+- Samples from the reference repo (MIT), copied to `public/desk/audio/`:
+  `mouse-down.mp3`, `mouse-up.mp3`, `key-1.mp3`…`key-6.mp3` (Henry
+  Heffernan's foley) and `office.mp3` (the office ambience the reference
+  credits to Sound Cassette). The Windows 95 startup sample is Microsoft's and
+  is not copied; a short synthesised chime (`lib/audio` style) plays instead.
+- `features/desk/ambience.ts` (pure): `ambienceParams(distance)` maps the
+  camera's distance to the desk origin to the low-pass cutoff and the level
+  exactly as the reference does (`map(d, 0, 10000, 100, 22000) − 3000` Hz,
+  `map(d, 1200, 10000, 0, 0.2)` clamped to 0.05–0.1): zoomed into the monitor
+  the office goes quiet and muffled.
+- `features/desk/audio.ts`: `createDeskAudio()` on the shared `AudioContext`
+  from `lib/audio/context.ts`. `unlock()` runs on the first pointer or key
+  press in the figure (autoplay policy; a press inside the same-origin iframe
+  activates the parent too): it decodes the samples, plays the chime and starts
+  the ambience loop through a low-pass filter. `key()` plays a random key
+  sample (held keys do not repeat), `mouse('down' | 'up')` the clicks, panned
+  slightly (keyboard left, mouse right) in place of the reference's positional
+  audio. `setDistance()` applies `ambienceParams` with a short ramp. `setMuted()`
+  drives a master gain. `dispose()` stops everything.
+- Wiring: `screen-events.ts` also reports the iframe's `pointerdown`,
+  `pointerup`, `keydown` and `keyup`; `engine.ts` reports the camera distance
+  on every drawn frame (`onFrame`); `DeskScene` connects both to the audio.
+- A **Mute** toggle sits in the caption's actions and in the full-screen bar,
+  persisted in `localStorage` (`desk-muted`). Default: sound on, as in the
+  reference, but nothing plays until the first press.
+
+### 3.12 Credits, as the reference (added 2026-10-03)
+
+The Credits window matches the reference's: a 1100×800 window on a black
+page, white serif text, "Credits" and "<host>, <year>" centred at the top, one
+section at a time (title, then name / role rows 600 px wide), "Click to
+continue…" under it, and a row of dots that counts the seconds until the next
+section (5 s) — a click advances at once. Sections: Engineering & Design (the
+owner, All); Modeling & Texturing (Henry Heffernan, Mickael Boitte, Sean
+Nicolas, who made the models the scene uses); Sound Design (Henry Heffernan,
+Sound Cassette); Built with (three.js, Next & React, Payload); Inspiration
+(Henry Heffernan, Bruno Simon). Sections fade and rise in with a CSS
+animation. `Window` grows a `status` prop for the bottom-left "© Copyright
+<year> <name>" and app titles may depend on the data.
+
+### 3.13 Showcase, as the reference (added 2026-10-03)
+
+The Showcase reproduces the reference's layout and type:
+
+- Fonts via `next/font/google` in the OS layout: **Ultra** for display
+  headings (the reference's Gastromond) and **Courier Prime** (400/700) for
+  text (the reference's Millennium), as `--os-display` / `--os-serif`. Sizes as
+  the reference's `index.css`: p 18 px, h1 64 px display, h2 32, h3 24, h4 18,
+  list items 16 px apart, justified text blocks, `.site-page-content` with a
+  300 px left margin for the sidebar and 64/32/16 px padding, links blue and
+  purple once visited.
+- **Home**: no sidebar; the name as a 72 px display h1, the discipline title
+  as h2, the four section links in a row (16 px padding), all centred.
+- **Sidebar** (every other page): 300 px fixed column, 48 px padding; the name
+  on two lines in 38 px display type, "Showcase 'YY" as h3, the links as bold
+  underlined uppercase h4 32 px apart, the current one marked with the
+  reference's small purple ring.
+- **About**: h1 "Welcome" (−16 px), h3 "I'm <name>", the bio paragraphs, then
+  the reference's bordered strip ("Looking for the full letter?" → the site at
+  `/`, in place of the résumé download) .
+- **Work**: per entry, the reference's header (h1 company with its URL as an
+  h4 link beside it; h3 role with the bold period beside it) and a text block.
+- **Projects**: h1 "Projects" / h3 "& Content", a paragraph, then one
+  reference-style big button per project (48 px display title, h3 summary).
+- **Contact**: h1 "Contact" with the contact links as big square buttons
+  (their chips as labels), then the email. No form (there is no backend).
+- The window is titled "<name> - Showcase <year>" with "© Copyright <year>
+  <name>" in the status bar.
 
 ## 4. Performance
 
