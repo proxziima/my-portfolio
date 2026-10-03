@@ -35,7 +35,6 @@ export interface PageNotes {
 
 export interface Settings {
   seo: { title: string; description: string; ogImage?: string }
-  splineSceneUrl: string
   sectionLabels: { work: string; projects: string; content: string }
   pickerHint: string
   pageNotes: PageNotes
