@@ -113,10 +113,12 @@ export function createDeskEngine({
     wake()
   }
 
+  // the screen's static videos follow the loop: they decode only while the figure is on screen
   const stop = () => {
     running = false
     cancelAnimationFrame(raf)
     raf = 0
+    screen.pause()
   }
 
   return {
@@ -136,6 +138,7 @@ export function createDeskEngine({
       if (disposed) return
       running = true
       dirty = true
+      screen.play()
       wake()
     },
     stop,
@@ -160,6 +163,9 @@ export function createDeskEngine({
     },
     setReduceMotion(on) {
       rig.setReduceMotion(on)
+      // the preference can flip while the figure is on screen: the hidden static stops decoding too
+      if (on) screen.pause()
+      else if (running) screen.play()
       wake()
     },
     goTo(key) {

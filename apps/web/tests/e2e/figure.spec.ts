@@ -14,6 +14,12 @@ test('the monitor shows the OS and the scene draws a first frame', async ({ page
   const fx = scene.locator('.screen-fx')
   await expect(fx).toBeAttached()
   await expect(fx).toHaveCSS('pointer-events', 'none')
+  // the reference's layers: inner shadow and smudges (images), two loops of static (videos)
+  await expect(fx.locator('video')).toHaveCount(2)
+  await expect(fx.locator('img')).toHaveCount(2)
+  // once the OS shows its desktop the static runs while the figure is on screen
+  await expect(fx).toHaveAttribute('data-ready', 'true', { timeout: 20_000 })
+  await expect.poll(() => fx.locator('video').evaluateAll((vs) => (vs as HTMLVideoElement[]).some((v) => !v.paused)), { timeout: 10_000 }).toBe(true)
 })
 
 test('full screen covers the viewport and Escape restores the box', async ({ page }) => {

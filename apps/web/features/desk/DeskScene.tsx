@@ -1,11 +1,10 @@
 'use client'
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useInView } from '@/lib/dom/use-in-view'
 import { useReducedMotion } from '@/lib/dom/use-reduced-motion'
 import { createDeskAudio, type DeskAudio } from './audio'
 import { OS_PATH } from './config'
 import { createDeskEngine, type DeskEngine } from './engine'
-import { noiseDataUrl } from './noise'
 import { cappedPixelRatio } from './pixel-ratio'
 import { watchScreen } from './screen-events'
 import styles from './DeskScene.module.css'
@@ -120,9 +119,5 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
     else engine.stop()
   }, [engine, visible])
 
-  // the noise tile for the screen's static (screen-fx.css); the scene is client-only (no SSR), so `document` exists
-  const noise = useMemo(() => noiseDataUrl(), [])
-  const hostStyle = useMemo(() => (noise ? ({ '--noise': `url(${noise})` }) as CSSProperties : undefined), [noise])
-
-  return <div ref={hostRef} className={styles.host} style={hostStyle} data-loaded={loaded} data-anchor="desk-scene" />
+  return <div ref={hostRef} className={styles.host} data-loaded={loaded} data-anchor="desk-scene" />
 }

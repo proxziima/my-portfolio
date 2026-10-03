@@ -1,18 +1,12 @@
-/* The CRT look of the monitor's screen, in CSS layers over the iframe (the reference used video and
-   texture planes). Everything here is static or compositor-only, so it costs no WebGL work.
+/* The CRT look of the monitor's screen: the reference's texture planes (`MonitorScreen.createTextureLayers`)
+   as DOM layers over the iframe, blended as it blended them. `plus-lighter` is CSS's additive blend,
+   the reference's `AdditiveBlending`. Compositor-only, so it costs no WebGL work.
    Global, not a module: monitor-screen.ts builds the screen's DOM imperatively. */
 .screen-fx {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image:
-    /* vignette: the tube's edges fall off */
-    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.35) 100%),
-    /* the soft colour band the reference's static layer leaves around 60% of the width */
-    linear-gradient(90deg, rgba(0, 0, 0, 0) 50%, rgba(255, 140, 220, 0.1) 57%, rgba(140, 255, 200, 0.09) 62%, rgba(0, 0, 0, 0) 69%),
-    /* scanlines: a soft triangle over 4px, not hard 1px lines, which the scaled-down screen aliases into broad bands */
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.05) 4px);
-  /* hidden until the OS has loaded (monitor-screen.ts sets data-ready); the pseudo-elements fade with it */
+  /* hidden until the OS has loaded (monitor-screen.ts sets data-ready); the layers fade with it */
   opacity: 0;
   transition: opacity 0.6s ease;
 }
@@ -21,41 +15,48 @@
   opacity: 1;
 }
 
-/* smudges: large-scale fractal noise through a colour matrix, inline SVG, static */
-.screen-fx::before {
-  content: '';
+.screen-shadow,
+.screen-static,
+.screen-smudges {
   position: absolute;
   inset: 0;
-  opacity: 0.1;
-  mix-blend-mode: screen;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1280' height='1024'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='0.004 0.006' numOctaves='3' seed='3'/><feColorMatrix values='0 0 0 0 0.9  0 0 0 0 0.9  0 0 0 0 0.9  0 0 0 1.6 -0.6'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>");
-  background-size: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }
 
-/* static: the noise tile, stepped across the screen */
-.screen-fx::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0.08;
-  mix-blend-mode: overlay;
-  background-image: var(--noise, none);
-  background-size: 128px 128px;
-  animation: static-shift 0.4s steps(6) infinite;
+/* the tube's inner shadow: normal blending, full opacity, its alpha does the falloff */
+.screen-shadow {
+  opacity: 1;
+  mix-blend-mode: normal;
+}
+
+.screen-static {
+  opacity: 0.5;
+  mix-blend-mode: plus-lighter;
+}
+
+.screen-static--fine {
+  opacity: 0.1;
+}
+
+.screen-smudges {
+  opacity: 0.12;
+  mix-blend-mode: plus-lighter;
+}
+
+/* no additive blend: `screen` is the closest, it brightens without clipping */
+@supports not (mix-blend-mode: plus-lighter) {
+  .screen-static,
+  .screen-smudges {
+    mix-blend-mode: screen;
+  }
 }
 
 /* the reference's jitter: the picture never sits perfectly still */
 .screen-jitter {
   animation: jitter 0.3s ease-in-out infinite;
-}
-
-@keyframes static-shift {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: 64px 96px;
-  }
 }
 
 @keyframes jitter {
@@ -71,9 +72,13 @@
   100% { transform: translate(0.075px, 0.025px); }
 }
 
+/* a still frame of static reads as dirt on the glass: drop it (monitor-screen.ts does not play it either) */
 @media (prefers-reduced-motion: reduce) {
-  .screen-fx::after,
   .screen-jitter {
     animation: none;
+  }
+
+  .screen-static {
+    display: none;
   }
 }

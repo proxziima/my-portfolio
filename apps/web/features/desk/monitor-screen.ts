@@ -38,8 +38,15 @@ export interface MonitorScreen {
   css: CSS3DObject
   /** Add to the GL scene. */
   gl: Object3D
+  /** Plays the static videos; a no-op under reduced motion. */
+  play(): void
+  /** Pauses the static videos, so they decode only while the scene is on screen. */
+  pause(): void
   dispose(): void
 }
+
+/** The reference's screen layers (`MonitorScreen.createTextureLayers`), served from `public/`. */
+const LAYER_DIR = '/desk/screen'
 
 /** The OS's desktop root; absent while it shows the boot or shutdown console. */
 const DESKTOP_SELECTOR = '[data-anchor="desktop"]'
@@ -104,12 +111,44 @@ function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement): () => void {
   }
 }
 
+/** A still layer: decorative, never dragged or announced. */
+function layerImage(className: string, file: string): HTMLImageElement {
+  const img = document.createElement('img')
+  img.className = className
+  img.src = `${LAYER_DIR}/${file}`
+  img.alt = ''
+  img.decoding = 'async'
+  img.draggable = false
+  return img
+}
+
+/** A looping static layer; not autoplay, so `play`/`pause` decide when it decodes. */
+function layerVideo(className: string, file: string): HTMLVideoElement {
+  const video = document.createElement('video')
+  video.className = className
+  video.src = `${LAYER_DIR}/${file}`
+  video.muted = true
+  video.loop = true
+  video.playsInline = true
+  video.preload = 'metadata'
+  video.autoplay = false
+  video.disablePictureInPicture = true
+  video.setAttribute('aria-hidden', 'true')
+  return video
+}
+
 /**
  * The DOM the CSS3D object carries: a fixed-size slab shaded like a powered-off tube, the iframe
- * inset by `padding`, and over both the CRT layers (`screen-fx.css`), which let the pointer through
- * to the iframe and fade in only while the OS shows its desktop (`gateOnDesktop`).
+ * inset by `padding`, and over both the reference's CRT layers in its stacking order (inner shadow,
+ * two static videos, smudges; blended in `screen-fx.css`), which let the pointer through to the
+ * iframe and fade in only while the OS shows its desktop (`gateOnDesktop`).
  */
-function createScreenElement(src: string, screen: ScreenSpec): { element: HTMLDivElement; iframe: HTMLIFrameElement; stopGate: () => void } {
+function createScreenElement(src: string, screen: ScreenSpec): {
+  element: HTMLDivElement
+  iframe: HTMLIFrameElement
+  videos: HTMLVideoElement[]
+  stopGate: () => void
+} {
   const element = document.createElement('div')
   Object.assign(element.style, {
     width: `${screen.width}px`,
@@ -126,10 +165,18 @@ function createScreenElement(src: string, screen: ScreenSpec): { element: HTMLDi
   fx.setAttribute('aria-hidden', 'true')
   fx.style.pointerEvents = 'none' // inline too: the iframe must stay clickable even before the stylesheet applies
   fx.dataset.ready = 'false'
+  const videos = [
+    layerVideo('screen-static', 'static-base.mp4'),
+    layerVideo('screen-static screen-static--fine', 'static-layer.mp4'),
+  ]
+  fx.append(layerImage('screen-shadow', 'shadow.png'), ...videos, layerImage('screen-smudges', 'smudges.jpg'))
   const stopGate = gateOnDesktop(iframe, fx)
   element.append(iframe, fx)
-  return { element, iframe, stopGate }
+  return { element, iframe, videos, stopGate }
 }
+
+const prefersReducedMotion = () =>
+  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const place = (object: Object3D, spec: PlaneSpec) => {
   object.position.set(spec.position.x, spec.position.y, spec.position.z)
@@ -142,7 +189,7 @@ const place = (object: Object3D, spec: PlaneSpec) => {
  * of the glass cover the iframe and the glass itself shows the DOM beneath the canvas.
  */
 export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): MonitorScreen {
-  const { element, iframe, stopGate } = createScreenElement(src, screen)
+  const { element, iframe, videos, stopGate } = createScreenElement(src, screen)
   const tilt = MathUtils.degToRad(screen.tiltDeg)
 
   const css = new CSS3DObject(element)
@@ -172,7 +219,22 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
     iframe,
     css,
     gl,
+    play() {
+      // the videos are hidden under reduced motion (screen-fx.css): do not decode them either
+      if (prefersReducedMotion()) return
+      // a rejected play (autoplay policy, a pause racing it) leaves the static still, nothing worse
+      for (const v of videos) v.play().catch(() => {})
+    },
+    pause() {
+      for (const v of videos) v.pause()
+    },
     dispose() {
+      // pausing alone keeps the decoder: drop the source and reload to release it now
+      for (const v of videos) {
+        v.pause()
+        v.removeAttribute('src')
+        v.load()
+      }
       for (const g of geometries) g.dispose()
       occluderMaterial.dispose()
       bezelMaterial.dispose()
