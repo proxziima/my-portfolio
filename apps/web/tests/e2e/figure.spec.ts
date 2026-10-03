@@ -19,6 +19,7 @@ test('full screen covers the viewport and Escape restores the box', async ({ pag
   const box = page.locator('[data-anchor="figure-box"]')
   await figure.getByRole('button', { name: 'Full screen' }).click()
   await expect(box).toHaveAttribute('data-full', 'true')
+  await expect(box.getByRole('button', { name: 'Exit full screen' })).toBeFocused()
   const viewport = page.viewportSize()
   if (!viewport) throw new Error('no viewport')
   await expect.poll(async () => (await box.boundingBox())?.width).toBe(viewport.width)
@@ -27,6 +28,7 @@ test('full screen covers the viewport and Escape restores the box', async ({ pag
   await expect(page.locator('html')).toHaveAttribute('data-fullscreen', 'true')
   await page.keyboard.press('Escape')
   await expect(box).toHaveAttribute('data-full', 'false')
+  await expect(figure.getByRole('button', { name: 'Full screen' })).toBeFocused()
   await expect.poll(async () => {
     const r = await box.boundingBox()
     return r ? Math.round((r.width / r.height) * 10) / 10 : 0

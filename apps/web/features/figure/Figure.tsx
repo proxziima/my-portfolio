@@ -1,6 +1,6 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { OS_PATH } from '@/features/desk/config'
 import { useFullscreen } from '@/lib/dom/use-fullscreen'
 import { useInView } from '@/lib/dom/use-in-view'
@@ -27,13 +27,27 @@ export function Figure() {
   const [failed, setFailed] = useState(false)
   const fail = useCallback(() => setFailed(true), [])
 
+  // leaving full screen hands focus back to the button that entered it (the Exit button unmounts)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const wasOn = useRef(false)
+  useEffect(() => {
+    const leaving = wasOn.current && !full.on
+    wasOn.current = full.on
+    if (!leaving) return
+    const focus = () => trigger.current?.focus({ preventScroll: true })
+    // native full screen leaves the rest of the page inert until the browser has actually left it
+    if (!document.fullscreenElement) return void focus()
+    document.addEventListener('fullscreenchange', focus, { once: true })
+    return () => document.removeEventListener('fullscreenchange', focus)
+  }, [full.on])
+
   return (
     <figure className={styles.plate} data-anchor="figure">
       {!failed && (
         <div ref={box} className={styles.box} data-anchor="figure-box" data-full={full.on}>
           {near && <DeskScene onFail={fail} />}
           {full.on && (
-            <button type="button" className={styles.exit} onClick={full.exit}>
+            <button type="button" className={styles.exit} onClick={full.exit} autoFocus>
               Exit full screen
             </button>
           )}
@@ -43,7 +57,7 @@ export function Figure() {
         <span key={current.slug} className={styles.captionText}>{current.caption}</span>
         <span className={styles.actions}>
           {!failed && (
-            <button type="button" className={styles.action} onClick={full.enter}>
+            <button ref={trigger} type="button" className={styles.action} onClick={full.enter}>
               Full screen
             </button>
           )}

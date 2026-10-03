@@ -15,7 +15,7 @@ let latest: Api | undefined
 function Harness() {
   const ref = useRef<HTMLDivElement>(null)
   latest = useFullscreen(ref)
-  return createElement('div', { ref, id: 'box' })
+  return createElement('div', { ref, id: 'box' }, createElement('iframe'))
 }
 
 let host: HTMLElement
@@ -62,6 +62,17 @@ describe('useFullscreen', () => {
     act(() => latest?.enter())
     act(() => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(latest?.on).toBe(false)
+  })
+
+  it('Escape inside a same-origin iframe in the element exits', () => {
+    act(() => latest?.enter())
+    const frame = host.querySelector('iframe')
+    const win = frame?.contentWindow
+    if (!win) throw new Error('no iframe window')
+    act(() => {
+      win.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
     expect(latest?.on).toBe(false)
   })

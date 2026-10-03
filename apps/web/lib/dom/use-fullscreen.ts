@@ -43,10 +43,29 @@ export function useFullscreen(ref: RefObject<HTMLElement | null>): Fullscreen {
     }
     document.addEventListener('keydown', onKey)
     document.addEventListener('fullscreenchange', onChange)
+    // the OS on the monitor is a same-origin iframe: a key pressed while it has focus never reaches this document
+    const frames: Window[] = []
+    for (const frame of ref.current?.querySelectorAll('iframe') ?? []) {
+      try {
+        const win = frame.contentWindow
+        if (!win) continue
+        win.addEventListener('keydown', onKey)
+        frames.push(win)
+      } catch {
+        /* cross-origin */
+      }
+    }
     return () => {
       delete document.documentElement.dataset.fullscreen
       document.removeEventListener('keydown', onKey)
       document.removeEventListener('fullscreenchange', onChange)
+      for (const win of frames) {
+        try {
+          win.removeEventListener('keydown', onKey)
+        } catch {
+          /* cross-origin */
+        }
+      }
     }
   }, [on, exit, ref])
 
