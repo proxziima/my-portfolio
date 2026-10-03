@@ -19,6 +19,11 @@ describe('windowReducer', () => {
     expect(activeWindow(s)).toBe('a')
   })
 
+  it('focusing the window already on top changes nothing', () => {
+    const s = open(EMPTY_WINDOWS, 'a', 'b')
+    expect(windowReducer(s, { type: 'focus', id: 'b' })).toBe(s)
+  })
+
   it('focus raises; focusing a missing window is a no-op', () => {
     const s = open(EMPTY_WINDOWS, 'a', 'b')
     expect(activeWindow(windowReducer(s, { type: 'focus', id: 'a' }))).toBe('a')

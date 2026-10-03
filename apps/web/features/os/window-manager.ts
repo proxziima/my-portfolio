@@ -43,7 +43,9 @@ export function windowReducer(state: WindowManager, action: WindowAction): Windo
     case 'open':
       return raise(state, action.id)
     case 'focus':
-      return state.windows[action.id] ? raise(state, action.id) : state
+      // already on top: same state, so a press on the front window does not re-render the desktop
+      if (!state.windows[action.id] || activeWindow(state) === action.id) return state
+      return raise(state, action.id)
     case 'close': {
       const { [action.id]: _closed, ...windows } = state.windows
       return { ...state, windows }

@@ -32,20 +32,27 @@ export function Taskbar({ apps, windows, active, onTab, onShutdown }: Props) {
   const startRef = useRef<HTMLDivElement>(null)
   const time = useClock()
 
-  // the Start menu closes on any press outside it, like the real one
+  // the Start menu closes on any press outside it, like the real one, and on Escape
   useEffect(() => {
     if (!menuOpen) return
     const close = (e: PointerEvent) => {
       if (!startRef.current?.contains(e.target as Node)) setMenuOpen(false)
     }
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
     document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      document.removeEventListener('keydown', escape)
+    }
   }, [menuOpen])
 
   return (
     <nav className={`${styles.bar} ${bevel.raised}`} aria-label="Taskbar">
       <div ref={startRef} className={styles.start}>
-        <button type="button" className={`${styles.startButton} ${menuOpen ? bevel.pressed : bevel.raised}`} aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+        <button type="button" className={`${styles.startButton} ${menuOpen ? bevel.pressed : bevel.raised}`} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
           <Icon name="flag" size={16} />
           <b>Start</b>
         </button>

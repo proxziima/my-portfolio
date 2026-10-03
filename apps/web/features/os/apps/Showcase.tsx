@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { Entry, Portfolio } from '@/lib/cms/types'
 import { filterByDiscipline } from '@/lib/cms/filter'
 import type { OsAppProps } from '../apps'
+import { osBioHtml } from '../bio-markup'
 import styles from './Showcase.module.css'
 
 type Page = 'home' | 'about' | 'work' | 'projects' | 'content' | 'contact'
@@ -42,7 +43,7 @@ export function Showcase({ data }: OsAppProps) {
   const slug = discipline?.slug ?? ''
   const nav = pages(data)
   // the bio paragraphs are the CMS's own HTML dialect (lib/cms/bio-html.ts): already escaped there
-  const bioHtml = (discipline?.bio ?? []).map((p) => `<p>${p}</p>`).join('')
+  const bioHtml = osBioHtml(discipline?.bio ?? [])
 
   return (
     <div className={styles.explorer} data-page={page}>

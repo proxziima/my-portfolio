@@ -5,6 +5,10 @@ import '@/features/os/os.css'
 export default function OsLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
+      {/* the OS is iframed on the monitor: any relative link must leave the frame, not nest the site inside it */}
+      <head>
+        <base target="_top" />
+      </head>
       <body>{children}</body>
     </html>
   )
