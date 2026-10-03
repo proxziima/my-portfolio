@@ -351,7 +351,10 @@ installed `ACAD` folder with `ACADR12.BAT` and `CONFIG.SYS`. The bundle
 `public/autocad.jsdos` (6.6 MB) is that install minus what AutoCAD never loads
 at runtime (`SOURCE`, `TUTORIAL`, `R11SUPP`, ADS sources and docs) plus a
 `.jsdos/dosbox.conf` taken from the Doom bundle with a clean autoexec:
-`mount c .`, `c:`, `call ACADR12.BAT`.
+`mount c .`, `c:`, `call ACADR12.BAT C:\ACAD\SAMPLE\HOUSEPLN`. The batch file
+passes its first argument to AutoCAD as the drawing to open, so AutoCAD starts
+on the bundled house floor plan (its saved view already fits the screen).
+Visitors' edits live in js-dos's in-memory drive and vanish on reload.
 
 DRY: Doom and AutoCAD are the same thing — a bundle in `DosPlayer` on black —
 so `apps/doom/` (the loader and player) moves to `apps/dos/`, `apps/Doom.tsx`
