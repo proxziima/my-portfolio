@@ -378,6 +378,22 @@ a pixel icon of the boot-screen mark (`public/os/icons/autocad.png`). Credits'
 The startup banner shows the licensee the installed copy carries; this is
 AutoCAD's own screen and is not altered.
 
+### 3.14c My Resume (added 2026-10-03)
+
+A "My Resume" desktop icon opens Adobe Acrobat Reader for DOS (1993) on the
+owner's résumé, as a third `dosApp` with AutoCAD's 4:3 shape.
+
+The Reader only reads PDF 1.0: no embedded fonts, no Flate compression. A
+résumé exported today (Google Docs: PDF 1.4 with embedded TrueType) opens but
+fails with "Bad font object". So the résumé is typeset from Markdown instead:
+`apps/web/content/resume.md` is the source, and `bun run resume:pdf`
+(`apps/web/scripts/resume-pdf/`) parses it, wraps it with Helvetica's AFM
+metrics, writes a PDF 1.0 using the Reader's built-in Helvetica fonts by name
+(WinAnsi, uncompressed streams, a classic xref), and swaps it into
+`public/resume.jsdos` as `ACRODOS/RESUME.PDF`. Text stays text, crisp at any
+zoom. The bundle is the Reader install (tour, registration card and VESA tools
+dropped; 1.7 MB) with an autoexec of `cd \ACRODOS` / `ACROBAT RESUME.PDF`.
+
 ### 3.15 Screen effects (added 2026-10-03)
 
 The reference's smudge/static/shadow planes become CSS layers inside the

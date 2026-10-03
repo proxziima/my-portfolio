@@ -1,9 +1,13 @@
 import type { SVGProps } from 'react'
 
-export type IconName = 'computer' | 'folder' | 'document' | 'doom' | 'autocad' | 'flag' | 'minimize' | 'maximize' | 'close'
+export type IconName = 'computer' | 'folder' | 'document' | 'doom' | 'autocad' | 'resume' | 'flag' | 'minimize' | 'maximize' | 'close'
 
 /** Icons taken as the reference's bitmaps rather than redrawn; served from `public/`. */
-const BITMAPS: Partial<Record<IconName, string>> = { doom: '/os/icons/doom.png', autocad: '/os/icons/autocad.png' }
+const BITMAPS: Partial<Record<IconName, string>> = {
+  doom: '/os/icons/doom.png',
+  autocad: '/os/icons/autocad.png',
+  resume: '/os/icons/resume.png',
+}
 
 /** 16×16 pixel-art paths; `shapeRendering="crispEdges"` keeps them sharp when scaled by integers. */
 const PATHS: Partial<Record<IconName, { fill: string; d: string }[]>> = {

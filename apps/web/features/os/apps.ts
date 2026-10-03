@@ -37,6 +37,17 @@ const DOS_CHROME = { status: 'Powered by JSDOS & DOSBox', barColor: '#1c1c1c' } 
 export const APPS: readonly OsApp[] = [
   // the reference's "Henry Heffernan - Showcase 2022", with our owner and this year
   { id: 'showcase', title: (data) => `${data.profile.name} - Showcase ${new Date().getFullYear()}`, shortcut: 'My Showcase', icon: 'folder', component: Showcase },
+  {
+    id: 'resume',
+    title: 'My Resume',
+    shortcut: 'My Resume',
+    icon: 'resume',
+    // Acrobat Reader for DOS opening the résumé (content/resume.md, built in by `bun run resume:pdf`)
+    component: dosApp('/resume.jsdos', 'Resume'),
+    // its 640×480 VGA screen, as tall as the Showcase window, like AutoCAD
+    aspect: 4 / 3,
+    ...DOS_CHROME,
+  },
   { id: 'credits', title: 'Credits', shortcut: 'Credits', icon: 'document', component: Credits, size: { width: 1100, height: 800 } },
   { id: 'doom', title: 'Doom', shortcut: 'Doom', icon: 'doom', component: dosApp('/doom.jsdos', 'Doom'), size: { width: 980, height: 670 }, ...DOS_CHROME },
   {

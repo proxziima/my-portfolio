@@ -76,6 +76,12 @@ test('the AutoCAD shortcut boots Release 12 in js-dos', async ({ page }) => {
   await openDosApp(page, 'AutoCAD', 'AutoCAD Release 12')
 })
 
+test('the My Resume shortcut opens the résumé in Acrobat Reader for DOS', async ({ page }) => {
+  test.setTimeout(60_000)
+  await openDesktop(page)
+  await openDosApp(page, 'My Resume', 'My Resume')
+})
+
 test('two DOS programs share one js-dos runtime', async ({ page }) => {
   test.setTimeout(90_000)
   await openDesktop(page)
