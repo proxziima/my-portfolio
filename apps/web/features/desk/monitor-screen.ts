@@ -41,12 +41,75 @@ export interface MonitorScreen {
   dispose(): void
 }
 
+/** The OS's desktop root; absent while it shows the boot or shutdown console. */
+const DESKTOP_SELECTOR = '[data-anchor="desktop"]'
+/** If the desktop has not shown by then (a changed OS, a slow CMS), the layers come on anyway. */
+const DESKTOP_TIMEOUT_MS = 20_000
+
+/**
+ * Shows the CRT layers only while the OS shows its desktop: the boot and shutdown screens are black
+ * consoles; the CRT layers over them read as a broken texture. Watches the iframe's document (same
+ * origin) on every load; where it cannot be read, or the desktop never appears, the layers come on
+ * so they are never lost. Returns the cleanup.
+ */
+function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement): () => void {
+  let observer: MutationObserver | null = null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  // every mutation in the OS lands here: write only on a change
+  const set = (ready: boolean) => {
+    const value = String(ready)
+    if (fx.dataset.ready !== value) fx.dataset.ready = value
+  }
+  const stop = () => {
+    observer?.disconnect()
+    observer = null
+    clearTimeout(timer)
+  }
+  const onLoad = () => {
+    stop()
+    let doc: Document | null = null
+    try {
+      doc = iframe.contentDocument
+    } catch {
+      doc = null
+    }
+    const body = doc?.body
+    if (!body) {
+      set(true)
+      return
+    }
+    let seen = false
+    const check = () => {
+      const on = body.querySelector(DESKTOP_SELECTOR) !== null
+      if (on && !seen) {
+        seen = true
+        clearTimeout(timer)
+      }
+      set(on)
+    }
+    timer = setTimeout(() => {
+      if (seen) return
+      stop()
+      set(true)
+    }, DESKTOP_TIMEOUT_MS)
+    // keeps watching after the first hit: shutdown → boot takes the desktop away again
+    observer = new MutationObserver(check)
+    observer.observe(body, { childList: true, subtree: true })
+    check()
+  }
+  iframe.addEventListener('load', onLoad)
+  return () => {
+    iframe.removeEventListener('load', onLoad)
+    stop()
+  }
+}
+
 /**
  * The DOM the CSS3D object carries: a fixed-size slab shaded like a powered-off tube, the iframe
  * inset by `padding`, and over both the CRT layers (`screen-fx.css`), which let the pointer through
- * to the iframe. The layers wait for the iframe's load: over the bare slab they read as a broken texture.
+ * to the iframe and fade in only while the OS shows its desktop (`gateOnDesktop`).
  */
-function createScreenElement(src: string, screen: ScreenSpec): { element: HTMLDivElement; iframe: HTMLIFrameElement } {
+function createScreenElement(src: string, screen: ScreenSpec): { element: HTMLDivElement; iframe: HTMLIFrameElement; stopGate: () => void } {
   const element = document.createElement('div')
   Object.assign(element.style, {
     width: `${screen.width}px`,
@@ -63,9 +126,9 @@ function createScreenElement(src: string, screen: ScreenSpec): { element: HTMLDi
   fx.setAttribute('aria-hidden', 'true')
   fx.style.pointerEvents = 'none' // inline too: the iframe must stay clickable even before the stylesheet applies
   fx.dataset.ready = 'false'
-  iframe.addEventListener('load', () => { fx.dataset.ready = 'true' }, { once: true })
+  const stopGate = gateOnDesktop(iframe, fx)
   element.append(iframe, fx)
-  return { element, iframe }
+  return { element, iframe, stopGate }
 }
 
 const place = (object: Object3D, spec: PlaneSpec) => {
@@ -79,7 +142,7 @@ const place = (object: Object3D, spec: PlaneSpec) => {
  * of the glass cover the iframe and the glass itself shows the DOM beneath the canvas.
  */
 export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): MonitorScreen {
-  const { element, iframe } = createScreenElement(src, screen)
+  const { element, iframe, stopGate } = createScreenElement(src, screen)
   const tilt = MathUtils.degToRad(screen.tiltDeg)
 
   const css = new CSS3DObject(element)
@@ -113,6 +176,7 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
       for (const g of geometries) g.dispose()
       occluderMaterial.dispose()
       bezelMaterial.dispose()
+      stopGate()
       element.remove()
     },
   }
