@@ -41,15 +41,23 @@ export interface MonitorScreen {
   dispose(): void
 }
 
-/** The DOM the CSS3D object carries: a fixed-size dark slab with the iframe inset by `padding`. */
+/**
+ * The DOM the CSS3D object carries: a fixed-size dark slab with the iframe inset by `padding`, and
+ * over both the CRT layers (`screen-fx.css`), which let the pointer through to the iframe.
+ */
 function createScreenElement(src: string, screen: ScreenSpec): { element: HTMLDivElement; iframe: HTMLIFrameElement } {
   const element = document.createElement('div')
   Object.assign(element.style, { width: `${screen.width}px`, height: `${screen.height}px`, background: '#1d2e2f' })
   const iframe = document.createElement('iframe')
   iframe.src = src
   iframe.title = 'Desktop'
+  iframe.className = 'screen-jitter'
   Object.assign(iframe.style, { display: 'block', width: '100%', height: '100%', border: '0', padding: `${screen.padding}px`, boxSizing: 'border-box' })
-  element.append(iframe)
+  const fx = document.createElement('div')
+  fx.className = 'screen-fx'
+  fx.setAttribute('aria-hidden', 'true')
+  fx.style.pointerEvents = 'none' // inline too: the iframe must stay clickable even before the stylesheet applies
+  element.append(iframe, fx)
   return { element, iframe }
 }
 

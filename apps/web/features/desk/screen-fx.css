@@ -1,0 +1,72 @@
+/* The CRT look of the monitor's screen, in CSS layers over the iframe (the reference used video and
+   texture planes). Everything here is static or compositor-only, so it costs no WebGL work.
+   Global, not a module: monitor-screen.ts builds the screen's DOM imperatively. */
+.screen-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    /* vignette: the tube's edges fall off */
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.35) 100%),
+    /* the soft colour band the reference's static layer leaves around 60% of the width */
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 50%, rgba(255, 140, 220, 0.1) 57%, rgba(140, 255, 200, 0.09) 62%, rgba(0, 0, 0, 0) 69%),
+    /* scanlines: a soft triangle over 4px, not hard 1px lines, which the scaled-down screen aliases into broad bands */
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.05) 4px);
+}
+
+/* smudges: large-scale fractal noise through a colour matrix, inline SVG, static */
+.screen-fx::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.13;
+  mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1280' height='1024'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='0.004 0.006' numOctaves='3' seed='3'/><feColorMatrix values='0 0 0 0 0.9  0 0 0 0 0.9  0 0 0 0 0.9  0 0 0 1.6 -0.6'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>");
+  background-size: cover;
+}
+
+/* static: the noise tile, stepped across the screen */
+.screen-fx::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  mix-blend-mode: overlay;
+  background-image: var(--noise, none);
+  background-size: 128px 128px;
+  animation: static-shift 0.4s steps(6) infinite;
+}
+
+/* the reference's jitter: the picture never sits perfectly still */
+.screen-jitter {
+  animation: jitter 0.3s ease-in-out infinite;
+}
+
+@keyframes static-shift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 64px 96px;
+  }
+}
+
+@keyframes jitter {
+  10% { transform: translate(-0.1px, -0.15px); }
+  20% { transform: translate(0.15px, 0.1px); }
+  30% { transform: translate(-0.2px, -0.25px); }
+  40% { transform: translate(0.05px, 0.1px); }
+  50% { transform: translate(-0.025px, -0.05px); }
+  60% { transform: translate(0, 0.075px); }
+  70% { transform: translate(-0.075px, -0.1px); }
+  80% { transform: translate(0.075px, 0.125px); }
+  90% { transform: translate(-0.125px, -0.075px); }
+  100% { transform: translate(0.075px, 0.025px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-fx::after,
+  .screen-jitter {
+    animation: none;
+  }
+}

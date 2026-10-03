@@ -1,13 +1,16 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useInView } from '@/lib/dom/use-in-view'
 import { useReducedMotion } from '@/lib/dom/use-reduced-motion'
 import { createDeskAudio, type DeskAudio } from './audio'
 import { OS_PATH } from './config'
 import { createDeskEngine, type DeskEngine } from './engine'
+import { noiseDataUrl } from './noise'
 import { cappedPixelRatio } from './pixel-ratio'
 import { watchScreen } from './screen-events'
 import styles from './DeskScene.module.css'
+// global: the screen's DOM is built imperatively, so its CRT layers cannot take module class names
+import './screen-fx.css'
 
 /**
  * The desk in the figure box. Builds the engine once per mount, sizes it to the box, drives the
@@ -117,5 +120,14 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
     else engine.stop()
   }, [engine, visible])
 
-  return <div ref={hostRef} className={styles.host} data-loaded={loaded} data-anchor="desk-scene" />
+  // one noise tile for the screen's static and the grain; the scene is client-only (no SSR), so `document` exists
+  const noise = useMemo(() => noiseDataUrl(), [])
+  const hostStyle = useMemo(() => (noise ? ({ '--noise': `url(${noise})` }) as CSSProperties : undefined), [noise])
+
+  // the grain is a React child beside the engine's two layers: the engine appends them, it never replaces the host's children
+  return (
+    <div ref={hostRef} className={styles.host} style={hostStyle} data-loaded={loaded} data-anchor="desk-scene">
+      <div className={styles.grain} aria-hidden="true" />
+    </div>
+  )
 }

@@ -10,6 +10,10 @@ test('the monitor shows the OS and the scene draws a first frame', async ({ page
   await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached({ timeout: 20_000 })
   await expect(scene).toHaveAttribute('data-loaded', 'true', { timeout: 30_000 })
   await expect(scene.locator('canvas')).toHaveCount(1)
+  // the CRT layers sit over the iframe and must let the pointer through to it
+  const fx = scene.locator('.screen-fx')
+  await expect(fx).toBeAttached()
+  await expect(fx).toHaveCSS('pointer-events', 'none')
 })
 
 test('full screen covers the viewport and Escape restores the box', async ({ page }) => {
