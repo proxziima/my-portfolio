@@ -28,6 +28,7 @@ export interface DeskAsset {
   drop?: readonly string[]
 }
 
+// textures are 2048² WebP: a 600×400 box at ≤2× never shows more, and 4096² would cost ~64 MB of GPU memory each
 /** The desk: three baked GLBs and their textures (public/desk, see the README). */
 export const DESK_ASSETS: readonly DeskAsset[] = [
   { model: '/desk/computer.glb', texture: '/desk/computer.webp' },
