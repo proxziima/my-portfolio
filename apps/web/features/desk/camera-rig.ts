@@ -1,5 +1,5 @@
 import { cubicBezier, quinticInOut, type Easing } from './ease'
-import { deskPose, distance, lerpPointer, lerpVec, monitorPose, PARALLAX_RATE, REST, smoothing, type Pointer, type Pose } from './keyframes'
+import { deskPose, distance, lerpPointer, lerpVec, monitorPose, PARALLAX_RATE, pointerDistance, REST, smoothing, type Pointer, type Pose } from './keyframes'
 
 export type CameraKey = 'desk' | 'monitor'
 
@@ -16,6 +16,8 @@ export interface RigCamera {
 
 /** Below this many scene units a frame is treated as still, so the renderer can skip it. */
 const EPSILON = 0.05
+/** Below this (pointer units) the parallax easing counts as converged, so the engine can park. */
+const SETTLE = 1e-3
 
 interface Tween { from: Pose; elapsed: number; ms: number; ease: Easing }
 
@@ -79,6 +81,15 @@ export class CameraRig {
     this.pose = next
     this.apply()
     return true
+  }
+
+  /** No tween running and the parallax has converged: nothing would move next frame. */
+  settled(): boolean {
+    if (this.tween) return false
+    // at the monitor the pointer is ignored, so unconverged parallax would never settle there
+    if (this.key === 'monitor') return true
+    const want = this.reduceMotion ? REST : this.pointer
+    return pointerDistance(this.eased.target, want) < SETTLE && pointerDistance(this.eased.position, want) < SETTLE
   }
 
   private goal(dt: number): Pose {

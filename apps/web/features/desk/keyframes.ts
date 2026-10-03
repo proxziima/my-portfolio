@@ -51,3 +51,4 @@ export const smoothing = (ratePerFrame: number, dtMs: number): number => 1 - (1 
 export const lerpVec = (a: Vec3, b: Vec3, t: number): Vec3 => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t })
 export const lerpPointer = (a: Pointer, b: Pointer, t: number): Pointer => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
 export const distance = (a: Vec3, b: Vec3): number => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+export const pointerDistance = (a: Pointer, b: Pointer): number => Math.hypot(a.x - b.x, a.y - b.y)

@@ -78,6 +78,22 @@ describe('CameraRig', () => {
     expect(run(rig, 200)).toBe(0)
   })
 
+  it('reports settled only when no tween runs and the parallax has converged', () => {
+    const camera = fakeCamera()
+    const rig = new CameraRig(camera)
+    rig.setAspect(ASPECT)
+    run(rig, 100)
+    expect(rig.settled()).toBe(true)
+    rig.setPointer({ x: 1, y: 0 })
+    expect(rig.settled()).toBe(false)
+    run(rig, 8000)
+    expect(rig.settled()).toBe(true)
+    rig.goTo('monitor')
+    expect(rig.settled()).toBe(false)
+    run(rig, TRANSITIONS.monitor.ms + 50)
+    expect(rig.settled()).toBe(true)
+  })
+
   it('jumps straight to the pose and ignores the pointer under reduced motion', () => {
     const camera = fakeCamera()
     const rig = new CameraRig(camera, true)
