@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Caveat, Inter } from 'next/font/google'
 import { ThemeScript } from '@/features/theme/ThemeScript'
-import './globals.css'
+import '../globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 const caveat = Caveat({ subsets: ['latin'], weight: ['500', '600'], variable: '--font-caveat', display: 'swap' })
