@@ -231,6 +231,29 @@ DeskScene
   changes, and dropping fields needs a production migration). Follow-up: remove
   them with a migration.
 
+### 3.11 Full screen (added 2026-10-03)
+
+The reference is a full-viewport experience; in the letter the figure is a
+600×400 box, so the OS on the monitor is small. A **Full screen** button next
+to the caption expands the figure box to the viewport, where the monitor zoom
+puts the 1280×1024 screen at the reference's scale.
+
+- `lib/dom/use-fullscreen.ts`: `useFullscreen(ref) → { on, enter, exit, toggle }`.
+  `enter` sets `on` and, where the Fullscreen API exists, calls
+  `element.requestFullscreen()` (browser chrome goes too, like the reference);
+  `exit` clears `on` and calls `document.exitFullscreen()` if that element is
+  the fullscreen one. A `fullscreenchange` that leaves the element (the user
+  pressed Esc or switched apps) clears `on`; an Escape `keydown` exits in both
+  modes. While `on`, `<html data-fullscreen>` locks page scroll (`base.css`).
+  Without the API (iOS Safari) the CSS mode alone applies.
+- `Figure`: the box gets `data-full`; `.box[data-full='true']` is
+  `position: fixed; inset: 0; z-index: 101` (above the blowout layers at
+  97–100) with the paper background (also under `:fullscreen`, whose UA default
+  is black). The scene's `ResizeObserver` refits the renderer and the rig's
+  aspect, so the desk and monitor poses re-frame for the wide box. An
+  **Exit full screen** button sits top-right inside the box while `on`.
+- Nothing changes in the engine or the OS.
+
 ### 3.10 Sound
 
 Out of this spec. The reference's keyboard, mouse, startup and ambience
