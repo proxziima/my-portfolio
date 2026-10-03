@@ -5,6 +5,8 @@ import { reduceMonitorFocus, UNFOCUSED, wantsMonitor, type MonitorEvent } from '
  * Pointer enter/leave and focus come from the iframe element itself (they fire in the parent
  * document even for a cross-origin frame). Presses are only visible inside the frame's own window,
  * which is reachable because the OS is same-origin; a cross-origin frame simply loses the drag guard.
+ * A cancelled press (native drag, context menu) fires `pointercancel` instead of `pointerup` and
+ * releases as well.
  */
 export function watchScreen(iframe: HTMLIFrameElement, onChange: (wantsMonitor: boolean) => void): () => void {
   let state = UNFOCUSED
@@ -34,6 +36,7 @@ export function watchScreen(iframe: HTMLIFrameElement, onChange: (wantsMonitor: 
     try {
       on(inner, 'pointerdown', () => send('press'))
       on(inner, 'pointerup', () => send('release'))
+      on(inner, 'pointercancel', () => send('release'))
     } catch {
       /* cross-origin: no drag guard */
     }
@@ -46,6 +49,7 @@ export function watchScreen(iframe: HTMLIFrameElement, onChange: (wantsMonitor: 
   })
   on(iframe, 'blur', () => send('blur'))
   on(window, 'pointerup', () => send('release'))
+  on(window, 'pointercancel', () => send('release'))
   on(iframe, 'load', watchInner)
 
   return () => {

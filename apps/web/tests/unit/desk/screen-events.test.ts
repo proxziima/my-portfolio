@@ -41,6 +41,25 @@ describe('watchScreen', () => {
     expect(onChange).toHaveBeenLastCalledWith(false)
   })
 
+  it('a cancelled press releases the monitor too', () => {
+    fire(iframe, 'pointerenter')
+    fire(iframe, 'load')
+    const inner = iframe.contentWindow
+    if (!inner) throw new Error('jsdom gave the iframe no window')
+    fire(inner, 'pointerdown')
+    fire(iframe, 'pointerleave')
+    expect(onChange).toHaveBeenLastCalledWith(true)
+    fire(inner, 'pointercancel')
+    expect(onChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('ignores focus that arrives while the pointer is already over the screen', () => {
+    fire(iframe, 'pointerenter')
+    fire(iframe, 'focus')
+    fire(iframe, 'pointerleave')
+    expect(onChange).toHaveBeenLastCalledWith(false)
+  })
+
   it('treats keyboard focus as hovering', () => {
     fire(iframe, 'focus')
     expect(onChange).toHaveBeenLastCalledWith(true)
