@@ -1,0 +1,81 @@
+.window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  padding: 3px;
+  min-width: 240px;
+  min-height: 160px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 2px 0 4px;
+  background: var(--os-title-inactive);
+  color: var(--os-text-inverse);
+  font-weight: 700;
+  cursor: move;
+  touch-action: none;
+}
+
+.window[data-active='true'] .title {
+  background: var(--os-title);
+}
+
+.titleText {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.controls {
+  display: flex;
+  gap: 2px;
+  cursor: default;
+}
+
+.controls button {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 14px;
+  padding: 0;
+}
+
+.controls button:active {
+  border-color: var(--os-dark) var(--os-light) var(--os-light) var(--os-dark);
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  margin: 4px 0;
+  background: var(--os-light);
+  overflow: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.status {
+  display: flex;
+  gap: 2px;
+  height: 20px;
+}
+
+.status > span:first-child {
+  flex: 1;
+  padding: 0 4px;
+  line-height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.grip {
+  width: 20px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background-image: repeating-linear-gradient(135deg, var(--os-shadow) 0 1px, transparent 1px 4px);
+}
