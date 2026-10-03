@@ -37,15 +37,15 @@ export function collectErrors(page: Page): () => string[] {
 }
 
 /**
- * `test` with the Spline scene held back. The 4.5 MB scene renders on software WebGL in headless
- * Chromium, which starves requestAnimationFrame (and so Playwright's own actionability checks and the
- * page's rAF-driven animations); none of these tests is about the scene. The figure tests, which are,
- * route the scene themselves (a route registered later takes precedence).
+ * `test` with the desk models held back. The scene renders on software WebGL in headless Chromium,
+ * which starves requestAnimationFrame (and so Playwright's own actionability checks and the page's
+ * rAF-driven animations); none of these tests is about the scene. The figure tests, which are,
+ * route the models themselves (a route registered later takes precedence).
  */
 export const test = base.extend<{ sceneHeldBack: void }>({
   sceneHeldBack: [
     async ({ page }, use) => {
-      await page.route('**/*.splinecode', () => new Promise<void>(() => {}))
+      await page.route('**/*.glb', () => new Promise<void>(() => {}))
       await use()
     },
     { auto: true },

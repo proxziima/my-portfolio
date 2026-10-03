@@ -30,13 +30,13 @@ test.describe('without javascript', () => {
   })
 })
 
-// `test` holds the scene back by default; these tests route it themselves (the later route wins)
+// `test` holds the models back by default; these tests route them themselves (the later route wins)
 test.describe('the figure', () => {
-  test('keeps a 3:2 box and its caption while the scene is slow', async ({ page }) => {
+  test('keeps a 3:2 box and its caption while the models are slow', async ({ page }) => {
     const errors: string[] = []
     page.on('pageerror', (e) => errors.push(e.message))
-    // the 4.5 MB scene never arrives
-    await page.route('**/*.splinecode', () => new Promise<void>(() => {}))
+    // the models never arrive
+    await page.route('**/*.glb', () => new Promise<void>(() => {}))
     await openPortfolio(page)
 
     const box = page.locator('[data-anchor="figure-box"]')
@@ -47,11 +47,12 @@ test.describe('the figure', () => {
     const caption = page.locator('figure[data-anchor="figure"] figcaption')
     await expect(caption).not.toBeEmpty()
     await expect(caption).toBeVisible()
+    await expect(caption.getByRole('link', { name: 'Open the desktop →' })).toHaveAttribute('href', '/os')
     expect(errors).toEqual([])
   })
 
-  test('collapses to the caption when the scene fails', async ({ page }) => {
-    await page.route('**/*.splinecode', (route) => route.abort())
+  test('collapses to the caption when a model fails', async ({ page }) => {
+    await page.route('**/*.glb', (route) => route.abort())
     await openPortfolio(page)
     await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
     await expect(page.locator('[data-anchor="figure-box"]')).toHaveCount(0, { timeout: 10_000 })

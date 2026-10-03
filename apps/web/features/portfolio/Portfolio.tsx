@@ -30,7 +30,7 @@ export function Portfolio({ data }: { data: PortfolioData }) {
           <WallSwitch ref={switchRef} disabled={blowout.isActive} onToggled={blowout.register} />
           <RoleHeadline name={data.profile.name} tail={data.profile.headlineTail} hint={settings.pickerHint} />
           <Bio />
-          <Figure sceneUrl={settings.splineSceneUrl} />
+          <Figure />
           <ContactLinks links={data.contactLinks} />
           <EntryList id="work" title={settings.sectionLabels.work} entries={data.work} />
           <EntryList id="projects" title={settings.sectionLabels.projects} entries={data.projects} />

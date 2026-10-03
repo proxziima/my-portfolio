@@ -5,8 +5,8 @@
   touch-action: pan-y;
 }
 
-/* 3:2, not the template's 216px strip: at 600×216 (and even 16:9) the scene's framing crops the lamp
-   and the plant. The ratio scales with the column on mobile. */
+/* 3:2: the desk shot's framing (monitor centred, keyboard in the foreground). The ratio scales
+   with the column on mobile. */
 .box {
   position: relative;
   width: 100%;
@@ -14,21 +14,30 @@
   overflow: hidden;
 }
 
-/* once the scene is up, its own in-scene cursor is the only one; loading or failed keeps the normal one */
-.box:has(canvas[data-loaded='true']) {
-  cursor: none;
-}
-
-.box canvas[data-loaded='true'] {
-  cursor: none !important; /* the runtime writes an inline cursor on the canvas as it hovers objects */
-}
-
 .caption {
-  composes: enter from '../../shared/ui/motion.module.css';
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 10px;
   font-size: 11.5px;
   color: var(--ink-soft);
-  opacity: 0.75;
   font-variant-numeric: tabular-nums;
   transition: var(--theme-transition);
+}
+
+.captionText {
+  composes: enter from '../../shared/ui/motion.module.css';
+  opacity: 0.75;
+}
+
+.open {
+  flex-shrink: 0;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 2px;
+}
+
+.open:hover {
+  color: var(--ink);
 }
