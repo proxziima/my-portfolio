@@ -32,6 +32,19 @@
   mix-blend-mode: normal;
 }
 
+/* The reference drew these layers additively into a transparent WebGL canvas, and the browser then
+   composited that canvas over the iframe: page × (1 − canvas alpha) + the layers' added colour. The
+   additive part is `plus-lighter` below; the canvas alpha is this veil under them. Without it a white
+   page clips the additions away; with it white reads as the reference's slightly dulled phosphor
+   (measured: reference page ≈ 240/255) and the static, the colour streak and the smudges show on it. */
+.screen-fx::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: var(--screen-veil, 0.14);
+}
+
 .screen-static {
   opacity: 0.5;
   mix-blend-mode: plus-lighter;
