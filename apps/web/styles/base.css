@@ -205,6 +205,11 @@ h2 {
   opacity: 0;
 }
 
+/* the figure's full-screen mode (lib/dom/use-fullscreen.ts): the page behind must not scroll */
+:root[data-fullscreen] {
+  overflow: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

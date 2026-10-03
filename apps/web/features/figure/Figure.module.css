@@ -30,14 +30,62 @@
   opacity: 0.75;
 }
 
-.open {
+.actions {
+  display: flex;
   flex-shrink: 0;
+  gap: 14px;
+}
+
+/* the button and the link look alike */
+.action {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   color: inherit;
+  font: inherit;
   text-decoration: underline;
   text-decoration-color: var(--rule);
   text-underline-offset: 2px;
+  cursor: pointer;
 }
 
-.open:hover {
+.action:hover {
+  color: var(--ink);
+}
+
+/* full screen: the box covers the viewport above every fixed layer (blowout 97–100, switch 9) and
+   keeps the page's paper behind the scene; the browser's :fullscreen default would be black */
+.box[data-full='true'] {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  width: auto;
+  aspect-ratio: auto;
+  background: var(--paper);
+}
+
+.box:fullscreen {
+  background: var(--paper);
+}
+
+/* above the canvas (z 1) and the CSS3D layer (z 0) the engine appends */
+.exit {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  padding: 6px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: var(--theme-transition);
+}
+
+.exit:hover {
   color: var(--ink);
 }
