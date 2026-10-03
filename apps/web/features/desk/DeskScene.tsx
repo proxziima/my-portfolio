@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useInView } from '@/lib/dom/use-in-view'
 import { useReducedMotion } from '@/lib/dom/use-reduced-motion'
+import { createDeskAudio, type DeskAudio } from './audio'
 import { OS_PATH } from './config'
 import { createDeskEngine, type DeskEngine } from './engine'
 import { cappedPixelRatio } from './pixel-ratio'
@@ -10,11 +11,15 @@ import styles from './DeskScene.module.css'
 
 /**
  * The desk in the figure box. Builds the engine once per mount, sizes it to the box, drives the
- * camera from the pointer and the screen's events, and renders only while on screen.
- * `onFail` fires if WebGL is missing or an asset fails, so the figure can collapse to its caption.
+ * camera from the pointer and the screen's events, and renders only while on screen. It also owns
+ * the scene's sounds: key and mouse foley for what happens inside the OS, a startup chime and an
+ * office ambience that muffles as the camera zooms in, all silent until the first gesture and
+ * whenever `muted`. `onFail` fires if WebGL is missing or an asset fails, so the figure can
+ * collapse to its caption.
  */
-export function DeskScene({ onFail }: { onFail: () => void }) {
+export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const audioRef = useRef<DeskAudio | null>(null)
   const [engine, setEngine] = useState<DeskEngine | null>(null)
   const [loaded, setLoaded] = useState(false)
   const visible = useInView(hostRef)
@@ -24,13 +29,21 @@ export function DeskScene({ onFail }: { onFail: () => void }) {
     const host = hostRef.current
     if (!host) return
     let live = true
+    const audio = createDeskAudio()
     let created: DeskEngine
     try {
-      created = createDeskEngine({ host, screenSrc: OS_PATH, onFirstFrame: () => { if (live) setLoaded(true) } })
+      created = createDeskEngine({
+        host,
+        screenSrc: OS_PATH,
+        onFirstFrame: () => { if (live) setLoaded(true) },
+        onFrame: (distance) => audio.setDistance(distance),
+      })
     } catch {
+      audio.dispose()
       onFail()
       return
     }
+    audioRef.current = audio
     const engine = created
     const fit = () => {
       engine.resize(host.clientWidth, host.clientHeight)
@@ -51,7 +64,21 @@ export function DeskScene({ onFail }: { onFail: () => void }) {
       dprQuery.addEventListener('change', onDpr)
     }
     watchDpr()
-    const unwatch = watchScreen(engine.iframe, (want) => engine.goTo(want ? 'monitor' : 'desk'))
+    const unlock = () => audio.unlock()
+    const unwatch = watchScreen(
+      engine.iframe,
+      (want) => engine.goTo(want ? 'monitor' : 'desk'),
+      (input) => {
+        unlock()
+        if (input.type === 'pointerdown') audio.mouse('down')
+        else if (input.type === 'pointerup') audio.mouse('up')
+        else if (input.type === 'keydown') audio.key(input.key, input.repeat)
+        else audio.keyUp()
+      },
+    )
+    // a press on the desk itself also counts as the gesture that may start sound
+    host.addEventListener('pointerdown', unlock)
+    host.addEventListener('keydown', unlock)
     const onMove = (e: PointerEvent) => {
       const r = host.getBoundingClientRect()
       engine.setPointer({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: ((e.clientY - r.top) / r.height) * 2 - 1 })
@@ -65,10 +92,19 @@ export function DeskScene({ onFail }: { onFail: () => void }) {
       dprQuery?.removeEventListener('change', onDpr)
       unwatch()
       host.removeEventListener('pointermove', onMove)
+      host.removeEventListener('pointerdown', unlock)
+      host.removeEventListener('keydown', unlock)
+      audio.dispose()
+      audioRef.current = null
       setEngine(null)
       engine.dispose()
     }
   }, [onFail])
+
+  // depends on `engine` too: the audio is created with it, so the choice is re-applied once it exists
+  useEffect(() => {
+    audioRef.current?.setMuted(muted)
+  }, [engine, muted])
 
   useEffect(() => {
     engine?.setReduceMotion(reduce)

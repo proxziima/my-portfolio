@@ -70,11 +70,16 @@
 }
 
 /* above the canvas (z 1) and the CSS3D layer (z 0) the engine appends */
-.exit {
+.bar {
   position: absolute;
   top: 16px;
   right: 16px;
   z-index: 2;
+  display: flex;
+  gap: 8px;
+}
+
+.barButton {
   padding: 6px 12px;
   border: 1px solid var(--rule);
   border-radius: 4px;
@@ -86,6 +91,6 @@
   transition: var(--theme-transition);
 }
 
-.exit:hover {
+.barButton:hover {
   color: var(--ink);
 }

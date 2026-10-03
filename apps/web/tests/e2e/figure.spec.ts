@@ -35,3 +35,16 @@ test('full screen covers the viewport and Escape restores the box', async ({ pag
   }).toBe(1.5)
   await expect(page.locator('html')).not.toHaveAttribute('data-fullscreen', 'true')
 })
+
+test('the mute toggle flips and persists', async ({ page }) => {
+  await openPortfolio(page)
+  const figure = page.locator('[data-anchor="figure"]')
+  await figure.scrollIntoViewIfNeeded()
+  const mute = figure.getByRole('button', { name: 'Mute' })
+  await expect(mute).toHaveAttribute('aria-pressed', 'false')
+  await mute.click()
+  await expect(figure.getByRole('button', { name: 'Unmute' })).toHaveAttribute('aria-pressed', 'true')
+  expect(await page.evaluate(() => localStorage.getItem('desk-muted'))).toBe('1')
+  await page.reload()
+  await expect(page.locator('[data-anchor="figure"]').getByRole('button', { name: 'Unmute' })).toBeVisible()
+})

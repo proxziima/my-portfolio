@@ -4,6 +4,7 @@ import { watchScreen } from '@/features/desk/screen-events'
 
 let iframe: HTMLIFrameElement
 const onChange = vi.fn()
+const onInput = vi.fn()
 let unwatch: () => void
 
 const fire = (target: EventTarget, type: string) => target.dispatchEvent(new Event(type, { bubbles: true }))
@@ -12,7 +13,8 @@ beforeEach(() => {
   iframe = document.createElement('iframe')
   document.body.append(iframe)
   onChange.mockClear()
-  unwatch = watchScreen(iframe, onChange)
+  onInput.mockClear()
+  unwatch = watchScreen(iframe, onChange, onInput)
 })
 
 afterEach(() => {
@@ -65,6 +67,22 @@ describe('watchScreen', () => {
     expect(onChange).toHaveBeenLastCalledWith(true)
     fire(iframe, 'blur')
     expect(onChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('reports the frame\'s presses and keys as inputs', () => {
+    fire(iframe, 'load')
+    const inner = iframe.contentWindow
+    if (!inner) throw new Error('jsdom gave the iframe no window')
+    inner.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', repeat: false, bubbles: true }))
+    inner.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }))
+    fire(inner, 'pointerdown')
+    fire(inner, 'pointerup')
+    expect(onInput.mock.calls.map((c) => c[0])).toEqual([
+      { type: 'keydown', key: 'a', repeat: false },
+      { type: 'keyup', key: 'a', repeat: false },
+      { type: 'pointerdown', key: '', repeat: false },
+      { type: 'pointerup', key: '', repeat: false },
+    ])
   })
 
   it('stops listening once unsubscribed', () => {

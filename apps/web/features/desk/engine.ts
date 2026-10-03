@@ -14,6 +14,8 @@ export interface DeskEngineOptions {
   reduceMotion?: boolean
   /** The first frame drawn with the models in place. */
   onFirstFrame?: () => void
+  /** Every drawn frame: the camera's distance to the desk origin, for the ambience. */
+  onFrame?: (cameraDistance: number) => void
 }
 
 export interface DeskEngine {
@@ -39,7 +41,13 @@ const MAX_DT = 100
  * settled the loop parks until an input wakes it. Throws if WebGL is unavailable, so the caller
  * can fall back.
  */
-export function createDeskEngine({ host, screenSrc, reduceMotion = false, onFirstFrame }: DeskEngineOptions): DeskEngine {
+export function createDeskEngine({
+  host,
+  screenSrc,
+  reduceMotion = false,
+  onFirstFrame,
+  onFrame,
+}: DeskEngineOptions): DeskEngine {
   const gl = new WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
   gl.setClearColor(0x000000, 0)
   const css = new CSS3DRenderer()
@@ -72,6 +80,7 @@ export function createDeskEngine({ host, screenSrc, reduceMotion = false, onFirs
       announced = true
       onFirstFrame?.()
     }
+    onFrame?.(camera.position.length())
   }
 
   const frame = (now: number) => {
