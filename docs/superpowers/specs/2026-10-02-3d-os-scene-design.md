@@ -367,9 +367,11 @@ DRY: Doom and AutoCAD are the same thing — a bundle in `DosPlayer` on black �
 so `apps/doom/` (the loader and player) moves to `apps/dos/`, `apps/Doom.tsx`
 becomes `apps/dos-app.tsx` with `dosApp(bundleUrl, displayName)` returning the
 component, and the registry holds both, sharing one `DOS_CHROME`: AutoCAD as
-"AutoCAD Release 12" (shortcut "AutoCAD"), 970×778 so the content box is
-1.5× its 640×480 VGA screen (the chrome is 10 px across and 58 px down; 1:1
-read too small), the same status and bar colour as Doom, and
+"AutoCAD Release 12" (shortcut "AutoCAD"), opening by shape rather than size:
+`aspect: 4 / 3` makes `initialRect` give it the Showcase window's height and
+the width its 640×480 VGA screen needs (1159×920 on the 1280×1024 desk; the
+chrome is `WINDOW_CHROME`, 10 px across and 58 px down), the same status and
+bar colour as Doom, and
 a pixel icon of the boot-screen mark (`public/os/icons/autocad.png`). Credits'
 "Games" section becomes "DOS software" with an Autodesk row.
 

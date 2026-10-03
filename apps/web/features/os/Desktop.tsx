@@ -60,6 +60,7 @@ export function Desktop({ data }: { data: Portfolio }) {
             zIndex={w.zIndex}
             hidden={w.minimized}
             size={app.size}
+            aspect={app.aspect}
             bounds={bounds}
             onFocus={() => dispatch({ type: 'focus', id: app.id })}
             onMinimize={() => dispatch({ type: 'minimize', id: app.id })}

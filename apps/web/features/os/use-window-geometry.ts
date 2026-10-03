@@ -7,9 +7,9 @@ type Mode = 'move' | 'resize'
 /**
  * A window's rect: placed on mount from the desk's measured size, moved and resized with pointer
  * capture, maximised to the desk. `bounds` and `size` must be referentially stable; a new identity
- * re-places the window.
+ * re-places the window. `aspect` (content width / height) opens it as tall as the desk allows.
  */
-export function useWindowGeometry(size: Size | undefined, bounds: () => Size) {
+export function useWindowGeometry(size: Size | undefined, bounds: () => Size, aspect?: number) {
   const [rect, setRect] = useState<Rect>({ x: 0, y: 0, width: 0, height: 0 })
   const [maximized, setMaximized] = useState(false)
   // the rect is mirrored in a ref so a gesture can start from the latest one without re-subscribing
@@ -18,8 +18,8 @@ export function useWindowGeometry(size: Size | undefined, bounds: () => Size) {
   const restore = useRef<Rect | null>(null)
 
   useLayoutEffect(() => {
-    setRect(initialRect(bounds(), size))
-  }, [bounds, size])
+    setRect(initialRect(bounds(), size, aspect))
+  }, [bounds, size, aspect])
 
   const gesture = useCallback(
     (mode: Mode) => (e: ReactPointerEvent<HTMLElement>) => {

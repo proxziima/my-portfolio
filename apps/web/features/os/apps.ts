@@ -20,6 +20,8 @@ export interface OsApp {
   component: ComponentType<OsAppProps>
   /** Opening size; omitted = fill the desk with a margin. */
   size?: Size
+  /** Opening shape instead of a size: content width / height, as tall as the fill window allows. */
+  aspect?: number
   /** The status bar's text; omitted = the owner's copyright line. */
   status?: string
   /** The active title bar's colour, as the reference's Doom paints its own. */
@@ -37,15 +39,14 @@ export const APPS: readonly OsApp[] = [
   { id: 'showcase', title: (data) => `${data.profile.name} - Showcase ${new Date().getFullYear()}`, shortcut: 'My Showcase', icon: 'folder', component: Showcase },
   { id: 'credits', title: 'Credits', shortcut: 'Credits', icon: 'document', component: Credits, size: { width: 1100, height: 800 } },
   { id: 'doom', title: 'Doom', shortcut: 'Doom', icon: 'doom', component: dosApp('/doom.jsdos', 'Doom'), size: { width: 980, height: 670 }, ...DOS_CHROME },
-  // the window chrome is 10 px across and 58 px down: this leaves exactly its 640×480 VGA screen, unscaled
   {
     id: 'autocad',
     title: 'AutoCAD Release 12',
     shortcut: 'AutoCAD',
     icon: 'autocad',
     component: dosApp('/autocad.jsdos', 'AutoCAD'),
-    // 1.5× its 640×480 VGA screen plus the window chrome (10 × 58): readable, and it fits the 1280×1024 desk
-    size: { width: 970, height: 778 },
+    // its 640×480 VGA screen, as tall as the Showcase window (about 1149×862 on the 1280×1024 desk)
+    aspect: 4 / 3,
     ...DOS_CHROME,
   },
 ]

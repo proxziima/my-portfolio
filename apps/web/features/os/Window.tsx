@@ -18,6 +18,8 @@ interface Props {
   /** Minimised: kept mounted so the app's state survives. */
   hidden: boolean
   size?: Size
+  /** Content width / height: opens as tall as the desk allows with that shape (a DOS screen). */
+  aspect?: number
   bounds: () => Size
   onFocus: () => void
   onMinimize: () => void
@@ -27,8 +29,8 @@ interface Props {
 
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
 
-export function Window({ title, status, icon, barColor, active, zIndex, hidden, size, bounds, onFocus, onMinimize, onClose, children }: Props) {
-  const { style, maximized, onMoveStart, onResizeStart, toggleMaximize } = useWindowGeometry(size, bounds)
+export function Window({ title, status, icon, barColor, active, zIndex, hidden, size, aspect, bounds, onFocus, onMinimize, onClose, children }: Props) {
+  const { style, maximized, onMoveStart, onResizeStart, toggleMaximize } = useWindowGeometry(size, bounds, aspect)
   return (
     <section
       role="dialog"
