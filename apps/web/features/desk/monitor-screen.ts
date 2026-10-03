@@ -76,7 +76,8 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
   gl.rotation.copy(css.rotation)
 
   const { occluder, bezels } = screenPlanes(screen)
-  const occluderMaterial = new MeshBasicMaterial({ transparent: true, opacity: 0, blending: NoBlending, side: DoubleSide })
+  // black with alpha 0: the canvas is premultiplied, so any brighter colour at alpha 0 composites as light instead of a hole
+  const occluderMaterial = new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, blending: NoBlending, side: DoubleSide })
   const bezelMaterial = new MeshBasicMaterial({ color: BEZEL_COLOR, side: DoubleSide })
   const geometries: PlaneGeometry[] = []
   const add = (spec: PlaneSpec, material: MeshBasicMaterial) => {
