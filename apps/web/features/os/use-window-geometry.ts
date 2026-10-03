@@ -5,8 +5,9 @@ import { clampRect, initialRect, TASKBAR_HEIGHT, type Rect, type Size } from './
 type Mode = 'move' | 'resize'
 
 /**
- * A window's rect: placed on mount from the desk's measured size (the desk ref is attached by the
- * time this layout effect runs), moved and resized with pointer capture, maximised to the desk.
+ * A window's rect: placed on mount from the desk's measured size, moved and resized with pointer
+ * capture, maximised to the desk. `bounds` and `size` must be referentially stable; a new identity
+ * re-places the window.
  */
 export function useWindowGeometry(size: Size | undefined, bounds: () => Size) {
   const [rect, setRect] = useState<Rect>({ x: 0, y: 0, width: 0, height: 0 })
@@ -47,12 +48,13 @@ export function useWindowGeometry(size: Size | undefined, bounds: () => Size) {
   )
 
   const toggleMaximize = useCallback(() => {
-    setMaximized((on) => {
-      if (on && restore.current) setRect(restore.current)
-      else restore.current = latest.current
-      return !on
-    })
-  }, [])
+    if (maximized) {
+      if (restore.current) setRect(restore.current)
+    } else {
+      restore.current = latest.current
+    }
+    setMaximized(!maximized)
+  }, [maximized])
 
   const style: CSSProperties = maximized
     ? { left: 0, top: 0, width: '100%', height: `calc(100% - ${TASKBAR_HEIGHT}px)` }

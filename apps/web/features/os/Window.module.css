@@ -24,6 +24,14 @@
   background: var(--os-title);
 }
 
+.window[data-maximized='true'] .title {
+  cursor: default;
+}
+
+.window[data-maximized='true'] .grip {
+  visibility: hidden;
+}
+
 .titleText {
   flex: 1;
   overflow: hidden;

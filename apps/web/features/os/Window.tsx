@@ -33,6 +33,7 @@ export function Window({ title, icon, active, zIndex, hidden, size, bounds, onFo
       style={{ ...style, zIndex }}
       hidden={hidden}
       data-active={active}
+      data-maximized={maximized}
       onPointerDownCapture={onFocus}
     >
       <header className={styles.title} onPointerDown={onMoveStart} onDoubleClick={toggleMaximize}>
