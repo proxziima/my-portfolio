@@ -48,16 +48,17 @@ bun run --cwd apps/web build
 bun run --cwd apps/web test:e2e
 ```
 
-## Updating the desk model
+## The desk and its OS
 
-The figure is a Spline scene. To replace it:
+The figure is a three.js scene (`apps/web/features/desk/`): three baked GLBs with one unlit texture each, and a CSS3D `<iframe>` of `/os` set into the monitor. Hovering the monitor zooms the camera to the screen; leaving zooms back. `/os` (`apps/web/features/os/`) is a small Windows-98-style desktop fed by the same CMS data, and works on its own (that is also the mobile route, linked under the figure). Design: [docs/superpowers/specs/2026-10-02-3d-os-scene-design.md](docs/superpowers/specs/2026-10-02-3d-os-scene-design.md).
 
-1. In Spline, export the scene (**Export → Code**, which downloads a `.splinecode`) or save the editor file (`.spline`).
-2. In the admin (http://localhost:3001/admin), open **Site → Spline scenes → Create new**, give it a title and upload the file. Only `.spline` and `.splinecode` files are accepted.
-3. Open **Site settings → Figure → Scene**, pick the new scene and save.
-4. The CMS revalidates the web app within seconds. Hard-refresh the page to see the new model.
+The models come from [Henry Heffernan's portfolio](https://github.com/henryjeff/portfolio-website) (MIT). To replace them with your own desk:
 
-The web app uses the uploaded scene first, then the **Spline scene URL** field below it, then the static fallback `apps/web/public/spline/scene.splinecode`. `docs/assets/interactive_workspace.spline` is only a working copy of the editor file; nothing reads it. The browser loads the upload from the CMS origin, so `WEB_URL` in `apps/payload/.env` must be the web app's exact origin (e.g. `http://localhost:3000`): it is the CMS's only CORS origin. Details are in [apps/payload/README.md](apps/payload/README.md#updating-the-desk-model).
+1. Export each part as a GLB with baked lighting (from Spline: **Export → 3D → GLTF**; from Blender: bake to a texture, then export glTF Binary). Keep the monitor's screen a flat quad roughly at the reference's place, or move `SCREEN` in `apps/web/features/desk/config.ts` to match.
+2. Convert the baked textures to 2048² WebP (`sharp`, quality 85) and drop everything in `apps/web/public/desk/`.
+3. Point `DESK_ASSETS` in `config.ts` at the new files; adjust `MODEL_SCALE` if the export's units differ.
+
+The CMS's **Site settings → Figure** group and **Spline scenes** collection are no longer read by the web app; they stay until a migration removes them.
 
 ## Blog, draft preview and live preview
 

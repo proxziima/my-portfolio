@@ -35,14 +35,11 @@ export const SiteSettings: GlobalConfig = {
           name: 'scene',
           type: 'upload',
           relationTo: 'scenes',
-          admin: {
-            description:
-              'Upload a new Spline export (.spline / .splinecode) to replace the desk model. Takes precedence over the URL below.',
-          },
+          admin: { description: 'Unused since the three.js desk (October 2026); kept until a migration removes it.' },
         },
         {
           ...urlField('splineSceneUrl'),
-          admin: { description: 'Spline → Export → Code → copy the .splinecode URL. Empty = /spline/scene.splinecode.' },
+          admin: { description: 'Unused since the three.js desk (October 2026); kept until a migration removes it.' },
         },
       ],
     },
