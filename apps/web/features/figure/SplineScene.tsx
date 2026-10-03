@@ -1,6 +1,8 @@
 'use client'
 import { Application } from '@splinetool/runtime'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useInView } from '@/lib/dom/use-in-view'
+import { applyPixelRatio, scenePixelRatio } from './scene-pixel-ratio'
 import { useFitScale } from './use-fit-scale'
 import { useHideSplineTextProxy } from './use-hide-spline-text-proxy'
 import styles from './SplineScene.module.css'
@@ -15,35 +17,38 @@ const FRAME = { width: 600, height: 400 }
  */
 const SCENE_ZOOM = 0.7
 /**
- * About 857×571 CSS px. It renders at that size × devicePixelRatio even when scaled down into a narrow
- * box; the runtime has no pixel-ratio option to cap it. Accepted GPU cost (spec §6.8).
+ * About 857×571 CSS px, scaled into the box by `fit`. Its WebGL buffer is sized to the device pixels it
+ * covers after that scaling, not to the full stage × devicePixelRatio (see scene-pixel-ratio.ts).
  */
 const STAGE = { width: FRAME.width / SCENE_ZOOM, height: FRAME.height / SCENE_ZOOM }
 
 /**
  * The Spline scene, client-only, driven through the runtime directly rather than
- * `@splinetool/react-spline`, for two things the wrapper doesn't expose:
+ * `@splinetool/react-spline`, for what the wrapper doesn't expose:
  * - `renderer: 'webgl'`: on the auto-selected WebGPU pipeline this scene logs pipeline and
  *   shadow-texture validation errors (and drops two draws); the WebGL pipeline renders it cleanly
  * - a load rejection (missing file, unparsable scene), which the wrapper rethrows during render.
- *   `onFail` lets the figure collapse to its caption.
+ *   `onFail` lets the figure collapse to its caption
+ * - the loaded app itself: its pixel ratio follows the fit, and it stops rendering while off screen.
  */
 export function SplineScene({ url, onFail }: { url: string; onFail: () => void }) {
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [loaded, setLoaded] = useState(false)
+  const [app, setApp] = useState<Application | null>(null)
   const fit = useFitScale(stageRef, STAGE.width)
+  const visible = useInView(stageRef)
   useHideSplineTextProxy()
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     let live = true
-    let app: Application | undefined
+    let instance: Application | undefined
     try {
-      app = new Application(canvas, { renderMode: 'auto', renderer: 'webgl' })
-      app.load(url).then(
-        () => { if (live) setLoaded(true) },
+      const loading = new Application(canvas, { renderMode: 'auto', renderer: 'webgl' })
+      instance = loading
+      loading.load(url).then(
+        () => { if (live) setApp(loading) },
         () => { if (live) onFail() },
       )
     } catch {
@@ -51,13 +56,25 @@ export function SplineScene({ url, onFail }: { url: string; onFail: () => void }
     }
     return () => {
       live = false
-      app?.dispose()
+      setApp(null)
+      instance?.dispose()
     }
   }, [url, onFail])
 
+  useEffect(() => {
+    if (app) applyPixelRatio(app, scenePixelRatio(window.devicePixelRatio, fit))
+  }, [app, fit])
+
+  // nothing to see off screen: stop the render loop (and its events) until the stage scrolls back
+  useEffect(() => {
+    if (!app) return
+    if (visible && app.isStopped) app.play()
+    else if (!visible && !app.isStopped) app.stop()
+  }, [app, visible])
+
   return (
     <div ref={stageRef} className={styles.stage} style={{ ...STAGE, '--fit': fit } as CSSProperties}>
-      <canvas ref={canvasRef} data-loaded={loaded} aria-hidden="true" />
+      <canvas ref={canvasRef} data-loaded={app !== null} aria-hidden="true" />
     </div>
   )
 }
