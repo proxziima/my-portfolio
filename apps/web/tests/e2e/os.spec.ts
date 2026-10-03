@@ -51,6 +51,18 @@ test('a shortcut opens Credits on top, and close removes it', async ({ page }) =
   await expect(credits).toHaveCount(0)
 })
 
+test('the Doom shortcut boots the shareware bundle in js-dos', async ({ page }) => {
+  // DOSBox runs as WASM and the frames are drawn in software in headless Chromium: allow it time
+  test.setTimeout(60_000)
+  await openDesktop(page)
+  await page.getByRole('button', { name: 'Doom', exact: true }).dblclick()
+  const doom = page.getByRole('dialog', { name: 'Doom' })
+  await expect(doom).toBeVisible()
+  await expect(doom.locator('footer span').first()).toHaveText('Powered by JSDOS & DOSBox')
+  await expect(page.locator('head script[src="/js-dos/js-dos.js"]')).toHaveCount(1)
+  await expect(doom.locator('[data-anchor="dos-player"] canvas').first()).toBeAttached({ timeout: 30_000 })
+})
+
 test('dragging the title bar moves the window', async ({ page }) => {
   await openDesktop(page)
   const title = showcase(page).locator('header')

@@ -22,6 +22,13 @@ export const CREDITS = (name: string): CreditSection[] => [
     ],
   },
   {
+    title: 'Games',
+    rows: [
+      ['id Software', 'DOOM (shareware)'],
+      ['js-dos & DOSBox', 'DOS emulation'],
+    ],
+  },
+  {
     title: 'Built with',
     rows: [
       ['three.js', 'Scene'],

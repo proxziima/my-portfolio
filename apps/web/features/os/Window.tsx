@@ -11,6 +11,8 @@ interface Props {
   /** The status bar's text, like the reference's copyright line; defaults to the title. */
   status?: string
   icon: IconName
+  /** Overrides the active title bar's colour (an inactive one stays grey). */
+  barColor?: string
   active: boolean
   zIndex: number
   /** Minimised: kept mounted so the app's state survives. */
@@ -25,7 +27,7 @@ interface Props {
 
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
 
-export function Window({ title, status, icon,active, zIndex, hidden, size, bounds, onFocus, onMinimize, onClose, children }: Props) {
+export function Window({ title, status, icon, barColor, active, zIndex, hidden, size, bounds, onFocus, onMinimize, onClose, children }: Props) {
   const { style, maximized, onMoveStart, onResizeStart, toggleMaximize } = useWindowGeometry(size, bounds)
   return (
     <section
@@ -38,7 +40,7 @@ export function Window({ title, status, icon,active, zIndex, hidden, size, bound
       data-maximized={maximized}
       onPointerDownCapture={onFocus}
     >
-      <header className={styles.title} onPointerDown={onMoveStart} onDoubleClick={toggleMaximize}>
+      <header className={styles.title} style={active && barColor ? { background: barColor } : undefined} onPointerDown={onMoveStart} onDoubleClick={toggleMaximize}>
         <Icon name={icon} size={16} />
         <span className={styles.titleText}>{title}</span>
         <span className={styles.controls} onPointerDown={stop} onDoubleClick={stop}>

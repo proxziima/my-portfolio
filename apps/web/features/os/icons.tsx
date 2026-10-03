@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react'
 
-export type IconName = 'computer' | 'folder' | 'document' | 'flag' | 'minimize' | 'maximize' | 'close'
+export type IconName = 'computer' | 'folder' | 'document' | 'doom' | 'flag' | 'minimize' | 'maximize' | 'close'
 
 /** 16×16 pixel-art paths; `shapeRendering="crispEdges"` keeps them sharp when scaled by integers. */
 const PATHS: Record<IconName, { fill: string; d: string }[]> = {
@@ -16,6 +16,15 @@ const PATHS: Record<IconName, { fill: string; d: string }[]> = {
   document: [
     { fill: '#ffffff', d: 'M3 1h7l3 3v11H3z' },
     { fill: '#808080', d: 'M10 1v3h3zM5 6h6v1H5zM5 8h6v1H5zM5 10h6v1H5z' },
+  ],
+  // the DOOM marine's status-bar face: green helmet band, skin, dark eyes, a red grimace
+  doom: [
+    { fill: '#1c1c1c', d: 'M3 1h10v1h1v11h-1v2H3v-2H2V2h1z' },
+    { fill: '#5a8a3a', d: 'M3 2h10v3H3z' },
+    { fill: '#d9a066', d: 'M3 5h10v7h-1v2H4v-2H3z' },
+    { fill: '#a8703a', d: 'M7 8h2v2H7z' },
+    { fill: '#1c1c1c', d: 'M5 6h2v2H5zM9 6h2v2H9z' },
+    { fill: '#c02020', d: 'M6 11h4v1H6z' },
   ],
   flag: [
     { fill: '#ff0000', d: 'M2 2h6v6H2z' },

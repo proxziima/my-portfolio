@@ -1,0 +1,16 @@
+/* fills the window's content box; js-dos lays its canvas out inside and follows this box's size */
+.player {
+  position: absolute;
+  inset: 0;
+}
+
+.message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #c0c0c0;
+  font-family: monospace;
+  pointer-events: none;
+}

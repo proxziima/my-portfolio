@@ -42,7 +42,7 @@ export function Desktop({ data }: { data: Portfolio }) {
     <div ref={deskRef} className={styles.desktop} data-anchor="desktop">
       <div className={styles.shortcuts}>
         {apps.map((app) => (
-          <Shortcut key={app.id} icon={app.icon} label={app.title} onOpen={() => dispatch({ type: 'open', id: app.id })} />
+          <Shortcut key={app.id} icon={app.icon} label={app.shortcut ?? app.title} onOpen={() => dispatch({ type: 'open', id: app.id })} />
         ))}
       </div>
       {apps.map((app) => {
@@ -53,8 +53,9 @@ export function Desktop({ data }: { data: Portfolio }) {
           <Window
             key={app.id}
             title={app.title}
-            status={status}
+            status={app.status ?? status}
             icon={app.icon}
+            barColor={app.barColor}
             active={active === app.id}
             zIndex={w.zIndex}
             hidden={w.minimized}
