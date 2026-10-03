@@ -328,6 +328,42 @@ The Showcase reproduces the reference's layout and type:
 - The window is titled "<name> - Showcase <year>" with "© Copyright <year>
   <name>" in the status bar.
 
+### 3.14 Doom, as the reference (added 2026-10-03)
+
+The reference's js-dos v7 runtime (`public/js-dos/`, GPL-2.0) and its
+shareware DOOM bundle (`public/doom.jsdos`, id Software's freely
+redistributable shareware episode) are copied as they are. `features/os/apps/doom/`
+holds a one-time script loader (`loadJsDos`, which also sets
+`emulators.pathPrefix = '/js-dos/'`), a `DosPlayer` port (`Dos(root)` →
+`run(bundle)`, `stop()` on unmount) and the `Doom` app; the registry gains
+`shortcut` (desk label, "My Showcase" / "Credits" / "Doom" as the reference),
+`status` ("Powered by JSDOS & DOSBox") and `barColor` (`#1c1c1c`). The Doom
+desktop icon is the reference's bitmap (`public/os/icons/doom.png`); `Icon`
+renders bitmap icons for names listed in `BITMAPS`. Credits gain a "Games"
+section naming id Software and js-dos/DOSBox. Serving GPL binaries means
+offering their source: the Credits link to github.com/caiiiycuk/js-dos.
+
+### 3.15 Screen effects (added 2026-10-03)
+
+The reference's smudge/static/shadow planes become CSS layers inside the
+CSS3D screen element (`.screen-fx`, `features/desk/screen-fx.css`): a
+vignette, the soft pink/green colour band around 60 % of the width, soft
+scanlines, a static tile (a seeded 128² noise PNG made once with a canvas,
+`features/desk/noise.ts`, stepped by a CSS animation), an inline-SVG
+fractal-noise smudge layer, and the reference's sub-pixel `jitter` on the
+iframe. The overlay is `pointer-events: none`, fades in only once the iframe
+has loaded (before that the slab is a powered-off CRT gradient), and all
+animation stops under `prefers-reduced-motion`. The reference's whole-canvas
+film grain was tried and dropped: on the page's dark paper it speckled.
+
+### 3.16 Brand and icons (added 2026-10-03)
+
+The baked computer texture carried the reference's "Heffernan / henry inc"
+logo on the monitor bezel; it is erased in place (median filter over the
+band, which keeps the baked shading) and the owner's name is drawn in the
+same spot and orientation with `sharp`. The site's favicon and touch icons are
+the reference's computer icon.
+
 ## 4. Performance
 
 Mandatory, and the reason for most choices above:
