@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useReducer, useRef, useState } from 'react'
-import { APPS, BOOT_APP, desktopApps, resolveApp, type OsData, type ResolvedApp } from './apps'
+import { APPS, BOOT_APP, desktopApps, resolveApp, withChildren, type OsData, type ResolvedApp } from './apps'
 import { Boot } from './Boot'
 import { Shortcut } from './Shortcut'
 import { Shutdown } from './Shutdown'
@@ -64,7 +64,7 @@ export function Desktop({ data }: { data: OsData }) {
             bounds={bounds}
             onFocus={() => dispatch({ type: 'focus', id: app.id })}
             onMinimize={() => dispatch({ type: 'minimize', id: app.id })}
-            onClose={() => dispatch({ type: 'close', id: app.id })}
+            onClose={() => withChildren(APPS, app.id).forEach((id) => dispatch({ type: 'close', id }))}
           >
             <App data={data} open={open} />
           </Window>

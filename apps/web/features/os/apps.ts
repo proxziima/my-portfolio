@@ -28,8 +28,8 @@ export interface OsApp {
   title: Text
   /** The desktop label, short like the reference's ("My Showcase"); omitted = the title (resolved by resolveApp). */
   shortcut?: Text
-  /** false: no desktop shortcut; another app opens it (the Messenger's conversation). */
-  desktop?: false
+  /** The app that opens this one (the Messenger opens its conversation): no desktop shortcut, and it closes with its parent. */
+  parent?: string
   icon: IconName
   component: ComponentType<OsAppProps>
   /** Opening size; omitted = fill the desk with a margin. */
@@ -53,8 +53,16 @@ export const resolveApp = (app: OsApp, data: OsData): ResolvedApp => ({
   shortcut: resolve(app.shortcut ?? app.title, data),
 })
 
-/** The apps with a desktop shortcut. */
-export const desktopApps = <T extends { desktop?: false }>(apps: readonly T[]): T[] => apps.filter((app) => app.desktop !== false)
+type Family = Pick<OsApp, 'id' | 'parent'>
+
+/** The apps with a desktop shortcut: those no other app opens. */
+export const desktopApps = <T extends Family>(apps: readonly T[]): T[] => apps.filter((app) => !app.parent)
+
+/** An app and every window it opened, and those windows' own, for closing them together. */
+export const withChildren = (apps: readonly Family[], id: string): string[] => [
+  id,
+  ...apps.filter((app) => app.parent === id).flatMap((child) => withChildren(apps, child.id)),
+]
 
 /** The chrome every DOS program shares, as the reference's Doom window. */
 const DOS_CHROME = { status: 'Powered by JSDOS & DOSBox', barColor: '#1c1c1c' } as const
@@ -99,8 +107,8 @@ export const APPS: readonly OsApp[] = [
     title: (data) => withName(data.messenger.labels.conversation, data.messenger.contact.name),
     icon: 'messenger',
     component: Conversation,
-    // opened by double-clicking the contact in the Messenger
-    desktop: false,
+    // opened by double-clicking the contact in the Messenger, and closed with it
+    parent: 'messenger',
     size: { width: 580, height: 520 },
   },
 ]

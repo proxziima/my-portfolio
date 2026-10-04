@@ -174,6 +174,17 @@ test('the keyboard opens the conversation from the contact list', async ({ page 
   await expect(page.getByRole('dialog', { name: 'Vinicius Queiroz - Conversation' })).toBeVisible()
 })
 
+test('closing the Messenger closes its conversation too', async ({ page }) => {
+  await openDesktop(page)
+  await page.getByRole('button', { name: 'Messenger', exact: true }).dblclick()
+  await page.getByRole('dialog', { name: 'Windows Live Messenger' }).getByRole('button', { name: /Vinicius Queiroz/ }).first().dblclick()
+  const chat = page.getByRole('dialog', { name: 'Vinicius Queiroz - Conversation' })
+  await expect(chat).toBeVisible()
+  await page.getByRole('button', { name: 'Close Windows Live Messenger' }).click()
+  await expect(page.getByRole('dialog', { name: 'Windows Live Messenger' })).toHaveCount(0)
+  await expect(chat).toHaveCount(0)
+})
+
 test('the conversation has no desktop shortcut', async ({ page }) => {
   await openDesktop(page)
   await expect(page.getByRole('button', { name: /Conversation/ })).toHaveCount(0)
