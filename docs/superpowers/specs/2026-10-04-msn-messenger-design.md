@@ -62,12 +62,15 @@ messenger
 │  ├─ favorites        "Favorites"
 │  ├─ friends          "Friends"
 │  ├─ whatsNew         "What's new"
-│  └─ typing           "{name} is typing a message..."   ({name} is replaced by the contact's name)
+│  ├─ typing           "{name} is typing a message..."   ({name} is replaced by the contact's name)
+│  └─ send             "Send"
 └─ whatsNew            array of { text: text required, linkLabel: text, url: urlField, image: upload → media }
 ```
 
-The `status` select is a shared field factory (`src/fields/messenger-status.ts`)
-used by both groups. `url` reuses `fields/link-url.ts`'s `urlField`.
+A local `person()` helper builds the name / status / personal message / avatar
+fields for both groups (DRY). `url` reuses `fields/link-url.ts`'s `urlField`.
+`SiteSettings.ts`'s local `requiredText` helper moves to
+`src/fields/required-text.ts` so both globals share it.
 
 - **Migration:** `bun run --cwd apps/payload payload migrate:create messenger`,
   committed with the global. Production runs pending migrations on start.
@@ -115,8 +118,8 @@ Each unit has one job:
 
 | File | Job |
 |---|---|
-| `status.ts` | `STATUS_LABEL` (Available, Busy, Away, Appear offline) and the status → CSS colour token map. Pure. |
-| `Avatar.tsx` | A framed picture with the frame coloured by status. Two sizes (`lg` header/conversation, `sm` list). Falls back to the SVG silhouette. |
+| `status.ts` | `STATUS_LABEL` (Available, Busy, Away, Offline). Status colours live only in the CSS, keyed by `data-status`. |
+| `Avatar.tsx` | A framed picture with the frame coloured by status. Three sizes (`lg` conversation, `md` main header, `sm` Favorites row). Falls back to the SVG silhouette. |
 | `PersonLine.tsx` | "Name (Status)" plus the personal message, ellipsised. Used by the header, the list rows and the conversation header (DRY). |
 | `responder.ts` | The `Message` and `Responder` types, `scriptedResponder(replies)` and `typingDelay(text)` (proportional to length, clamped to 0.8–2.5 s). Pure and unit-tested. |
 | `use-conversation.ts` | The hook `useConversation(responder)` returns `{ messages, typing, send }`. It appends the visitor's message, sets `typing`, awaits the responder after the delay and appends the reply. It cancels on unmount and ignores empty input. |
@@ -148,12 +151,12 @@ behaves.
   - `typingDelay` clamping;
   - `useConversation`: send → typing → reply with fake timers; empty input
     ignored; no update after unmount;
-  - the status labels map.
+  - `groupBySender` and `matchesQuery`.
 - **Unit (`tests/unit/cms/mappers.test.ts`):** `toMessenger` maps media URLs,
   drops unsafe links and turns empty strings into `undefined`.
-- **Unit (`window-manager`, `apps`):** an app with `desktop: false` gets no
-  shortcut. This is checked through a small exported helper,
-  `desktopApps(apps)`.
+- **Unit (`tests/unit/os/apps.test.ts`):** `desktopApps` drops apps with
+  `desktop: false`, and `resolveApp` resolves a title and shortcut that come
+  from content.
 - **E2E (`tests/e2e/os.spec.ts`):** double-click the Messenger shortcut. The
   window shows the viewer, and Favorites and Friends each list the contact.
   Double-click the contact, and the Conversation window opens with a taskbar
