@@ -127,7 +127,10 @@ export function toPostView(p: Post, base: string): PostView {
   }
 }
 
-const toPerson = (p: CmsMessenger['viewer'], base: string): MessengerPerson => ({
+/** The viewer and the contact share their person fields. */
+type CmsPerson = CmsMessenger['viewer'] | CmsMessenger['contact']
+
+const toPerson = (p: CmsPerson, base: string): MessengerPerson => ({
   name: p.name,
   status: p.status,
   personalMessage: p.personalMessage?.trim() || undefined,

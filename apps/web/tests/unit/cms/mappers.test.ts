@@ -108,6 +108,7 @@ describe('toMessenger', () => {
     whatsNew: [
       { id: 'n1', text: 'New post', linkLabel: '', url: '/blog', image: { url: '/api/media/file/t.png' } },
       { id: 'n2', text: 'Unsafe', linkLabel: 'x', url: 'javascript:alert(1)', image: null },
+      { id: null, text: 'Repo', linkLabel: ' GitHub ', url: 'https://github.com/x', image: null },
     ],
   } as unknown as CmsMessenger
 
@@ -130,6 +131,8 @@ describe('toMessenger', () => {
     expect(toMessenger(doc, BASE).whatsNew).toEqual([
       { id: 'n1', text: 'New post', link: { label: '/blog', href: '/blog' }, image: 'http://cms.test/api/media/file/t.png' },
       { id: 'n2', text: 'Unsafe', link: undefined, image: undefined },
+      // a labelled link keeps its (trimmed) label; an item saved without an id is keyed by its position
+      { id: '2', text: 'Repo', link: { label: 'GitHub', href: 'https://github.com/x' }, image: undefined },
     ])
   })
 
