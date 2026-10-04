@@ -8,6 +8,9 @@ describe('withName', () => {
   it('replaces every {name}', () => {
     expect(withName('{name}, {name}!', 'Vini')).toBe('Vini, Vini!')
   })
+  it('inserts the name literally, $ patterns included', () => {
+    expect(withName('{name} is typing', 'Ca$h $&')).toBe('Ca$h $& is typing')
+  })
   it('leaves a label without {name} as it is', () => {
     expect(withName('Send', 'Vinicius')).toBe('Send')
   })

@@ -125,6 +125,6 @@ export const messenger = {
   },
   whatsNew: [
     { text: 'Vinicius added Messenger to his desktop.', linkLabel: 'See the site', url: '/' },
-    { text: 'Vinicius published a new post.', linkLabel: 'Read the blog', url: '/blog' },
+    { text: 'Vinicius rebuilt his desktop as a Windows 98 PC.', linkLabel: 'Open it full screen', url: '/os' },
   ],
 }

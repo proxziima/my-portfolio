@@ -39,7 +39,7 @@
 - Modify `app/(os)/os/page.tsx`: pass `OsData`.
 - Modify `features/os/apps.ts`: `OsData`, `open`, `desktop`, `resolveApp`, `desktopApps`, and the two new apps.
 - Modify `features/os/Desktop.tsx`: use `resolveApp`/`desktopApps` and pass `open`.
-- Create `features/os/enter-opens.ts`: Enter opens, shared by shortcuts and contact rows.
+- Create `features/os/enter-opens.ts`: Enter opens, shared by shortcuts and contact rows. (Replaced during review by `open-gestures.ts`: a double click or a keyboard / screen-reader click opens.)
 - Modify `features/os/Shortcut.tsx`: use `enterOpens`.
 - Modify `features/os/icons.tsx`: the `messenger` icon.
 - Create `features/os/apps/messenger/`: `status.ts`, `responder.ts`, `use-conversation.ts`, `Avatar.tsx`, `PersonLine.tsx`, `ContactRow.tsx`, `WhatsNew.tsx`, `Messenger.tsx`, `History.tsx`, `Conversation.tsx`, `messenger.module.css`.
