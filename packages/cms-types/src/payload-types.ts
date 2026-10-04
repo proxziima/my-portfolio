@@ -1296,11 +1296,11 @@ export interface SiteSetting {
   defaultDiscipline?: (number | null) | Discipline;
   figure?: {
     /**
-     * Upload a new Spline export (.spline / .splinecode) to replace the desk model. Takes precedence over the URL below.
+     * Unused since the three.js desk (October 2026); kept until a migration removes it.
      */
     scene?: (number | null) | Scene;
     /**
-     * Spline → Export → Code → copy the .splinecode URL. Empty = /spline/scene.splinecode.
+     * Unused since the three.js desk (October 2026); kept until a migration removes it.
      */
     splineSceneUrl?: string | null;
   };
