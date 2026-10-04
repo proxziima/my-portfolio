@@ -1368,6 +1368,9 @@ export interface Messenger {
       id?: string | null;
     }[];
   };
+  /**
+   * The fixed words of the Messenger windows.
+   */
   labels: {
     search: string;
     favorites: string;

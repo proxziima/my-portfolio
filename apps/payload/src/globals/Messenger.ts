@@ -53,6 +53,7 @@ export const Messenger: GlobalConfig = {
     {
       name: 'labels',
       type: 'group',
+      admin: { description: 'The fixed words of the Messenger windows.' },
       fields: [
         requiredText('search', 'Search contacts or the web...'),
         requiredText('favorites', 'Favorites'),

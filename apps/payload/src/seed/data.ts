@@ -111,13 +111,10 @@ export const defaultDisciplineSlug = 'se'
 // No real content & community data is available yet; the web hides the section when empty.
 export const content: never[] = []
 
+// Only the content: the window title, the visitor and the labels keep the global's field defaults.
 export const messenger = {
-  title: 'Windows Live Messenger',
-  shortcut: 'Messenger',
-  viewer: { name: 'Visitor', status: 'available' as const, personalMessage: 'Say hi to Vinicius 👋' },
   contact: {
     name: 'Vinicius Queiroz',
-    status: 'available' as const,
     personalMessage: 'building things on the web, one pixel at a time',
     replies: [
       { text: 'hey! 👋 thanks for stopping by my desktop' },
@@ -125,14 +122,6 @@ export const messenger = {
       { text: 'meanwhile, have a look at My Showcase or My Resume, everything I do is in there' },
       { text: 'brb 🙂' },
     ],
-  },
-  labels: {
-    search: 'Search contacts or the web...',
-    favorites: 'Favorites',
-    friends: 'Friends',
-    whatsNew: "What's new",
-    typing: '{name} is typing a message...',
-    send: 'Send',
   },
   whatsNew: [
     { text: 'Vinicius added Messenger to his desktop.', linkLabel: 'See the site', url: '/' },
