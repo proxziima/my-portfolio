@@ -64,3 +64,44 @@ export interface PostView {
   heroImage?: { url: string; alt: string }
   status: 'draft' | 'published'
 }
+
+export type MessengerStatus = 'available' | 'busy' | 'away' | 'offline'
+
+/** Someone the Messenger shows: the visitor or the contact. Absolute avatar URL. */
+export interface MessengerPerson {
+  name: string
+  status: MessengerStatus
+  personalMessage?: string
+  avatar?: string
+}
+
+export interface MessengerContact extends MessengerPerson {
+  /** Scripted replies, in order; the last one repeats. */
+  replies: string[]
+}
+
+export interface WhatsNewItem {
+  id: string
+  text: string
+  link?: { label: string; href: string }
+  image?: string
+}
+
+export interface MessengerLabels {
+  search: string
+  favorites: string
+  friends: string
+  whatsNew: string
+  /** `{name}` is replaced by the contact's name. */
+  typing: string
+  send: string
+}
+
+export interface Messenger {
+  title: string
+  shortcut: string
+  viewer: MessengerPerson
+  contact: MessengerContact
+  labels: MessengerLabels
+  whatsNew: WhatsNewItem[]
+}

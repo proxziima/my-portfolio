@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
-import { mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
+import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Messenger as CmsMessenger, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
+import { mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toMessenger, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
 
 const discipline = { id: 1, slug: 'se', title: 'Software engineer', order: 1, level: 'LV 9', figureCaption: 'Fig. 1', bio: { root: { children: [] } }, curiousNotes: [{ id: 'n', side: 'left', text: 'x', formula: null }], updatedAt: '', createdAt: '' } as unknown as CmsDiscipline
 
@@ -89,4 +89,51 @@ describe('mediaUrl', () => {
       expect(mediaUrl({ id: 1, alt: '', url } as unknown as Media, BASE)).toBeUndefined()
     },
   )
+})
+
+describe('toMessenger', () => {
+  const doc = {
+    id: 1,
+    title: 'Windows Live Messenger',
+    shortcut: 'Messenger',
+    viewer: { name: 'Visitor', status: 'available', personalMessage: '  ', avatar: null },
+    contact: {
+      name: 'Vinicius Queiroz',
+      status: 'away',
+      personalMessage: ' building things ',
+      avatar: { url: '/api/media/file/v.png' },
+      replies: [{ id: 'a', text: 'hey' }, { id: 'b', text: 'brb' }],
+    },
+    labels: { search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', send: 'Send' },
+    whatsNew: [
+      { id: 'n1', text: 'New post', linkLabel: '', url: '/blog', image: { url: '/api/media/file/t.png' } },
+      { id: 'n2', text: 'Unsafe', linkLabel: 'x', url: 'javascript:alert(1)', image: null },
+    ],
+  } as unknown as CmsMessenger
+
+  it('maps people, trimming empty personal messages away and resolving avatars', () => {
+    const m = toMessenger(doc, BASE)
+    expect(m.viewer).toEqual({ name: 'Visitor', status: 'available', personalMessage: undefined, avatar: undefined })
+    expect(m.contact).toEqual({
+      name: 'Vinicius Queiroz',
+      status: 'away',
+      personalMessage: 'building things',
+      avatar: 'http://cms.test/api/media/file/v.png',
+      replies: ['hey', 'brb'],
+    })
+    expect(m.labels.typing).toBe('{name} is typing')
+    expect(m.title).toBe('Windows Live Messenger')
+    expect(m.shortcut).toBe('Messenger')
+  })
+
+  it("keeps What's new items, labels a link by its URL when unlabelled and drops unsafe links", () => {
+    expect(toMessenger(doc, BASE).whatsNew).toEqual([
+      { id: 'n1', text: 'New post', link: { label: '/blog', href: '/blog' }, image: 'http://cms.test/api/media/file/t.png' },
+      { id: 'n2', text: 'Unsafe', link: undefined, image: undefined },
+    ])
+  })
+
+  it("tolerates a global saved without What's new", () => {
+    expect(toMessenger({ ...doc, whatsNew: null } as unknown as CmsMessenger, BASE).whatsNew).toEqual([])
+  })
 })

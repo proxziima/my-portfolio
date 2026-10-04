@@ -1,10 +1,10 @@
 import type {
-  Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Post, Profile, Project, SiteSetting,
+  Contact, Content, Discipline as CmsDiscipline, Experience, Media, Messenger as CmsMessenger, Navigation, Post, Profile, Project, SiteSetting,
 } from '@repo/cms-types'
 import { formatPeriod } from '@/lib/format/period'
 import { safeHref } from '@/shared/ui/chip-markup'
 import { bioParagraphs } from './bio-html'
-import type { Discipline, Entry, LinkItem, NavItem, Portfolio, PostView, Settings } from './types'
+import type { Discipline, Entry, LinkItem, Messenger, MessengerPerson, NavItem, Portfolio, PostView, Settings } from './types'
 
 type Related = number | CmsDiscipline
 
@@ -124,5 +124,31 @@ export function toPostView(p: Post, base: string): PostView {
     authors: (p.populatedAuthors ?? []).flatMap((a) => (a.name?.trim() ? [a.name.trim()] : [])),
     ...(hero && heroUrl ? { heroImage: { url: heroUrl, alt: hero.alt } } : {}),
     status: p._status === 'published' ? 'published' : 'draft',
+  }
+}
+
+const toPerson = (p: CmsMessenger['viewer'], base: string): MessengerPerson => ({
+  name: p.name,
+  status: p.status,
+  personalMessage: p.personalMessage?.trim() || undefined,
+  avatar: mediaUrl(p.avatar, base),
+})
+
+export function toMessenger(m: CmsMessenger, base: string): Messenger {
+  return {
+    title: m.title,
+    shortcut: m.shortcut,
+    viewer: toPerson(m.viewer, base),
+    contact: { ...toPerson(m.contact, base), replies: m.contact.replies.map((r) => r.text) },
+    labels: m.labels,
+    whatsNew: (m.whatsNew ?? []).map((w, i) => {
+      const href = safeHref(w.url)
+      return {
+        id: w.id ?? String(i),
+        text: w.text,
+        link: href ? { label: w.linkLabel?.trim() || href, href } : undefined,
+        image: mediaUrl(w.image, base),
+      }
+    }),
   }
 }
