@@ -1,0 +1,125 @@
+/* Windows Live Messenger 2009 inside the Win98 chrome: Aero blues, Segoe UI, frames coloured by status. */
+.messenger,
+.conversation {
+  --msn-font: 'Segoe UI', Tahoma, Arial, sans-serif;
+  --msn-text: #1b1b1b;
+  --msn-muted: #6d7b8d;
+  --msn-heading: #1e5aa8;
+  --msn-link: #0066cc;
+  --msn-line: #c5d9ee;
+  --msn-field: #a9c4e2;
+  --msn-sky: linear-gradient(180deg, #e9f4fd 0%, #d2e7fa 100%);
+  --msn-band: linear-gradient(180deg, #5aa7e6 0%, #2e7ccc 100%);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  font: 12px/1.35 var(--msn-font);
+  color: var(--msn-text);
+  background: linear-gradient(180deg, #ffffff 60%, #e6f1fb 100%);
+}
+
+/* Status colours, used by the avatar frame and the Friends dot. */
+.avatar,
+.dot {
+  --msn-status-hi: #8ee05a;
+  --msn-status-lo: #3c9a1c;
+}
+.avatar[data-status='busy'],
+.dot[data-status='busy'] {
+  --msn-status-hi: #f58a7c;
+  --msn-status-lo: #c42b1c;
+}
+.avatar[data-status='away'],
+.dot[data-status='away'] {
+  --msn-status-hi: #f8d37c;
+  --msn-status-lo: #d98a10;
+}
+.avatar[data-status='offline'],
+.dot[data-status='offline'] {
+  --msn-status-hi: #dadada;
+  --msn-status-lo: #9a9a9a;
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  padding: 4px;
+  border-radius: 9px;
+  background: linear-gradient(160deg, var(--msn-status-hi), var(--msn-status-lo));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.6);
+}
+.avatar[data-size='lg'] {
+  width: 96px;
+  height: 96px;
+}
+.avatar[data-size='md'] {
+  width: 64px;
+  height: 64px;
+  padding: 3px;
+  border-radius: 7px;
+}
+.avatar[data-size='sm'] {
+  width: 32px;
+  height: 32px;
+  padding: 2px;
+  border-radius: 5px;
+}
+.avatar > img,
+.avatar > svg {
+  width: 100%;
+  height: 100%;
+  border-radius: 5px;
+  object-fit: cover;
+  background: #ffffff;
+}
+.avatar[data-size='sm'] > img,
+.avatar[data-size='sm'] > svg {
+  border-radius: 3px;
+}
+
+.dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: linear-gradient(var(--msn-status-hi), var(--msn-status-lo));
+}
+
+/* "Name (Status)" over the personal message, or all on one line ("Name (Status) - message"). */
+.person {
+  display: block;
+  min-width: 0;
+}
+.headline,
+.message {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status,
+.message {
+  color: var(--msn-muted);
+}
+.person[data-layout='inline'] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.person[data-layout='inline'] .headline,
+.person[data-layout='inline'] .message {
+  display: inline;
+}
+.person[data-layout='inline'] .message::before {
+  content: ' - ';
+}
+.person[data-large] .name {
+  font-size: 18px;
+}
+.person[data-large] .headline {
+  margin-bottom: 2px;
+}
+.person[data-large] .message {
+  color: var(--msn-text);
+}
