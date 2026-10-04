@@ -94,6 +94,8 @@ export interface MessengerLabels {
   whatsNew: string
   /** `{name}` is replaced by the contact's name. */
   typing: string
+  /** `{name}` is replaced by the contact's name. */
+  conversation: string
   send: string
 }
 

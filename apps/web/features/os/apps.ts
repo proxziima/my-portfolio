@@ -5,6 +5,7 @@ import type { Size } from './window-geometry'
 import { Credits } from './apps/Credits'
 import { dosApp } from './apps/dos-app'
 import { Conversation } from './apps/messenger/Conversation'
+import { withName } from './apps/messenger/labels'
 import { Messenger } from './apps/messenger/Messenger'
 import { Showcase } from './apps/Showcase'
 
@@ -95,7 +96,7 @@ export const APPS: readonly OsApp[] = [
   },
   {
     id: 'conversation',
-    title: (data) => `${data.messenger.contact.name} - Conversation`,
+    title: (data) => withName(data.messenger.labels.conversation, data.messenger.contact.name),
     icon: 'messenger',
     component: Conversation,
     // opened by double-clicking the contact in the Messenger

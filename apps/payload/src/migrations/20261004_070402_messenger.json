@@ -4803,6 +4803,14 @@
           "autoincrement": false,
           "default": "'{name} is typing a message...'"
         },
+        "labels_conversation": {
+          "name": "labels_conversation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{name} - Conversation'"
+        },
         "labels_send": {
           "name": "labels_send",
           "type": "text",
@@ -4884,6 +4892,6 @@
   "internal": {
     "indexes": {}
   },
-  "id": "9878d219-d09f-427c-a1c2-4e3ed8c83146",
+  "id": "29bc2346-bd4c-4f05-a87d-3e4825f6001c",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }

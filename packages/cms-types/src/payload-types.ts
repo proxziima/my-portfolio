@@ -1380,6 +1380,10 @@ export interface Messenger {
      * {name} is replaced by the contact's name.
      */
     typing: string;
+    /**
+     * {name} is replaced by the contact's name.
+     */
+    conversation: string;
     send: string;
   };
   /**
@@ -1526,6 +1530,7 @@ export interface MessengerSelect<T extends boolean = true> {
         friends?: T;
         whatsNew?: T;
         typing?: T;
+        conversation?: T;
         send?: T;
       };
   whatsNew?:

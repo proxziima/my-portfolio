@@ -43,6 +43,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   	\`labels_friends\` text DEFAULT 'Friends' NOT NULL,
   	\`labels_whats_new\` text DEFAULT 'What''s new' NOT NULL,
   	\`labels_typing\` text DEFAULT '{name} is typing a message...' NOT NULL,
+  	\`labels_conversation\` text DEFAULT '{name} - Conversation' NOT NULL,
   	\`labels_send\` text DEFAULT 'Send' NOT NULL,
   	\`updated_at\` text,
   	\`created_at\` text,

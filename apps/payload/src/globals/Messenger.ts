@@ -60,6 +60,7 @@ export const Messenger: GlobalConfig = {
         requiredText('friends', 'Friends'),
         requiredText('whatsNew', "What's new"),
         requiredText('typing', '{name} is typing a message...', "{name} is replaced by the contact's name."),
+        requiredText('conversation', '{name} - Conversation', "{name} is replaced by the contact's name."),
         requiredText('send', 'Send'),
       ],
     },

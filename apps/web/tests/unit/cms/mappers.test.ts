@@ -104,7 +104,7 @@ describe('toMessenger', () => {
       avatar: { url: '/api/media/file/v.png' },
       replies: [{ id: 'a', text: 'hey' }, { id: 'b', text: 'brb' }],
     },
-    labels: { search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', send: 'Send' },
+    labels: { search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', conversation: '{name} - Conversation', send: 'Send' },
     whatsNew: [
       { id: 'n1', text: 'New post', linkLabel: '', url: '/blog', image: { url: '/api/media/file/t.png' } },
       { id: 'n2', text: 'Unsafe', linkLabel: 'x', url: 'javascript:alert(1)', image: null },
@@ -123,6 +123,7 @@ describe('toMessenger', () => {
       replies: ['hey', 'brb'],
     })
     expect(m.labels.typing).toBe('{name} is typing')
+    expect(m.labels.conversation).toBe('{name} - Conversation')
     expect(m.title).toBe('Windows Live Messenger')
     expect(m.shortcut).toBe('Messenger')
   })

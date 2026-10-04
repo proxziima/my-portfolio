@@ -3,6 +3,7 @@ import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { OsAppProps } from '../../apps'
 import { Avatar } from './Avatar'
 import { History } from './History'
+import { withName } from './labels'
 import { PersonLine } from './PersonLine'
 import { scriptedResponder, type Sender } from './responder'
 import { useConversation } from './use-conversation'
@@ -44,7 +45,7 @@ export function Conversation({ data }: OsAppProps) {
           </header>
           <History messages={messages} nameOf={nameOf} />
           <p className={styles.typing} aria-live="polite">
-            {typing ? labels.typing.replace('{name}', contact.name) : ''}
+            {typing ? withName(labels.typing, contact.name) : ''}
           </p>
           <form
             className={styles.compose}
