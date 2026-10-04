@@ -42,7 +42,7 @@ export function Desktop({ data }: { data: OsData }) {
     <div ref={deskRef} className={styles.desktop} data-anchor="desktop">
       <div className={styles.shortcuts}>
         {desktopApps(apps).map((app) => (
-          <Shortcut key={app.id} icon={app.icon} label={app.shortcut ?? app.title} onOpen={() => dispatch({ type: 'open', id: app.id })} />
+          <Shortcut key={app.id} icon={app.icon} label={app.shortcut} onOpen={() => open(app.id)} />
         ))}
       </div>
       {apps.map((app) => {

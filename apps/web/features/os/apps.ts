@@ -23,7 +23,7 @@ type Text = string | ((data: OsData) => string)
 export interface OsApp {
   id: string
   title: Text
-  /** The desktop label, short like the reference's ("My Showcase"); omitted = the title. */
+  /** The desktop label, short like the reference's ("My Showcase"); omitted = the title (resolved by resolveApp). */
   shortcut?: Text
   /** false: no desktop shortcut; another app opens it (the Messenger's conversation). */
   desktop?: false
@@ -40,18 +40,19 @@ export interface OsApp {
 }
 
 /** An app whose texts have been resolved against the content, for the chrome that only shows text. */
-export type ResolvedApp = Omit<OsApp, 'title' | 'shortcut'> & { title: string; shortcut?: string }
+export type ResolvedApp = Omit<OsApp, 'title' | 'shortcut'> & { title: string; shortcut: string }
 
 const resolve = (text: Text, data: OsData): string => (typeof text === 'function' ? text(data) : text)
 
 export const resolveApp = (app: OsApp, data: OsData): ResolvedApp => ({
   ...app,
   title: resolve(app.title, data),
-  shortcut: app.shortcut === undefined ? undefined : resolve(app.shortcut, data),
+  shortcut: resolve(app.shortcut ?? app.title, data),
 })
 
 /** The apps with a desktop shortcut. */
 export const desktopApps = <T extends { desktop?: false }>(apps: readonly T[]): T[] => apps.filter((app) => app.desktop !== false)
+
 /** The chrome every DOS program shares, as the reference's Doom window. */
 const DOS_CHROME = { status: 'Powered by JSDOS & DOSBox', barColor: '#1c1c1c' } as const
 
