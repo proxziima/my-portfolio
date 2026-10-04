@@ -100,6 +100,8 @@ export interface MessengerLabels {
   conversation: string
   send: string
   listeningTo: string
+  /** The words on the Conversation window's blue band. */
+  menu: string[]
 }
 
 /** The featured story at the foot of the main window. */

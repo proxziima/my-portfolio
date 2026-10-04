@@ -107,6 +107,7 @@ describe('toMessenger', () => {
     },
     labels: {
       search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', conversation: '{name} - Conversation', send: 'Send', listeningTo: 'Listening to:',
+      menu: [{ id: 'm1', label: 'Photos' }, { id: 'm2', label: 'Files' }],
     },
     spotlight: { title: ' Doom ', text: 'Boots in js-dos.', url: 'javascript:alert(1)', source: 'My Desktop', image: { url: '/api/media/file/d.png' } },
     whatsNew: [
@@ -129,6 +130,8 @@ describe('toMessenger', () => {
     })
     expect(m.labels.typing).toBe('{name} is typing')
     expect(m.labels.conversation).toBe('{name} - Conversation')
+    expect(m.labels.menu).toEqual(['Photos', 'Files'])
+    expect(toMessenger({ ...doc, labels: { ...doc.labels, menu: null } } as unknown as CmsMessenger, BASE).labels.menu).toEqual([])
     expect(m.title).toBe('Windows Live Messenger')
     expect(m.shortcut).toBe('Messenger')
   })

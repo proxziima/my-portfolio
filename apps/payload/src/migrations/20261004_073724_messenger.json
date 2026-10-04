@@ -4568,6 +4568,73 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "messenger_labels_menu": {
+      "name": "messenger_labels_menu",
+      "columns": {
+        "_order": {
+          "name": "_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "_parent_id": {
+          "name": "_parent_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "messenger_labels_menu_order_idx": {
+          "name": "messenger_labels_menu_order_idx",
+          "columns": [
+            "_order"
+          ],
+          "isUnique": false
+        },
+        "messenger_labels_menu_parent_id_idx": {
+          "name": "messenger_labels_menu_parent_id_idx",
+          "columns": [
+            "_parent_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "messenger_labels_menu_parent_id_fk": {
+          "name": "messenger_labels_menu_parent_id_fk",
+          "tableFrom": "messenger_labels_menu",
+          "tableTo": "messenger",
+          "columnsFrom": [
+            "_parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "messenger_whats_new": {
       "name": "messenger_whats_new",
       "columns": {
@@ -4970,6 +5037,6 @@
   "internal": {
     "indexes": {}
   },
-  "id": "a12a9d4d-2eb1-4bd2-b1d5-b74131290832",
+  "id": "5026f881-ae25-4ead-9151-e7f763600b61",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }

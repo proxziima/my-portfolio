@@ -69,6 +69,13 @@ export const Messenger: GlobalConfig = {
         requiredText('conversation', '{name} - Conversation', "{name} is replaced by the contact's name."),
         requiredText('send', 'Send'),
         requiredText('listeningTo', 'Listening to:'),
+        {
+          name: 'menu',
+          type: 'array',
+          admin: { description: "The words on the Conversation window's blue band." },
+          defaultValue: ['Photos', 'Files', 'Video', 'Call', 'Games', 'Activities'].map((label) => ({ label })),
+          fields: [{ name: 'label', type: 'text', required: true }],
+        },
       ],
     },
     {

@@ -1394,6 +1394,15 @@ export interface Messenger {
     conversation: string;
     send: string;
     listeningTo: string;
+    /**
+     * The words on the Conversation window's blue band.
+     */
+    menu?:
+      | {
+          label: string;
+          id?: string | null;
+        }[]
+      | null;
   };
   /**
    * The What's new panel; several items get a pager.
@@ -1557,6 +1566,12 @@ export interface MessengerSelect<T extends boolean = true> {
         conversation?: T;
         send?: T;
         listeningTo?: T;
+        menu?:
+          | T
+          | {
+              label?: T;
+              id?: T;
+            };
       };
   whatsNew?:
     | T

@@ -1,13 +1,28 @@
 'use client'
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import type { MessengerPerson } from '@/lib/cms/types'
 import type { OsAppProps } from '../../apps'
 import { Avatar } from './Avatar'
+import { BandCaret, Brush, Caret, Collapse, FontStyle, Layout, Nudge, Pen, Smiley, Webcam, Wink } from './glyphs'
 import { History } from './History'
 import { withName } from './labels'
 import { PersonLine } from './PersonLine'
 import { scriptedResponder, type Sender } from './responder'
 import { useConversation } from './use-conversation'
 import styles from './messenger.module.css'
+
+/** A picture in the left column, with the small hide and webcam buttons beside it (decorative). */
+function Portrait({ person }: { person: MessengerPerson }) {
+  return (
+    <div className={styles.portrait}>
+      <span className={styles.portraitTools} aria-hidden="true">
+        <Collapse />
+        <Webcam />
+      </span>
+      <Avatar person={person} size="lg" />
+    </div>
+  )
+}
 
 /** The Conversation window with the owner: pictures on the left, the chat on the right. */
 export function Conversation({ data }: OsAppProps) {
@@ -33,11 +48,22 @@ export function Conversation({ data }: OsAppProps) {
 
   return (
     <div className={styles.conversation}>
-      <div className={styles.band} aria-hidden="true" />
+      {/* the original's menu band; its words come from the CMS, its buttons are only drawn */}
+      <div className={styles.band} aria-hidden="true">
+        {labels.menu.map((word) => (
+          <span key={word}>{word}</span>
+        ))}
+        <span>»</span>
+        <span className={styles.bandTools}>
+          <Brush />
+          <BandCaret />
+          <Layout />
+        </span>
+      </div>
       <div className={styles.body}>
         <div className={styles.portraits}>
-          <Avatar person={contact} size="lg" />
-          <Avatar person={viewer} size="lg" />
+          <Portrait person={contact} />
+          <Portrait person={viewer} />
         </div>
         <div className={styles.chat}>
           <header className={styles.chatHeader}>
@@ -55,9 +81,32 @@ export function Conversation({ data }: OsAppProps) {
             }}
           >
             <textarea ref={box} aria-label={`Message ${contact.name}`} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKeyDown} />
-            <button type="submit" disabled={!draft.trim()}>
-              {labels.send}
-            </button>
+            <div className={styles.composeBar}>
+              <span className={styles.emoticons} aria-hidden="true">
+                <span className={styles.tool}>
+                  <Smiley />
+                  <Caret />
+                </span>
+                <span className={styles.tool}>
+                  <Wink />
+                  <Caret />
+                </span>
+                <Nudge />
+                <span className={styles.tool}>
+                  <FontStyle />
+                  <Caret />
+                </span>
+                <span>»</span>
+              </span>
+              <span className={styles.composeEnd}>
+                <span aria-hidden="true">
+                  <Pen />
+                </span>
+                <button type="submit" disabled={!draft.trim()}>
+                  {labels.send}
+                </button>
+              </span>
+            </div>
           </form>
         </div>
       </div>

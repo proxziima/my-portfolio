@@ -1,5 +1,5 @@
 import * as migration_20260930_222916_initial from './20260930_222916_initial';
-import * as migration_20261004_072305_messenger from './20261004_072305_messenger';
+import * as migration_20261004_073724_messenger from './20261004_073724_messenger';
 
 export const migrations = [
   {
@@ -8,8 +8,8 @@ export const migrations = [
     name: '20260930_222916_initial',
   },
   {
-    up: migration_20261004_072305_messenger.up,
-    down: migration_20261004_072305_messenger.down,
-    name: '20261004_072305_messenger'
+    up: migration_20261004_073724_messenger.up,
+    down: migration_20261004_073724_messenger.down,
+    name: '20261004_073724_messenger'
   },
 ];

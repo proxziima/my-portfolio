@@ -150,7 +150,7 @@ export function toMessenger(m: CmsMessenger, base: string): Messenger {
     shortcut: m.shortcut,
     viewer: toPerson(m.viewer, base),
     contact: { ...toPerson(m.contact, base), replies: m.contact.replies.map((r) => r.text) },
-    labels: m.labels,
+    labels: { ...m.labels, menu: (m.labels.menu ?? []).map((item) => item.label) },
     whatsNew: (m.whatsNew ?? []).map((w, i) => {
       const href = safeHref(w.url)
       return {

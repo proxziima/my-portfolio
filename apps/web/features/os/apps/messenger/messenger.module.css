@@ -53,9 +53,21 @@
     linear-gradient(180deg, var(--msn-status-hi), var(--msn-status-lo));
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
 }
+/* the Conversation's big frame: a thick glossy band, rounder, with a soft drop shadow */
 .avatar[data-size='lg'] {
-  width: 96px;
-  height: 96px;
+  width: 106px;
+  height: 106px;
+  padding: 7px;
+  border-color: color-mix(in srgb, var(--msn-status-lo) 70%, #ffffff);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.75) 0%, rgb(255 255 255 / 0.1) 45%, rgb(255 255 255 / 0) 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--msn-status-hi) 70%, #ffffff), color-mix(in srgb, var(--msn-status-lo) 80%, #ffffff));
+  box-shadow: 0 2px 5px rgb(0 40 80 / 0.3);
+}
+.avatar[data-size='lg'] > img,
+.avatar[data-size='lg'] > svg {
+  border-radius: 4px;
 }
 .avatar[data-size='md'] {
   width: 54px;
@@ -415,46 +427,100 @@
   color: #5b84b3;
 }
 
-/* The Conversation window */
+
+/* The Conversation window: the blue band runs into a cyan fade, white behind the chat, light blue again under the message box */
+.conversation {
+  background: linear-gradient(
+    180deg,
+    #79cbf2 0,
+    #4ba8d4 18px,
+    #5aaed9 36px,
+    #66b8de 56px,
+    #7cc7e3 80px,
+    #a7dbef 92px,
+    #d6edf6 106px,
+    #f1f9fc 128px,
+    #ffffff 150px,
+    #ffffff calc(100% - 100px),
+    #e9f5f8 calc(100% - 90px),
+    #d6eaf7 calc(100% - 26px),
+    #cde6f5 100%
+  );
+}
 .band {
   flex: none;
-  height: 28px;
-  border-bottom: 1px solid #1f5fa3;
-  background: var(--msn-band);
+  display: flex;
+  align-items: center;
+  gap: 21px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  color: #ffffff;
+  text-shadow: 0 1px 1px rgb(0 40 90 / 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.bandTools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.bandTools > svg:last-child {
+  margin-left: 10px;
 }
 .body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
-  padding: 12px;
-  background: var(--msn-sky);
+  grid-template-columns: 148px 1fr;
+  gap: 14px;
+  padding: 12px 6px 8px 10px;
 }
 .portraits {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
+.portrait {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.portraitTools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
 .chat {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--msn-line);
-  border-radius: 4px;
-  background: #ffffff;
 }
 .chatHeader {
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--msn-line);
+  padding: 2px 0 10px;
+  /* the rule under the header, fading out to the right */
+  background: linear-gradient(90deg, #a9c9df, #d5e6f1 70%, transparent) bottom / 100% 1px no-repeat;
+}
+.chatHeader .person[data-large] .name {
+  font-size: 19px;
+  line-height: 24px;
+}
+.chatHeader .message,
+.chatHeader .listening {
+  line-height: 19px;
+}
+.chatHeader .status {
+  color: #3c3c3c;
 }
 .history {
   flex: 1;
   min-height: 0;
   overflow: auto;
   margin-top: 8px;
+  padding: 0 6px 0 4px;
 }
 .groups {
   margin: 0;
@@ -462,56 +528,120 @@
   list-style: none;
 }
 .groups > li + li {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 .sender {
+  line-height: 20px;
   color: var(--msn-muted);
 }
 .lines {
   margin: 0;
-  padding-left: 16px;
-  /* a nested list defaults to hollow circles; Messenger's bullets are solid */
-  list-style: disc;
+  padding: 0;
+  list-style: none;
 }
+/* Messenger's small grey bullet before each line */
 .lines > li {
+  position: relative;
+  padding-left: 14px;
+  line-height: 19px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+.lines > li::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #8ea3b8;
+}
 .typing {
-  min-height: 1.35em;
-  margin: 4px 0;
+  min-height: 16px;
+  margin: 2px 0 4px;
+  font-size: 11px;
   font-style: italic;
   color: var(--msn-muted);
 }
+/* the message box, a speech bubble pointing at the visitor's picture */
 .compose {
+  position: relative;
   display: flex;
-  gap: 6px;
-  padding: 6px;
-  border: 1px solid var(--msn-field);
+  flex-direction: column;
+  margin-left: 6px;
+  border: 1px solid #b2cadd;
   border-radius: 4px;
   background: #ffffff;
+  box-shadow: 0 1px 2px rgb(40 90 140 / 0.12);
 }
-.compose:focus-within {
+.compose::before {
+  content: '';
+  position: absolute;
+  top: 34px;
+  left: -7px;
+  width: 12px;
+  height: 12px;
+  border-bottom: 1px solid #b2cadd;
+  border-left: 1px solid #b2cadd;
+  background: #ffffff;
+  transform: rotate(45deg);
+}
+.compose:focus-within,
+.compose:focus-within::before {
   border-color: var(--msn-heading);
 }
 .compose > textarea {
-  flex: 1;
-  height: 56px;
+  position: relative;
+  height: 44px;
+  padding: 6px 8px;
   border: 0;
   outline: none;
   resize: none;
   font: inherit;
   color: var(--msn-text);
+  background: transparent;
 }
-.compose > button {
-  align-self: flex-end;
-  padding: 3px 14px;
-  border: 1px solid #7aa3cf;
-  border-radius: 3px;
-  background: linear-gradient(#fdfeff, #dbe9f8);
-  font: inherit;
-  color: var(--msn-text);
+.composeBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border-top: 1px solid #dbe7f1;
+  background: linear-gradient(180deg, #ffffff, #eef5fb);
+  border-radius: 0 0 4px 4px;
 }
-.compose > button:disabled {
+.emoticons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #4d6a8a;
+}
+.composeEnd {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+.composeEnd > span {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0 8px;
+  border-left: 1px solid #dbe7f1;
+}
+.composeEnd > button {
+  height: 100%;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid #dbe7f1;
+  background: none;
+  font: 600 13px/1 Georgia, 'Times New Roman', serif;
+  color: #2b2b2b;
+}
+.composeEnd > button:disabled {
   color: #9aa7b5;
+}
+.composeEnd > button:not(:disabled):hover {
+  background: #e3effa;
 }

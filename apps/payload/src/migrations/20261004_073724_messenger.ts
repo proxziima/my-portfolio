@@ -11,6 +11,16 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   `)
   await db.run(sql`CREATE INDEX \`messenger_contact_replies_order_idx\` ON \`messenger_contact_replies\` (\`_order\`);`)
   await db.run(sql`CREATE INDEX \`messenger_contact_replies_parent_id_idx\` ON \`messenger_contact_replies\` (\`_parent_id\`);`)
+  await db.run(sql`CREATE TABLE \`messenger_labels_menu\` (
+  	\`_order\` integer NOT NULL,
+  	\`_parent_id\` integer NOT NULL,
+  	\`id\` text PRIMARY KEY NOT NULL,
+  	\`label\` text NOT NULL,
+  	FOREIGN KEY (\`_parent_id\`) REFERENCES \`messenger\`(\`id\`) ON UPDATE no action ON DELETE cascade
+  );
+  `)
+  await db.run(sql`CREATE INDEX \`messenger_labels_menu_order_idx\` ON \`messenger_labels_menu\` (\`_order\`);`)
+  await db.run(sql`CREATE INDEX \`messenger_labels_menu_parent_id_idx\` ON \`messenger_labels_menu\` (\`_parent_id\`);`)
   await db.run(sql`CREATE TABLE \`messenger_whats_new\` (
   	\`_order\` integer NOT NULL,
   	\`_parent_id\` integer NOT NULL,
@@ -67,6 +77,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
 
 export async function down({ db, payload, req }: MigrateDownArgs): Promise<void> {
   await db.run(sql`DROP TABLE \`messenger_contact_replies\`;`)
+  await db.run(sql`DROP TABLE \`messenger_labels_menu\`;`)
   await db.run(sql`DROP TABLE \`messenger_whats_new\`;`)
   await db.run(sql`DROP TABLE \`messenger\`;`)
 }

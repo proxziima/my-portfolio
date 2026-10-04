@@ -111,7 +111,8 @@ export const APPS: readonly OsApp[] = [
     component: Conversation,
     // opened by double-clicking the contact in the Messenger, and closed with it
     parent: 'messenger',
-    size: { width: 580, height: 520 },
+    // the reference's 473×386 inside, a little roomier, plus the chrome
+    size: { width: 540, height: 470 },
   },
 ]
 

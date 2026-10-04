@@ -63,6 +63,90 @@ export const Layout = () => (
   </Glyph>
 )
 
+/** The small round button beside each Conversation picture (hide the picture). */
+export const Collapse = () => (
+  <Glyph size={14} viewBox="0 0 14 14">
+    <circle cx="7" cy="7" r="6" fill="#f4f9fd" stroke="#7d98b3" />
+    <path d="M4.5 5.8L7 8.3l2.5-2.5" fill="none" stroke="#4d6a8a" strokeWidth="1.3" />
+  </Glyph>
+)
+
+/** The webcam under it. */
+export const Webcam = () => (
+  <Glyph size={14} viewBox="0 0 14 14">
+    <circle cx="7" cy="6" r="4.6" fill="#3a6fb0" stroke="#24508a" />
+    <circle cx="7" cy="6" r="2" fill="#bfe0ff" />
+    <path d="M4 13h6l-1-2.5H5z" fill="#7d98b3" />
+  </Glyph>
+)
+
+/** A Messenger emoticon: a yellow face with the given features. */
+const Face = ({ children }: { children: ReactNode }) => (
+  <Glyph size={20} viewBox="0 0 20 20">
+    <circle cx="10" cy="10" r="8.5" fill="#ffd84a" stroke="#c99a12" />
+    <ellipse cx="10" cy="6.5" rx="5" ry="2.6" fill="#fff6c4" opacity="0.8" />
+    {children}
+  </Glyph>
+)
+
+export const Smiley = () => (
+  <Face>
+    <circle cx="7" cy="8.5" r="1.2" fill="#5a3a00" />
+    <circle cx="13" cy="8.5" r="1.2" fill="#5a3a00" />
+    <path d="M6 12q4 4 8 0" fill="none" stroke="#5a3a00" strokeWidth="1.3" strokeLinecap="round" />
+  </Face>
+)
+
+export const Wink = () => (
+  <Face>
+    <path d="M5.8 8.5h2.6" stroke="#5a3a00" strokeWidth="1.3" strokeLinecap="round" />
+    <circle cx="13" cy="8.5" r="1.2" fill="#5a3a00" />
+    <path d="M6 12q4 3.5 8 0" fill="none" stroke="#5a3a00" strokeWidth="1.3" strokeLinecap="round" />
+    <path d="M10.5 13.2q1.5 2.2 3 .2" fill="#e8564a" />
+  </Face>
+)
+
+/** The nudge: a face shaking. */
+export const Nudge = () => (
+  <Face>
+    <path d="M6 8l2 1M14 8l-2 1" stroke="#5a3a00" strokeWidth="1.3" strokeLinecap="round" />
+    <ellipse cx="10" cy="13" rx="2" ry="1.6" fill="#5a3a00" />
+    <path d="M1 6q-1 4 0 8M19 6q1 4 0 8" fill="none" stroke="#7d98b3" strokeWidth="1" />
+  </Face>
+)
+
+/** The font menu: an A and a B. */
+export const FontStyle = () => (
+  <Glyph size={20} viewBox="0 0 20 20">
+    <text x="1" y="14" fontFamily="Georgia, serif" fontSize="13" fill="#2f4f75">A</text>
+    <text x="9" y="17" fontFamily="Georgia, serif" fontSize="10" fill="#5a7896">B</text>
+    <path d="M2 17h8" stroke="#d04b3c" strokeWidth="1.2" />
+  </Glyph>
+)
+
+/** The handwriting pen at the message box's right. */
+export const Pen = () => (
+  <Glyph size={18} viewBox="0 0 18 18">
+    <path d="M3 15l1.2-3.6L12.5 3l2.5 2.5-8.4 8.3z" fill="#f4f8fc" stroke="#7d98b3" />
+    <path d="M3 15l1.2-3.6 2.4 2.4z" fill="#7d98b3" />
+  </Glyph>
+)
+
+/** The band's background picker: a paintbrush. */
+export const Brush = () => (
+  <Glyph size={16} viewBox="0 0 16 16">
+    <path d="M10 1.5l4.5 4.5-5 3-2.5-2.5z" fill="#ffffff" stroke="#e8f2fb" />
+    <path d="M6.5 7l2.5 2.5c-.5 2.5-2.5 4.5-6.5 5 .5-4 2-6 4-7.5z" fill="#ffd84a" stroke="#c99a12" strokeWidth="0.8" />
+  </Glyph>
+)
+
+/** The ▾ on the blue band, white like its words. */
+export const BandCaret = () => (
+  <Glyph size={8} viewBox="0 0 8 8">
+    <path d="M1 3h6L4 6.5z" fill="#ffffff" />
+  </Glyph>
+)
+
 /** The inbox tray at the header's right, under its count. */
 export const Inbox = () => (
   <Glyph size={30} viewBox="0 0 30 30">
