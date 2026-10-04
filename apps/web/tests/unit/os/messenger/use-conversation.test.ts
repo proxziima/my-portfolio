@@ -61,8 +61,7 @@ describe('useConversation', () => {
   })
 
   it('delivers replies in the order they were sent, typing until the last arrives', async () => {
-    // keyed on the replies already given: by the time a turn runs, both visitor messages are in
-    respond = async (history) => [long, 'ok'][history.filter((m) => m.from === 'contact').length] ?? ''
+    respond = scriptedResponder([long, 'ok'])
     mount()
     await act(async () => {
       void api.send('a')

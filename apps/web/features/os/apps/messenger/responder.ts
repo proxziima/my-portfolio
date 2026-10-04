@@ -12,12 +12,12 @@ export interface Message {
  */
 export type Responder = (history: readonly Message[]) => Promise<string>
 
-/** The visitor's Nth message gets the Nth reply; once they run out, the last one repeats. */
+/** Each turn gives the next reply; once they run out, the last one repeats. */
 export const scriptedResponder =
   (replies: readonly string[]): Responder =>
   async (history) => {
-    const sent = history.filter((m) => m.from === 'viewer').length
-    return replies[Math.min(sent, replies.length) - 1] ?? ''
+    const given = history.filter((m) => m.from === 'contact').length
+    return replies[Math.min(given, replies.length - 1)] ?? ''
   }
 
 const MS_PER_CHAR = 40
