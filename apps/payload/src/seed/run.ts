@@ -27,6 +27,7 @@ await payload.updateGlobal({ slug: 'profile', data: seed.profile, context: quiet
 await payload.updateGlobal({ slug: 'contact', data: { links: seed.contactLinks }, context: quiet })
 await payload.updateGlobal({ slug: 'navigation', data: { items: seed.navigationItems }, context: quiet })
 await payload.updateGlobal({ slug: 'site-settings', data: { defaultDiscipline: ids.get(seed.defaultDisciplineSlug) }, context: quiet })
+await payload.updateGlobal({ slug: 'messenger', data: seed.messenger, context: quiet })
 
 payload.logger.info('Seed complete')
 process.exit(0)
