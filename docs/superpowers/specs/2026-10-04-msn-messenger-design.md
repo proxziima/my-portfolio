@@ -29,8 +29,8 @@ long-term approach, no workarounds). The decisions and their reasons are below.
 | D6 | The visitor is the signed-in user: a `viewer` group (name, status, personal message, avatar) fills the main window's header. | This matches the reference, where the header is the person using Messenger. |
 | D7 | Use Win98 window chrome (the existing `Window`) with a WLM-styled interior. | One chrome system on the OS. The interior carries the Messenger look: blue gradients, Segoe UI, avatar frames coloured by status. |
 | D8 | Fetch the messenger data only on `/os`, through `getMessenger()`. The page passes `OsData = Portfolio & { messenger }` to the Desktop. | The site page (`/`) also calls `getPortfolio()`, and adding Messenger to `Portfolio` would make it fetch a global it never uses. |
-| D9 | Scripted replies are a `replies` array on the contact. The Nth message the visitor sends gets reply N, and the last reply repeats once the list runs out. A "typing" pause comes before each reply. | Simple, editable in the CMS, and it never runs dry. |
-| D10 | Replies go through a `Responder` function, `(history) => Promise<string>`. The scripted responder implements it. | This is where the future AI responder plugs in without touching the UI. It is one type and one function, not a framework. |
+| D9 | Scripted replies are a `replies` array on the contact. Each turn gives the next reply (indexed by the replies already given), and the last reply repeats once the list runs out. A "typing" pause comes before each reply. Turns are queued, so replies arrive in the order the messages were sent (code review, 2026-10-04). | Simple, editable in the CMS, and it never runs dry. |
+| D10 | Replies go through a `Responder` function, `(history) => Promise<string>`. The scripted responder implements it. A responder must not reject: it maps its own failures to a reply or `''` (no reply). | This is where the future AI responder plugs in without touching the UI. It is one type and one function, not a framework. |
 | D11 | Groups use native `<details>/<summary>`, and the search box filters contacts by name. | Collapsible groups and filtering for free, accessible and with no state code. |
 | D12 | Left out (YAGNI): the conversation toolbar actions, emoticon parsing, sounds, nudges, the Groups section, the bottom MSN ad and icon bar, and multiple contacts. | None of them is part of the request. The Conversation window keeps the reference's blue band as a decorative header with no fake buttons. |
 | D13 | Draw the taskbar and shortcut icon as a 16×16 pixel-art "buddy" in `icons.tsx`'s path table. | No Messenger bitmap exists under `docs/`, and drawn icons are the established pattern for non-reference art. |
@@ -63,6 +63,7 @@ messenger
 │  ├─ friends          "Friends"
 │  ├─ whatsNew         "What's new"
 │  ├─ typing           "{name} is typing a message..."   ({name} is replaced by the contact's name)
+│  ├─ conversation     "{name} - Conversation"           (the Conversation window's title)
 │  └─ send             "Send"
 └─ whatsNew            array of { text: text required, linkLabel: text, url: urlField, image: upload → media }
 ```
@@ -122,8 +123,8 @@ Each unit has one job:
 | `Avatar.tsx` | A framed picture with the frame coloured by status. Three sizes (`lg` conversation, `md` main header, `sm` Favorites row). Falls back to the SVG silhouette. |
 | `PersonLine.tsx` | "Name (Status)" plus the personal message, ellipsised. Used by the header, the list rows and the conversation header (DRY). |
 | `responder.ts` | The `Message` and `Responder` types, `scriptedResponder(replies)` and `typingDelay(text)` (proportional to length, clamped to 0.8–2.5 s). Pure and unit-tested. |
-| `use-conversation.ts` | The hook `useConversation(responder)` returns `{ messages, typing, send }`. It appends the visitor's message, sets `typing`, awaits the responder after the delay and appends the reply. It cancels on unmount and ignores empty input. |
-| `Messenger.tsx` | The main window: header (viewer), search, `<details>` Favorites (1) and Friends (1) both listing the contact, What's new (one item with ‹ › pager when there are several). Double-click or Enter on the contact calls `open('conversation')`. |
+| `use-conversation.ts` | The hook `useConversation(responder)` returns `{ messages, typing, send }`. It appends the visitor's message at once, then queues a turn: the responder answers the history as it stands at that turn, the typing pause runs (skipped for `''`), and the reply is appended. It ignores empty input; a reply after unmount is a no-op. |
+| `Messenger.tsx` | The main window: header (viewer), search, `<details>` Favorites (1) and Friends (1) both listing the contact, What's new (one item with ‹ › pager when there are several). A double click, Enter, Space or a screen reader's click on the contact calls `open('conversation')` (the shared `open-gestures.ts`, also used by desktop shortcuts). |
 | `ContactRow.tsx` | One contact row (Favorites style with a small avatar, Friends style with a status dot). Its button opens the conversation. |
 | `WhatsNew.tsx` | The What's new panel and its pager. |
 | `Conversation.tsx` | The Conversation window: blue band, contact avatar (top-left) and viewer avatar (bottom-left), header `PersonLine`, a scrolling history (sender name in grey, then bullet lines, consecutive messages grouped), the typing line, a textarea (Enter sends, Shift+Enter adds a new line) and a Send button. |
