@@ -298,6 +298,8 @@
 .lines {
   margin: 0;
   padding-left: 16px;
+  /* a nested list defaults to hollow circles; Messenger's bullets are solid */
+  list-style: disc;
 }
 .lines > li {
   overflow-wrap: anywhere;

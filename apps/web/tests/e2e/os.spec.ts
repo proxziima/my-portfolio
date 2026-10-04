@@ -132,3 +132,49 @@ test('the Showcase lists projects as raised boxes, and those with a link open it
     await expect(link).toHaveAttribute('target', '_blank')
   }
 })
+
+test('Messenger lists the owner and chats with scripted replies', async ({ page }) => {
+  const errors = collectErrors(page)
+  await openDesktop(page)
+  await page.getByRole('button', { name: 'Messenger', exact: true }).dblclick()
+  const messenger = page.getByRole('dialog', { name: 'Windows Live Messenger' })
+  await expect(messenger).toBeVisible()
+
+  // the owner sits under Favorites and under Friends; the search filters both
+  const owner = messenger.getByRole('button', { name: /Vinicius Queiroz/ })
+  await expect(owner).toHaveCount(2)
+  await messenger.getByRole('searchbox').fill('zzz')
+  await expect(owner).toHaveCount(0)
+  await messenger.getByRole('searchbox').fill('')
+
+  await owner.first().dblclick()
+  const chat = page.getByRole('dialog', { name: 'Vinicius Queiroz - Conversation' })
+  await expect(chat).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Taskbar' }).getByRole('button', { name: 'Vinicius Queiroz - Conversation' })).toBeVisible()
+
+  const box = chat.getByRole('textbox', { name: 'Message Vinicius Queiroz' })
+  await box.fill('hello there')
+  await box.press('Enter')
+  const log = chat.getByRole('log')
+  await expect(log.getByText('hello there')).toBeVisible()
+  const typing = chat.getByText('Vinicius Queiroz is typing a message...')
+  await expect(typing).toBeVisible()
+  await expect(log.locator('li li')).toHaveCount(2, { timeout: 5_000 })
+  await expect(typing).toBeHidden()
+  await expect(box).toBeFocused()
+  expect(errors()).toEqual([])
+})
+
+test('the keyboard opens the conversation from the contact list', async ({ page }) => {
+  await openDesktop(page)
+  await page.getByRole('button', { name: 'Messenger', exact: true }).dblclick()
+  const owner = page.getByRole('dialog', { name: 'Windows Live Messenger' }).getByRole('button', { name: /Vinicius Queiroz/ }).last()
+  await owner.focus()
+  await owner.press('Enter')
+  await expect(page.getByRole('dialog', { name: 'Vinicius Queiroz - Conversation' })).toBeVisible()
+})
+
+test('the conversation has no desktop shortcut', async ({ page }) => {
+  await openDesktop(page)
+  await expect(page.getByRole('button', { name: /Conversation/ })).toHaveCount(0)
+})
