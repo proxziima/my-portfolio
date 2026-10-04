@@ -4,6 +4,7 @@ import type { IconName } from './icons'
 import type { Size } from './window-geometry'
 import { Credits } from './apps/Credits'
 import { dosApp } from './apps/dos-app'
+import { Messenger } from './apps/messenger/Messenger'
 import { Showcase } from './apps/Showcase'
 
 /** What the OS apps read: the portfolio plus the content only the desktop shows. */
@@ -81,6 +82,15 @@ export const APPS: readonly OsApp[] = [
     // its 640×480 VGA screen, as tall as the Showcase window (about 1149×862 on the 1280×1024 desk)
     aspect: 4 / 3,
     ...DOS_CHROME,
+  },
+  {
+    id: 'messenger',
+    title: (data) => data.messenger.title,
+    shortcut: (data) => data.messenger.shortcut,
+    icon: 'messenger',
+    component: Messenger,
+    // the reference's tall contact list
+    size: { width: 360, height: 640 },
   },
 ]
 
