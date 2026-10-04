@@ -6,7 +6,10 @@ export interface Message {
   text: string
 }
 
-/** Produces the contact's next reply to the conversation so far ('' = no reply). */
+/**
+ * Produces the contact's next reply to the conversation so far ('' = no reply).
+ * Must not reject: a responder maps its own failures to a reply or ''.
+ */
 export type Responder = (history: readonly Message[]) => Promise<string>
 
 /** The visitor's Nth message gets the Nth reply; once they run out, the last one repeats. */

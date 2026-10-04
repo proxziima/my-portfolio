@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { typingDelay, type Message, type Responder, type Sender } from './responder'
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -12,14 +12,8 @@ export function useConversation(respond: Responder) {
   const history = useRef<readonly Message[]>([])
   const nextId = useRef(0)
   const pending = useRef(0)
-  const mounted = useRef(false)
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  // replies are produced one at a time, so they arrive in the order the messages were sent
+  const queue = useRef<Promise<void>>(Promise.resolve())
 
   const append = useCallback((from: Sender, text: string) => {
     history.current = [...history.current, { id: nextId.current++, from, text }]
@@ -27,20 +21,26 @@ export function useConversation(respond: Responder) {
   }, [])
 
   const send = useCallback(
-    async (input: string) => {
+    (input: string) => {
       const text = input.trim()
-      if (!text) return
+      if (!text) return Promise.resolve()
       append('viewer', text)
       pending.current += 1
       setTyping(true)
-      try {
-        const reply = await respond(history.current)
-        await wait(typingDelay(reply))
-        if (mounted.current && reply) append('contact', reply)
-      } finally {
-        pending.current -= 1
-        if (mounted.current) setTyping(pending.current > 0)
-      }
+      const turn = queue.current.then(async () => {
+        try {
+          const reply = await respond(history.current)
+          if (!reply) return
+          await wait(typingDelay(reply))
+          append('contact', reply)
+        } finally {
+          pending.current -= 1
+          setTyping(pending.current > 0)
+        }
+      })
+      // a failed turn must not block the ones after it; the caller still sees the rejection
+      queue.current = turn.catch(() => {})
+      return turn
     },
     [append, respond],
   )

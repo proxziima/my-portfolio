@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { scriptedResponder, typingDelay } from '@/features/os/apps/messenger/responder'
+import { scriptedResponder, typingDelay, type Responder } from '@/features/os/apps/messenger/responder'
 import { useConversation } from '@/features/os/apps/messenger/use-conversation'
 
 declare global {
@@ -10,7 +10,9 @@ declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean
 }
 
-const respond = scriptedResponder(['one', 'two'])
+const long = 'x'.repeat(30)
+const defaultResponder = scriptedResponder(['one', 'two'])
+let respond: Responder
 let api: ReturnType<typeof useConversation>
 
 function Harness() {
@@ -22,13 +24,16 @@ let host: HTMLElement
 let root: Root
 let mounted: boolean
 
+const mount = () => act(() => root.render(createElement(Harness)))
+
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   vi.useFakeTimers()
+  respond = defaultResponder
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
-  act(() => root.render(createElement(Harness)))
+  mount()
   mounted = true
 })
 
@@ -55,16 +60,35 @@ describe('useConversation', () => {
     expect(lines()).toEqual([['viewer', 'hi'], ['contact', 'one']])
   })
 
-  it('keeps typing until every pending reply has arrived', async () => {
+  it('delivers replies in the order they were sent, typing until the last arrives', async () => {
+    // keyed on the replies already given: by the time a turn runs, both visitor messages are in
+    respond = async (history) => [long, 'ok'][history.filter((m) => m.from === 'contact').length] ?? ''
+    mount()
     await act(async () => {
       void api.send('a')
       void api.send('b')
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(typingDelay('one'))
+      await vi.advanceTimersByTimeAsync(typingDelay(long))
+    })
+    expect(api.typing).toBe(true)
+    expect(lines()).toEqual([['viewer', 'a'], ['viewer', 'b'], ['contact', long]])
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(typingDelay('ok'))
     })
     expect(api.typing).toBe(false)
-    expect(lines()).toEqual([['viewer', 'a'], ['viewer', 'b'], ['contact', 'one'], ['contact', 'two']])
+    expect(lines()).toEqual([['viewer', 'a'], ['viewer', 'b'], ['contact', long], ['contact', 'ok']])
+  })
+
+  it('does not pause to type when there is no reply', async () => {
+    respond = async () => ''
+    mount()
+    await act(async () => {
+      await api.send('hi')
+    })
+    expect(api.typing).toBe(false)
+    expect(lines()).toEqual([['viewer', 'hi']])
   })
 
   it('ignores blank input', async () => {
@@ -81,7 +105,9 @@ describe('useConversation', () => {
     })
     act(() => root.unmount())
     mounted = false
-    await vi.advanceTimersByTimeAsync(typingDelay('one'))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(typingDelay('one'))
+    })
     expect(lines()).toEqual([['viewer', 'hi']])
   })
 })
