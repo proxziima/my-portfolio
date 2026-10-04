@@ -28,6 +28,7 @@ export function Messenger({ data, open }: OsAppProps) {
   const { viewer, contact, labels, whatsNew } = data.messenger
   const [query, setQuery] = useState('')
   const shown = matchesQuery(contact.name, query)
+  const count = shown ? 1 : 0
   const openConversation = () => open('conversation')
   return (
     <div className={styles.messenger}>
@@ -44,10 +45,10 @@ export function Messenger({ data, open }: OsAppProps) {
         onChange={(e) => setQuery(e.target.value)}
       />
       <div className={styles.list}>
-        <Group label={labels.favorites} count={shown ? 1 : 0} star>
+        <Group label={labels.favorites} count={count} star>
           {shown && <ContactRow contact={contact} variant="favorite" onOpen={openConversation} />}
         </Group>
-        <Group label={labels.friends} count={shown ? 1 : 0}>
+        <Group label={labels.friends} count={count}>
           {shown && <ContactRow contact={contact} variant="friend" onOpen={openConversation} />}
         </Group>
       </div>

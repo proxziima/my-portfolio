@@ -317,6 +317,9 @@
   border-radius: 4px;
   background: #ffffff;
 }
+.compose:focus-within {
+  border-color: var(--msn-heading);
+}
 .compose > textarea {
   flex: 1;
   height: 56px;

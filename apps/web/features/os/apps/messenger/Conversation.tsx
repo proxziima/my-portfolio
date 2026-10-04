@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState, type KeyboardEvent } from 'react'
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { OsAppProps } from '../../apps'
 import { Avatar } from './Avatar'
 import { History } from './History'
@@ -14,10 +14,13 @@ export function Conversation({ data }: OsAppProps) {
   const respond = useMemo(() => scriptedResponder(contact.replies), [contact.replies])
   const { messages, typing, send } = useConversation(respond)
   const [draft, setDraft] = useState('')
+  const box = useRef<HTMLTextAreaElement>(null)
 
+  // Send disables itself once the draft empties, so focus goes back to the message box
   const submit = () => {
     void send(draft)
     setDraft('')
+    box.current?.focus()
   }
   // Enter sends, Shift+Enter starts a new line, as in Messenger
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -50,7 +53,7 @@ export function Conversation({ data }: OsAppProps) {
               submit()
             }}
           >
-            <textarea aria-label={`Message ${contact.name}`} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKeyDown} />
+            <textarea ref={box} aria-label={`Message ${contact.name}`} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKeyDown} />
             <button type="submit" disabled={!draft.trim()}>
               {labels.send}
             </button>
