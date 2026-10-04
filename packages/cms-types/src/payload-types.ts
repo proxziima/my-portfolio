@@ -115,12 +115,14 @@ export interface Config {
     contact: Contact;
     navigation: Navigation;
     'site-settings': SiteSetting;
+    messenger: Messenger;
   };
   globalsSelect: {
     profile: ProfileSelect<false> | ProfileSelect<true>;
     contact: ContactSelect<false> | ContactSelect<true>;
     navigation: NavigationSelect<false> | NavigationSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    messenger: MessengerSelect<false> | MessengerSelect<true>;
   };
   locale: null;
   widgets: {
@@ -1329,6 +1331,74 @@ export interface SiteSetting {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "messenger".
+ */
+export interface Messenger {
+  id: number;
+  /**
+   * The window title and taskbar tab.
+   */
+  title: string;
+  /**
+   * The desktop shortcut label.
+   */
+  shortcut: string;
+  /**
+   * The visitor, signed in at the top of the main window.
+   */
+  viewer: {
+    name: string;
+    status: 'available' | 'busy' | 'away' | 'offline';
+    personalMessage?: string | null;
+    avatar?: (number | null) | Media;
+  };
+  /**
+   * The one contact (the owner), listed under Favorites and Friends.
+   */
+  contact: {
+    name: string;
+    status: 'available' | 'busy' | 'away' | 'offline';
+    personalMessage?: string | null;
+    avatar?: (number | null) | Media;
+    /**
+     * Scripted replies: a visitor's Nth message gets the Nth reply; the last one repeats.
+     */
+    replies: {
+      text: string;
+      id?: string | null;
+    }[];
+  };
+  labels: {
+    search: string;
+    favorites: string;
+    friends: string;
+    whatsNew: string;
+    /**
+     * {name} is replaced by the contact's name.
+     */
+    typing: string;
+    send: string;
+  };
+  /**
+   * The What's new panel; several items get a pager.
+   */
+  whatsNew?:
+    | {
+        text: string;
+        /**
+         * Defaults to the URL.
+         */
+        linkLabel?: string | null;
+        url?: string | null;
+        image?: (number | null) | Media;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "profile_select".
  */
 export interface ProfileSelect<T extends boolean = true> {
@@ -1411,6 +1481,58 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         sectionGap?: T;
         chips?: T;
         role?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "messenger_select".
+ */
+export interface MessengerSelect<T extends boolean = true> {
+  title?: T;
+  shortcut?: T;
+  viewer?:
+    | T
+    | {
+        name?: T;
+        status?: T;
+        personalMessage?: T;
+        avatar?: T;
+      };
+  contact?:
+    | T
+    | {
+        name?: T;
+        status?: T;
+        personalMessage?: T;
+        avatar?: T;
+        replies?:
+          | T
+          | {
+              text?: T;
+              id?: T;
+            };
+      };
+  labels?:
+    | T
+    | {
+        search?: T;
+        favorites?: T;
+        friends?: T;
+        whatsNew?: T;
+        typing?: T;
+        send?: T;
+      };
+  whatsNew?:
+    | T
+    | {
+        text?: T;
+        linkLabel?: T;
+        url?: T;
+        image?: T;
+        id?: T;
       };
   updatedAt?: T;
   createdAt?: T;

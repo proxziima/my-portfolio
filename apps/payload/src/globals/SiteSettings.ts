@@ -1,15 +1,8 @@
 import type { GlobalConfig } from 'payload'
 import { publicGlobalAccess } from '../access/public-read'
 import { urlField } from '../fields/link-url'
+import { requiredText } from '../fields/required-text'
 import { revalidateGlobalHooks } from '../hooks/revalidate-web'
-
-const requiredText = (name: string, defaultValue: string, description?: string) => ({
-  name,
-  type: 'text' as const,
-  required: true,
-  defaultValue,
-  admin: description ? { description } : undefined,
-})
 
 export const SiteSettings: GlobalConfig = {
   slug: 'site-settings',
