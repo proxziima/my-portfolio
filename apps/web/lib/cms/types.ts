@@ -72,6 +72,8 @@ export interface MessengerPerson {
   name: string
   status: MessengerStatus
   personalMessage?: string
+  /** A song: "♫ Listening to: …". */
+  listeningTo?: string
   avatar?: string
 }
 
@@ -97,6 +99,16 @@ export interface MessengerLabels {
   /** `{name}` is replaced by the contact's name. */
   conversation: string
   send: string
+  listeningTo: string
+}
+
+/** The featured story at the foot of the main window. */
+export interface Spotlight {
+  title: string
+  text?: string
+  href?: string
+  source?: string
+  image?: string
 }
 
 export interface Messenger {
@@ -106,4 +118,5 @@ export interface Messenger {
   contact: MessengerContact
   labels: MessengerLabels
   whatsNew: WhatsNewItem[]
+  spotlight?: Spotlight
 }

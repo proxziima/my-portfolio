@@ -41,7 +41,7 @@ export function Conversation({ data }: OsAppProps) {
         </div>
         <div className={styles.chat}>
           <header className={styles.chatHeader}>
-            <PersonLine person={contact} large />
+            <PersonLine person={contact} large listening={labels.listeningTo} />
           </header>
           <History messages={messages} nameOf={nameOf} />
           <p className={styles.typing} aria-live="polite">

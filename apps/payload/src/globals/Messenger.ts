@@ -12,10 +12,16 @@ const STATUSES = [
 ]
 
 /** A person as Messenger shows them: the visitor (viewer) or the owner (contact). */
-const person = (name: string, personalMessage?: string): Field[] => [
+const person = (name: string, personalMessage?: string, listeningTo?: string): Field[] => [
   requiredText('name', name),
   { name: 'status', type: 'select', required: true, defaultValue: 'available', options: STATUSES },
   { name: 'personalMessage', type: 'text', defaultValue: personalMessage },
+  {
+    name: 'listeningTo',
+    type: 'text',
+    defaultValue: listeningTo,
+    admin: { description: 'A song, shown as "♫ Listening to: …" under the personal message.' },
+  },
   { name: 'avatar', type: 'upload', relationTo: 'media' },
 ]
 
@@ -31,7 +37,7 @@ export const Messenger: GlobalConfig = {
       name: 'viewer',
       type: 'group',
       admin: { description: 'The visitor, signed in at the top of the main window.' },
-      fields: person('Visitor', 'Say hi to Vinicius 👋'),
+      fields: person('Visitor', 'Say hi to Vinicius 👋', 'Daft Punk - Digital Love'),
     },
     {
       name: 'contact',
@@ -62,6 +68,7 @@ export const Messenger: GlobalConfig = {
         requiredText('typing', '{name} is typing a message...', "{name} is replaced by the contact's name."),
         requiredText('conversation', '{name} - Conversation', "{name} is replaced by the contact's name."),
         requiredText('send', 'Send'),
+        requiredText('listeningTo', 'Listening to:'),
       ],
     },
     {
@@ -72,6 +79,18 @@ export const Messenger: GlobalConfig = {
         { name: 'text', type: 'text', required: true },
         { name: 'linkLabel', type: 'text', admin: { description: 'Defaults to the URL.' } },
         urlField('url'),
+        { name: 'image', type: 'upload', relationTo: 'media' },
+      ],
+    },
+    {
+      name: 'spotlight',
+      type: 'group',
+      admin: { description: 'The featured story at the foot of the main window (MSN Video in the original). Hidden without a title.' },
+      fields: [
+        { name: 'title', type: 'text' },
+        { name: 'text', type: 'textarea' },
+        urlField('url'),
+        { name: 'source', type: 'text', admin: { description: 'The small link under the story, e.g. "My Showcase".' } },
         { name: 'image', type: 'upload', relationTo: 'media' },
       ],
     },

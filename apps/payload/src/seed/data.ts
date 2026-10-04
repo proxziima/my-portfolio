@@ -127,4 +127,10 @@ export const messenger = {
     { text: 'Vinicius added Messenger to his desktop.', linkLabel: 'See the site', url: '/' },
     { text: 'Vinicius rebuilt his desktop as a Windows 98 PC.', linkLabel: 'Open it full screen', url: '/os' },
   ],
+  spotlight: {
+    title: 'Doom boots on this desktop',
+    text: 'The 1993 shareware episode runs in js-dos, right next to Messenger.',
+    url: '/os',
+    source: 'My Desktop',
+  },
 }

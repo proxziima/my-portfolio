@@ -4726,6 +4726,14 @@
           "autoincrement": false,
           "default": "'Say hi to Vinicius 👋'"
         },
+        "viewer_listening_to": {
+          "name": "viewer_listening_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'Daft Punk - Digital Love'"
+        },
         "viewer_avatar_id": {
           "name": "viewer_avatar_id",
           "type": "integer",
@@ -4751,6 +4759,13 @@
         },
         "contact_personal_message": {
           "name": "contact_personal_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "contact_listening_to": {
+          "name": "contact_listening_to",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -4819,6 +4834,49 @@
           "autoincrement": false,
           "default": "'Send'"
         },
+        "labels_listening_to": {
+          "name": "labels_listening_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'Listening to:'"
+        },
+        "spotlight_title": {
+          "name": "spotlight_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "spotlight_text": {
+          "name": "spotlight_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "spotlight_url": {
+          "name": "spotlight_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "spotlight_source": {
+          "name": "spotlight_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "spotlight_image_id": {
+          "name": "spotlight_image_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "text",
@@ -4846,6 +4904,13 @@
           "name": "messenger_contact_contact_avatar_idx",
           "columns": [
             "contact_avatar_id"
+          ],
+          "isUnique": false
+        },
+        "messenger_spotlight_spotlight_image_idx": {
+          "name": "messenger_spotlight_spotlight_image_idx",
+          "columns": [
+            "spotlight_image_id"
           ],
           "isUnique": false
         }
@@ -4876,6 +4941,19 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "messenger_spotlight_image_id_media_id_fk": {
+          "name": "messenger_spotlight_image_id_media_id_fk",
+          "tableFrom": "messenger",
+          "tableTo": "media",
+          "columnsFrom": [
+            "spotlight_image_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4892,6 +4970,6 @@
   "internal": {
     "indexes": {}
   },
-  "id": "29bc2346-bd4c-4f05-a87d-3e4825f6001c",
+  "id": "a12a9d4d-2eb1-4bd2-b1d5-b74131290832",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }

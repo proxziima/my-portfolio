@@ -1350,6 +1350,10 @@ export interface Messenger {
     name: string;
     status: 'available' | 'busy' | 'away' | 'offline';
     personalMessage?: string | null;
+    /**
+     * A song, shown as "♫ Listening to: …" under the personal message.
+     */
+    listeningTo?: string | null;
     avatar?: (number | null) | Media;
   };
   /**
@@ -1359,6 +1363,10 @@ export interface Messenger {
     name: string;
     status: 'available' | 'busy' | 'away' | 'offline';
     personalMessage?: string | null;
+    /**
+     * A song, shown as "♫ Listening to: …" under the personal message.
+     */
+    listeningTo?: string | null;
     avatar?: (number | null) | Media;
     /**
      * Scripted replies: a visitor's Nth message gets the Nth reply; the last one repeats.
@@ -1385,6 +1393,7 @@ export interface Messenger {
      */
     conversation: string;
     send: string;
+    listeningTo: string;
   };
   /**
    * The What's new panel; several items get a pager.
@@ -1401,6 +1410,19 @@ export interface Messenger {
         id?: string | null;
       }[]
     | null;
+  /**
+   * The featured story at the foot of the main window (MSN Video in the original). Hidden without a title.
+   */
+  spotlight?: {
+    title?: string | null;
+    text?: string | null;
+    url?: string | null;
+    /**
+     * The small link under the story, e.g. "My Showcase".
+     */
+    source?: string | null;
+    image?: (number | null) | Media;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -1506,6 +1528,7 @@ export interface MessengerSelect<T extends boolean = true> {
         name?: T;
         status?: T;
         personalMessage?: T;
+        listeningTo?: T;
         avatar?: T;
       };
   contact?:
@@ -1514,6 +1537,7 @@ export interface MessengerSelect<T extends boolean = true> {
         name?: T;
         status?: T;
         personalMessage?: T;
+        listeningTo?: T;
         avatar?: T;
         replies?:
           | T
@@ -1532,6 +1556,7 @@ export interface MessengerSelect<T extends boolean = true> {
         typing?: T;
         conversation?: T;
         send?: T;
+        listeningTo?: T;
       };
   whatsNew?:
     | T
@@ -1541,6 +1566,15 @@ export interface MessengerSelect<T extends boolean = true> {
         url?: T;
         image?: T;
         id?: T;
+      };
+  spotlight?:
+    | T
+    | {
+        title?: T;
+        text?: T;
+        url?: T;
+        source?: T;
+        image?: T;
       };
   updatedAt?: T;
   createdAt?: T;

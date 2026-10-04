@@ -4,7 +4,7 @@ import type {
 import { formatPeriod } from '@/lib/format/period'
 import { safeHref } from '@/shared/ui/chip-markup'
 import { bioParagraphs } from './bio-html'
-import type { Discipline, Entry, LinkItem, Messenger, MessengerPerson, NavItem, Portfolio, PostView, Settings } from './types'
+import type { Discipline, Entry, LinkItem, Messenger, MessengerPerson, NavItem, Portfolio, PostView, Settings, Spotlight } from './types'
 
 type Related = number | CmsDiscipline
 
@@ -134,8 +134,15 @@ const toPerson = (p: CmsPerson, base: string): MessengerPerson => ({
   name: p.name,
   status: p.status,
   personalMessage: p.personalMessage?.trim() || undefined,
+  listeningTo: p.listeningTo?.trim() || undefined,
   avatar: mediaUrl(p.avatar, base),
 })
+
+const toSpotlight = (s: CmsMessenger['spotlight'], base: string): Spotlight | undefined => {
+  const title = s?.title?.trim()
+  if (!s || !title) return undefined
+  return { title, text: s.text?.trim() || undefined, href: safeHref(s.url), source: s.source?.trim() || undefined, image: mediaUrl(s.image, base) }
+}
 
 export function toMessenger(m: CmsMessenger, base: string): Messenger {
   return {
@@ -153,5 +160,6 @@ export function toMessenger(m: CmsMessenger, base: string): Messenger {
         image: mediaUrl(w.image, base),
       }
     }),
+    spotlight: toSpotlight(m.spotlight, base),
   }
 }

@@ -18,6 +18,8 @@ export interface OsAppProps {
   data: OsData
   /** Opens another app's window, or raises it when open, as the Messenger opens a conversation. */
   open: (appId: string) => void
+  /** The desktop's other programs, as the Messenger's service bar launches them. */
+  apps: readonly ResolvedApp[]
 }
 
 /** Text that is fixed, or that comes from content (e.g. the owner's name). */
@@ -99,8 +101,8 @@ export const APPS: readonly OsApp[] = [
     shortcut: (data) => data.messenger.shortcut,
     icon: 'messenger',
     component: Messenger,
-    // the reference's tall contact list
-    size: { width: 360, height: 640 },
+    // the reference's contact list: its 316×708 inside, plus the chrome
+    size: { width: 330, height: 766 },
   },
   {
     id: 'conversation',

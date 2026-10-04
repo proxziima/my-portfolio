@@ -16,7 +16,7 @@ export function ContactRow({ contact, variant, onOpen }: Props) {
   const favorite = variant === 'favorite'
   return (
     <li>
-      <button type="button" className={styles.row} {...openGestures(onOpen)}>
+      <button type="button" className={styles.row} data-variant={variant} {...openGestures(onOpen)}>
         {favorite ? <Avatar person={contact} size="sm" /> : <span className={styles.dot} data-status={contact.status} aria-hidden="true" />}
         <PersonLine person={contact} inline={!favorite} />
       </button>

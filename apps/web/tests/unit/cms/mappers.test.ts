@@ -101,10 +101,14 @@ describe('toMessenger', () => {
       name: 'Vinicius Queiroz',
       status: 'away',
       personalMessage: ' building things ',
+      listeningTo: ' Daft Punk - Digital Love ',
       avatar: { url: '/api/media/file/v.png' },
       replies: [{ id: 'a', text: 'hey' }, { id: 'b', text: 'brb' }],
     },
-    labels: { search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', conversation: '{name} - Conversation', send: 'Send' },
+    labels: {
+      search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', conversation: '{name} - Conversation', send: 'Send', listeningTo: 'Listening to:',
+    },
+    spotlight: { title: ' Doom ', text: 'Boots in js-dos.', url: 'javascript:alert(1)', source: 'My Desktop', image: { url: '/api/media/file/d.png' } },
     whatsNew: [
       { id: 'n1', text: 'New post', linkLabel: '', url: '/blog', image: { url: '/api/media/file/t.png' } },
       { id: 'n2', text: 'Unsafe', linkLabel: 'x', url: 'javascript:alert(1)', image: null },
@@ -119,6 +123,7 @@ describe('toMessenger', () => {
       name: 'Vinicius Queiroz',
       status: 'away',
       personalMessage: 'building things',
+      listeningTo: 'Daft Punk - Digital Love',
       avatar: 'http://cms.test/api/media/file/v.png',
       replies: ['hey', 'brb'],
     })
@@ -139,5 +144,19 @@ describe('toMessenger', () => {
 
   it("tolerates a global saved without What's new", () => {
     expect(toMessenger({ ...doc, whatsNew: null } as unknown as CmsMessenger, BASE).whatsNew).toEqual([])
+  })
+
+  it('maps the spotlight, dropping an unsafe link', () => {
+    expect(toMessenger(doc, BASE).spotlight).toEqual({
+      title: 'Doom',
+      text: 'Boots in js-dos.',
+      href: undefined,
+      source: 'My Desktop',
+      image: 'http://cms.test/api/media/file/d.png',
+    })
+  })
+
+  it('has no spotlight without a title', () => {
+    expect(toMessenger({ ...doc, spotlight: { title: '  ', text: 'x' } } as unknown as CmsMessenger, BASE).spotlight).toBeUndefined()
   })
 })

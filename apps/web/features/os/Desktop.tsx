@@ -36,12 +36,13 @@ export function Desktop({ data }: { data: OsData }) {
 
   const active = activeWindow(wm)
   const apps: readonly ResolvedApp[] = APPS.map((app) => resolveApp(app, data))
+  const shortcuts = desktopApps(apps)
   // the reference's status bar is a copyright line, not the window's name
   const status = `© Copyright ${new Date().getFullYear()} ${data.profile.name}`
   return (
     <div ref={deskRef} className={styles.desktop} data-anchor="desktop">
       <div className={styles.shortcuts}>
-        {desktopApps(apps).map((app) => (
+        {shortcuts.map((app) => (
           <Shortcut key={app.id} icon={app.icon} label={app.shortcut} onOpen={() => open(app.id)} />
         ))}
       </div>
@@ -66,7 +67,7 @@ export function Desktop({ data }: { data: OsData }) {
             onMinimize={() => dispatch({ type: 'minimize', id: app.id })}
             onClose={() => withChildren(APPS, app.id).forEach((id) => dispatch({ type: 'close', id }))}
           >
-            <App data={data} open={open} />
+            <App data={data} open={open} apps={shortcuts.filter((other) => other.id !== app.id)} />
           </Window>
         )
       })}
