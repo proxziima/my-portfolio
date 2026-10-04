@@ -4,6 +4,7 @@ import type { IconName } from './icons'
 import type { Size } from './window-geometry'
 import { Credits } from './apps/Credits'
 import { dosApp } from './apps/dos-app'
+import { Conversation } from './apps/messenger/Conversation'
 import { Messenger } from './apps/messenger/Messenger'
 import { Showcase } from './apps/Showcase'
 
@@ -91,6 +92,15 @@ export const APPS: readonly OsApp[] = [
     component: Messenger,
     // the reference's tall contact list
     size: { width: 360, height: 640 },
+  },
+  {
+    id: 'conversation',
+    title: (data) => `${data.messenger.contact.name} - Conversation`,
+    icon: 'messenger',
+    component: Conversation,
+    // opened by double-clicking the contact in the Messenger
+    desktop: false,
+    size: { width: 580, height: 520 },
   },
 ]
 

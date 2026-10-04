@@ -242,3 +242,99 @@
   font: inherit;
   color: var(--msn-heading);
 }
+
+/* The Conversation window */
+.band {
+  flex: none;
+  height: 28px;
+  border-bottom: 1px solid #1f5fa3;
+  background: var(--msn-band);
+}
+.body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  padding: 12px;
+  background: var(--msn-sky);
+}
+.portraits {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--msn-line);
+  border-radius: 4px;
+  background: #ffffff;
+}
+.chatHeader {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--msn-line);
+}
+.history {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 8px;
+}
+.groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.groups > li + li {
+  margin-top: 6px;
+}
+.sender {
+  color: var(--msn-muted);
+}
+.lines {
+  margin: 0;
+  padding-left: 16px;
+}
+.lines > li {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.typing {
+  min-height: 1.35em;
+  margin: 4px 0;
+  font-style: italic;
+  color: var(--msn-muted);
+}
+.compose {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--msn-field);
+  border-radius: 4px;
+  background: #ffffff;
+}
+.compose > textarea {
+  flex: 1;
+  height: 56px;
+  border: 0;
+  outline: none;
+  resize: none;
+  font: inherit;
+  color: var(--msn-text);
+}
+.compose > button {
+  align-self: flex-end;
+  padding: 3px 14px;
+  border: 1px solid #7aa3cf;
+  border-radius: 3px;
+  background: linear-gradient(#fdfeff, #dbe9f8);
+  font: inherit;
+  color: var(--msn-text);
+}
+.compose > button:disabled {
+  color: #9aa7b5;
+}
