@@ -1,21 +1,32 @@
 import type { ComponentType } from 'react'
-import type { Portfolio } from '@/lib/cms/types'
+import type { Messenger as MessengerData, Portfolio } from '@/lib/cms/types'
 import type { IconName } from './icons'
 import type { Size } from './window-geometry'
 import { Credits } from './apps/Credits'
 import { dosApp } from './apps/dos-app'
 import { Showcase } from './apps/Showcase'
 
-export interface OsAppProps {
-  data: Portfolio
+/** What the OS apps read: the portfolio plus the content only the desktop shows. */
+export interface OsData extends Portfolio {
+  messenger: MessengerData
 }
+
+export interface OsAppProps {
+  data: OsData
+  /** Opens another app's window, or raises it when open, as the Messenger opens a conversation. */
+  open: (appId: string) => void
+}
+
+/** Text that is fixed, or that comes from content (e.g. the owner's name). */
+type Text = string | ((data: OsData) => string)
 
 export interface OsApp {
   id: string
-  /** A function when the title comes from content (e.g. the owner's name). */
-  title: string | ((data: Portfolio) => string)
+  title: Text
   /** The desktop label, short like the reference's ("My Showcase"); omitted = the title. */
-  shortcut?: string
+  shortcut?: Text
+  /** false: no desktop shortcut; another app opens it (the Messenger's conversation). */
+  desktop?: false
   icon: IconName
   component: ComponentType<OsAppProps>
   /** Opening size; omitted = fill the desk with a margin. */
@@ -28,9 +39,19 @@ export interface OsApp {
   barColor?: string
 }
 
-/** An app whose title has been resolved against the content, for the chrome that only shows text. */
-export type ResolvedApp = Omit<OsApp, 'title'> & { title: string }
+/** An app whose texts have been resolved against the content, for the chrome that only shows text. */
+export type ResolvedApp = Omit<OsApp, 'title' | 'shortcut'> & { title: string; shortcut?: string }
 
+const resolve = (text: Text, data: OsData): string => (typeof text === 'function' ? text(data) : text)
+
+export const resolveApp = (app: OsApp, data: OsData): ResolvedApp => ({
+  ...app,
+  title: resolve(app.title, data),
+  shortcut: app.shortcut === undefined ? undefined : resolve(app.shortcut, data),
+})
+
+/** The apps with a desktop shortcut. */
+export const desktopApps = <T extends { desktop?: false }>(apps: readonly T[]): T[] => apps.filter((app) => app.desktop !== false)
 /** The chrome every DOS program shares, as the reference's Doom window. */
 const DOS_CHROME = { status: 'Powered by JSDOS & DOSBox', barColor: '#1c1c1c' } as const
 
@@ -61,9 +82,6 @@ export const APPS: readonly OsApp[] = [
     ...DOS_CHROME,
   },
 ]
-
-/** The title the title bar and taskbar show (and the shortcut, when the app has no shorter label). */
-export const appTitle = (app: OsApp, data: Portfolio): string => (typeof app.title === 'function' ? app.title(data) : app.title)
 
 /** Opened when the desktop boots. */
 export const BOOT_APP = 'showcase'
