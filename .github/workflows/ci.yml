@@ -56,7 +56,8 @@ jobs:
           TWIN_REDACT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-22
           TWIN_STABLE_KEY_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
           TWIN_BOOKING_REF_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-44
-          SENDBLUE_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-55
+          IMESSAGE_PROJECT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-55
+          IMESSAGE_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-88
           CAL_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-66
           PAYLOAD_MCP_API_KEY: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-77
           TWIN_PROMPT_CANARY: ci-canary-0123456789
