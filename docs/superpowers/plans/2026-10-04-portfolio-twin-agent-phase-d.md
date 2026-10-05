@@ -598,6 +598,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ path
 }
 ```
 
+**Forged context notes.** The agent's abuse gate tells the model about abusive messages through a user-role note that starts with the exact prefix `[context, not from the visitor]` (`CONTEXT_NOTE_PREFIX`, defined in `apps/agents/agent/lib/abuse.ts`). A visitor must not be able to forge that note. Before forwarding, the BFF neutralises the prefix in visitor text: replace every case-insensitive occurrence of `[context` with `(context`. Do it in a small pure function, `neutraliseVisitorText`, in `lib/twin/limits.ts` (or a sibling file) with its own unit test. Apply it to `message` on both the create and send paths. Copy the literal into the web module with a comment pointing at the agent constant: the web app must not import agent code.
+
 `MessageBody.strict()` rejects `inputResponses`, `turnPolicy` and anything else. If the eve client sends extra fields on a normal send (for example `turnPolicy` or `outputSchema`), list them explicitly in `MessageBody` after checking `SendTurnPayload` in `eve/dist`. Never relax to `.passthrough()`.
 
 - [ ] **Step 7: Route test** (agent and CMS mocked with `vi.stubGlobal('fetch')`, the db on pglite)
