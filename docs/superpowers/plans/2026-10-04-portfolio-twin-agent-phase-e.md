@@ -9,6 +9,11 @@ There are two eval suites, and the split is deliberate:
 
 ---
 
+> **Amendment (2026-10-05, found in E1).** eve 0.71 compiles `'use workflow'`/`'use step'` only in modules whose realpath sits under the app root (`isAuthoredApplicationModule`). A fixture app therefore can't re-export the real `request_disclosure`. That changes three things:
+> - The offline fixture omits that tool.
+> - The approval-timeout acceptance criterion is proven by `apps/agents/tests/request-disclosure-body.test.ts`. It runs the real workflow body with `workflow` mocked (webhook never resolves, `sleep` resolves → `expired` → "not available" model text). The body's compilation is proven by `eve build`, and its steps by `approval-steps.test.ts`.
+> - `approval-timeout.eval.ts` (E2) is replaced by that test. The other offline evals stay.
+
 ### Task E1: Offline fixture app and stubs
 
 **Files:**
