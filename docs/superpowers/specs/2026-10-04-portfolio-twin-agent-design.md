@@ -208,6 +208,7 @@ All tools share these rules:
   - `kind` is one of `recruiter | hiring_manager | client | engineer | other`.
   - Writes `conversation.visitor` and links the long-term visitor record.
 - **`request_disclosure({ sourceId, reason })`**
+  > Transport superseded on 2026-10-05: owner approvals use iMessage via Sendblue. See [2026-10-05-imessage-owner-approvals-design.md](2026-10-05-imessage-owner-approvals-design.md).
   - A workflow `task`:
     1. A step persists a pending approval and sets `pendingApproval` in state.
     2. `createWebhook()` creates the callback URL.
