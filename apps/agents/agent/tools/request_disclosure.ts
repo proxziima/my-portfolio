@@ -35,13 +35,14 @@ export default defineWorkflowTool({
     'use workflow'
     const decision = createWebhook()
     const opened = await openApproval(ctx.session.id, ctx.callId, decision.url, input)
-    if (opened.kind === 'capped') return { status: 'denied' }
+    // Capped, or an item this session was never offered: denied, and the owner is not bothered.
+    if (opened.kind === 'capped' || opened.kind === 'notOffered') return { status: 'denied' }
     let status: DisclosureOutcome['status']
     if (opened.kind === 'alreadyDecided') {
       status = opened.status
     } else {
       try {
-        await notifyOwner(opened.approvalId, input)
+        await notifyOwner(opened.approvalId)
       } catch {
         await finalizeApproval(ctx.session.id, opened.approvalId)
         return { status: 'expired' }

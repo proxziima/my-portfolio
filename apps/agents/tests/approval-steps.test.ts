@@ -2,6 +2,7 @@ import {
   createConversation,
   createVisitor,
   decideApproval,
+  findSessionApproval,
   getApproval,
   getConversation,
   putCachedSearch,
@@ -29,7 +30,9 @@ const SESSION = 'sess-1'
 const HOOK = 'https://agents.test/.well-known/workflow/v1/webhook/tok-1'
 const HOOK_2 = 'https://agents.test/.well-known/workflow/v1/webhook/tok-2'
 const HOOK_3 = 'https://agents.test/.well-known/workflow/v1/webhook/tok-3'
-const input = { sourceId: 'knowledge:5', topic: 'Notice period', reason: 'Recruiter asked when I can start' }
+const input = { sourceId: 'knowledge:5', reason: 'Recruiter asked when I can start' }
+/** What this session's searches offered as restricted: the CMS's own topics. */
+const OFFERED = [1, 2, 3, 4, 5].map((n) => ({ sourceId: `knowledge:${n}`, topic: `CMS topic ${n}`, category: n === 5 ? ('availability' as const) : null }))
 
 let t: TestDb
 beforeEach(async () => {
@@ -38,6 +41,7 @@ beforeEach(async () => {
   m.sendApprovalRequest.mockReset().mockResolvedValue(501)
   m.markDecided.mockReset().mockResolvedValue(undefined)
   await createConversation(t.db, SESSION, await createVisitor(t.db))
+  await putCachedSearch(t.db, SESSION, 'offered', { items: [], restricted: OFFERED })
 })
 afterEach(async () => t.close())
 
@@ -54,15 +58,15 @@ describe('openApproval', () => {
     const first = await opened('call-1')
     const again = await opened('call-1')
     expect(again).toBe(first)
-    expect((await state()).pendingApprovals).toEqual([{ approvalId: first, sourceId: 'knowledge:5', topic: 'Notice period' }])
+    expect((await state()).pendingApprovals).toEqual([{ approvalId: first, sourceId: 'knowledge:5', topic: 'CMS topic 5' }])
     expect(await getApproval(t.db, first)).toMatchObject({ webhookUrl: HOOK, telegramMessageId: null })
   })
 
   it('reuses a pending approval for the same source instead of asking the owner again', async () => {
     const first = await opened('call-1')
     expect(await opened('call-2')).toBe(first)
-    await notifyOwner(first, input)
-    await notifyOwner(first, input)
+    await notifyOwner(first)
+    await notifyOwner(first)
     expect(m.sendApprovalRequest).toHaveBeenCalledTimes(1)
     expect((await state()).pendingApprovals).toHaveLength(1)
   })
@@ -91,26 +95,40 @@ describe('openApproval', () => {
     expect((await openApproval(SESSION, 'call-5', HOOK, { ...input, sourceId: 'knowledge:1' })).kind).toBe('pending')
   })
 
-  it('records a restricted category only from what this session’s search listed', async () => {
-    await opened('call-1', 'knowledge:9')
-    expect((await state()).restrictedCategoriesRequested).toEqual([])
-    await putCachedSearch(t.db, SESSION, 'notice', {
-      items: [],
-      restricted: [{ sourceId: 'knowledge:5', topic: 'Notice period', category: 'availability' }],
-    })
-    await opened('call-2', 'knowledge:5')
+  it('records the restricted category and stores the CMS stub topic, not the model’s', async () => {
+    const id = await opened('call-1', 'knowledge:5')
     expect((await state()).restrictedCategoriesRequested).toEqual(['availability'])
     expect((await state()).toolsUsed).toContain('request_disclosure')
+    expect(await getApproval(t.db, id)).toMatchObject({ topic: 'CMS topic 5' })
+  })
+
+  it('refuses an item this session was never offered as restricted: no row, no state change', async () => {
+    const before = await state()
+    expect(await openApproval(SESSION, 'call-1', HOOK, { ...input, sourceId: 'knowledge:99' })).toEqual({ kind: 'notOffered' })
+    // A public item listed by a search is not a restricted stub either.
+    await putCachedSearch(t.db, SESSION, 'public', { items: [{ sourceId: 'projects:7', kind: 'project', title: 'Atlas', text: 'x' }], restricted: [] })
+    expect(await openApproval(SESSION, 'call-2', HOOK, { ...input, sourceId: 'projects:7' })).toEqual({ kind: 'notOffered' })
+    expect(await findSessionApproval(t.db, SESSION, { sourceId: 'knowledge:99' })).toBeNull()
+    expect(await state()).toEqual(before)
   })
 })
 
 describe('notifyOwner', () => {
   it('sends once and stores the message id; a retry after the send does not resend', async () => {
     const id = await opened('call-1')
-    await notifyOwner(id, input)
+    await notifyOwner(id)
     expect(await getApproval(t.db, id)).toMatchObject({ telegramMessageId: 501, webhookUrl: HOOK })
-    await notifyOwner(id, input)
+    await notifyOwner(id)
     expect(m.sendApprovalRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the owner the CMS topic and item, never the visitor-steerable reason', async () => {
+    const id = await opened('call-1')
+    await notifyOwner(id)
+    const [, text] = m.sendApprovalRequest.mock.calls[0] as unknown as [string, string]
+    expect(text).toContain('CMS topic 5')
+    expect(text).toContain('knowledge:5')
+    expect(text).not.toContain(input.reason)
   })
 })
 

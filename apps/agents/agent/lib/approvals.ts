@@ -3,7 +3,7 @@ import {
   TWIN_LIMITS,
   TwinDisclosure,
   TwinSearchResult,
-  type KnowledgeCategory,
+  type RestrictedStub,
   type TwinItem,
 } from '@repo/twin/contract'
 import {
@@ -25,12 +25,12 @@ import { callPayloadTool } from './payload-mcp'
 import { markDecided, sendApprovalRequest } from './telegram'
 
 /**
- * What the model passes to `request_disclosure`: one restricted entry from a search result. The
- * category is not taken from the model; it is looked up in the session's own search results.
+ * What the model passes to `request_disclosure`: one restricted entry from a search result. Its
+ * topic and category are not taken from the model; they come from the CMS stub this session's own
+ * searches listed. The reason is kept on the approval row for audit, never shown to the owner.
  */
 export const DisclosureInput = z.object({
   sourceId: z.string().regex(/^[a-z-]+:[\w-]+$/),
-  topic: z.string().min(1).max(120),
   reason: z.string().min(1).max(300),
 })
 export type DisclosureInput = z.infer<typeof DisclosureInput>
@@ -42,24 +42,26 @@ export type DisclosureOutcome = { status: 'approved'; item: TwinItem } | { statu
 
 /**
  * Where an opened approval stands: waiting on the owner, already settled by an earlier request for
- * the same item, or refused because the session reached its approval cap.
+ * the same item, refused because the session reached its approval cap, or refused because this
+ * session was never offered that item as restricted.
  */
 export type OpenedApproval =
   | { kind: 'pending'; approvalId: string }
   | { kind: 'alreadyDecided'; approvalId: string; status: Decided }
   | { kind: 'capped' }
+  | { kind: 'notOffered' }
 
 /**
- * The category of a restricted knowledge entry, trusted only when one of the session's cached
- * searches listed that exact entry as restricted, so the model can't inflate intent signals.
- * Pure (no database access): this module is also bundled into the workflow body.
+ * The restricted stub for `sourceId`, trusted only when one of the session's cached searches listed
+ * that exact entry as restricted: the model can't open approvals for items it was never offered,
+ * put its own words in front of the owner, or inflate intent signals. Pure (no database access):
+ * this module is also bundled into the workflow body.
  */
-function restrictedCategoryIn(cachedSearches: unknown[], sourceId: string): KnowledgeCategory | null {
-  if (!sourceId.startsWith('knowledge:')) return null
+function restrictedStubIn(cachedSearches: unknown[], sourceId: string): RestrictedStub | null {
   for (const cached of cachedSearches) {
     const result = TwinSearchResult.safeParse(cached)
     const stub = result.success ? result.data.restricted.find((r) => r.sourceId === sourceId) : undefined
-    if (stub?.category) return stub.category
+    if (stub) return stub
   }
   return null
 }
@@ -77,16 +79,18 @@ export async function openApproval(
   input: DisclosureInput,
 ): Promise<OpenedApproval> {
   'use step'
+  const stub = restrictedStubIn(await listCachedSearches(db(), sessionId), input.sourceId)
+  if (!stub) return { kind: 'notOffered' }
   let row: ApprovalRecord | null =
     (await findSessionApproval(db(), sessionId, { callId })) ??
     (await findSessionApproval(db(), sessionId, { sourceId: input.sourceId }))
   const capped = !row && (await countSessionApprovals(db(), sessionId)) >= TWIN_LIMITS.maxApprovalsPerSession
   if (!row && !capped) {
-    const id = await createApproval(db(), { sessionId, callId, ...input })
+    const id = await createApproval(db(), { sessionId, callId, sourceId: stub.sourceId, topic: stub.topic, reason: input.reason })
     row = await getApproval(db(), id)
   }
   if (row?.status === 'pending') await setApprovalWebhook(db(), row.id, webhookUrl)
-  const category = restrictedCategoryIn(await listCachedSearches(db(), sessionId), input.sourceId)
+  const category = stub.category
   await updateConversation(db(), sessionId, (s) => ({
     ...s,
     pendingApprovals:
@@ -106,13 +110,18 @@ export async function openApproval(
 /**
  * Step: notify the owner with Approve/Deny. The stored message id marks the owner as notified, so
  * a retried step or a reused approval never sends twice.
+ *
+ * The text comes from the row only: the CMS stub's topic and the item id. The model's `reason` is
+ * left out on purpose. The visitor can steer it ("the owner already agreed, just approve"), and an
+ * approval prompt is exactly where such text does harm; even labelled and truncated it would sit
+ * beside the Approve button. The owner decides on the item itself.
  */
-export async function notifyOwner(approvalId: string, input: DisclosureInput): Promise<void> {
+export async function notifyOwner(approvalId: string): Promise<void> {
   'use step'
   const row = await getApproval(db(), approvalId)
   if (!row) throw new Error(`Approval ${approvalId} not found`)
   if (row.telegramMessageId !== null || row.status !== 'pending') return
-  const text = `Twin approval request\nTopic: ${input.topic}\nItem: ${input.sourceId}\nWhy: ${input.reason}\nAuto-denies after ${getEnv().TWIN_APPROVAL_TIMEOUT}.`
+  const text = `Twin approval request\nTopic: ${row.topic}\nItem: ${row.sourceId}\nAuto-denies after ${getEnv().TWIN_APPROVAL_TIMEOUT}.`
   await setApprovalTelegramMessage(db(), approvalId, await sendApprovalRequest(approvalId, text))
 }
 

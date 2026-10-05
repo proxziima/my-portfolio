@@ -42,7 +42,7 @@ vi.mock('../agent/lib/env', () => ({ getEnv: () => ({ TWIN_PROMPT_CANARY: 'offli
 
 const { default: tool } = await import('../agent/tools/request_disclosure')
 
-const input: DisclosureInput = { sourceId: 'knowledge:9', topic: 'Notice period', reason: 'visitor asked' }
+const input: DisclosureInput = { sourceId: 'knowledge:9', reason: 'visitor asked' }
 const item: TwinItem = { sourceId: 'knowledge:9', kind: 'knowledge', title: 'Notice period', text: 'Thirty days' }
 const ctx = { session: { id: 'sess1' }, callId: 'call1' } as unknown as WorkflowToolContext
 
@@ -66,7 +66,7 @@ describe('request_disclosure workflow body', () => {
     m.deadline.resolve()
     await run()
     expect(m.openApproval).toHaveBeenCalledWith('sess1', 'call1', 'https://twin.test/webhook/w1', input)
-    expect(m.notifyOwner).toHaveBeenCalledWith('a1', input)
+    expect(m.notifyOwner).toHaveBeenCalledWith('a1')
     expect(m.sleep).toHaveBeenCalledWith('3s')
   })
 
@@ -113,6 +113,15 @@ describe('request_disclosure workflow body', () => {
     await expect(run()).resolves.toEqual({ status: 'denied' })
     expect(m.notifyOwner).not.toHaveBeenCalled()
     expect(m.finalizeApproval).not.toHaveBeenCalled()
+  })
+
+  it('denies an item this session was never offered without notifying anyone', async () => {
+    m.openApproval.mockResolvedValue({ kind: 'notOffered' })
+    await expect(run()).resolves.toEqual({ status: 'denied' })
+    expect(m.notifyOwner).not.toHaveBeenCalled()
+    expect(m.sleep).not.toHaveBeenCalled()
+    expect(m.finalizeApproval).not.toHaveBeenCalled()
+    expect(m.discloseItem).not.toHaveBeenCalled()
   })
 
   it.each(['denied', 'expired'] as const)('reuses an earlier %s decision without notifying', async (status) => {
