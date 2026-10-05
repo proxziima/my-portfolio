@@ -2,7 +2,7 @@
 
 ## What it is
 
-A first-person "twin" of the portfolio owner. It answers recruiters and clients in the Messenger window on `/os`, using only what the Payload CMS says about the owner. It offers a call when the conversation warrants it, asks the owner on Telegram before it shares anything restricted, and shows the Cal.com booker inline. It is an [eve](https://eve.dev) 0.71 agent on OpenRouter with a Postgres-backed durable runtime. The design is in [the spec](../../docs/superpowers/specs/2026-10-04-portfolio-twin-agent-design.md). This README describes the code as it is now; where the two disagree, see [Where the code differs from the spec](#where-the-code-differs-from-the-spec).
+A first-person "twin" of the portfolio owner that answers recruiters and clients in the Messenger window on `/os`, using only what the Payload CMS says about the owner. It offers a call when the conversation warrants it, asks the owner on Telegram before it shares anything restricted, and shows the Cal.com booker inline. It is an [eve](https://eve.dev) 0.71 agent on OpenRouter with a Postgres-backed durable runtime, designed in [the spec](../../docs/superpowers/specs/2026-10-04-portfolio-twin-agent-design.md); this README describes the code as it is now, and [Where the code differs from the spec](#where-the-code-differs-from-the-spec) lists where the two disagree.
 
 ## Contents
 
@@ -31,7 +31,7 @@ What has **not** been verified:
 - **No Docker image has been built on the development machine**, which has no Docker. That covers `apps/agents/Dockerfile` and the compose stack (`docker-compose.yml`) with `postgres` and `agents`. CI builds the agent with `eve build` but not the image, so the first real image build happens in Easypanel or on a machine with Docker.
 - **The live evals (`evals/`) have not been run against a real model yet.** CI's `live-evals` job runs them against a real model with a throwaway CMS and agent inside the runner (see [Testing](#testing)), but no run of it has been reviewed. It has never run against the production CMS content.
 - **None of the external integrations has run end to end against the real service:** Telegram approvals, Cal.com webhooks, Google free/busy, OpenRouter fallback routing, and the spend ledger with real OpenRouter cost metadata. Each one is covered by unit tests with mocked HTTP. Telegram and Payload MCP are also covered by local stubs in the offline evals.
-- **`experimental.workflow.retention: 0` is unverified on the Postgres world.** eve's docs warn that "Custom Worlds used with eve might not support this feature". Nobody has checked that `@workflow/world-postgres` deletes run data at 0. See [Retention and deletion](#retention-and-deletion).
+- **`experimental.workflow.retention: 0` has not been verified at runtime on the Postgres world.** eve's docs warn that "Custom Worlds used with eve might not support this feature". The installed `@workflow/world-postgres` implements it (`dist/retention.js` clears the payload columns and stamps `expired_at` for runs started with `$retention: 0`), but no run has been inspected to confirm that the data is gone. See [Retention and deletion](#retention-and-deletion).
 
 ## Architecture
 
@@ -155,23 +155,26 @@ All commands run from the repository root in Git Bash unless they say otherwise.
 
 ### 1. Postgres
 
-On this machine there is no Docker. **PostgreSQL 17 runs in WSL** (`Ubuntu-24.04`) on **`127.0.0.1:5433`**, with role and password `twin`/`twin`.
+You need **PostgreSQL 17 reachable on `127.0.0.1:5433`, with role and database `twin`** (password `twin`). Either:
 
-- **Always use `127.0.0.1`.** `localhost` resolves to `::1`, which WSL doesn't forward.
-- **Wake the cluster:** `wsl -d Ubuntu-24.04 -u root -- pg_lsclusters`.
-- **Check it's up:** `pg_isready -h 127.0.0.1 -p 5433`. The psql tools are in `C:/Users/felip/AppData/Local/Programs/pgsql/bin`.
+- run `docker-compose.dev.yml`, or
+- use a native or WSL install of PostgreSQL 17 listening on port 5433.
+
+**Always use `127.0.0.1`.** On Windows with WSL, `localhost` resolves to `::1`, which WSL doesn't forward. Check it's up with `pg_isready -h 127.0.0.1 -p 5433`.
 
 There are two databases:
 
 - `twin`: development. The web BFF and the agent behind it share it.
 - `twin_eval`: the offline evals, CI's database name, and throwaway `eve dev` runs you don't want mixed into dev data.
 
-On a machine with Docker, `docker-compose.dev.yml` is the equivalent. It only creates `twin`, so create `twin_eval` yourself:
+`docker-compose.dev.yml` only creates `twin`, so create `twin_eval` yourself:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d postgres
 docker compose -f docker-compose.dev.yml exec postgres createdb -U twin twin_eval
 ```
+
+With a native or WSL install, create the role and both databases yourself.
 
 Create both schemas in each database you use: the twin tables, then the Workflow world.
 
@@ -190,7 +193,7 @@ Both commands are idempotent. The Docker image runs the same two before `eve sta
 bun run --cwd apps/payload dev               # http://localhost:3001, MCP at /api/mcp
 ```
 
-- **Set `TWIN_REDACT_SECRET` in `apps/payload/.env`** to the same value as in the agent and web env. `apps/payload/.env.example` doesn't list it yet. Without it, `/api/twin/redact-terms` answers 401, the BFF streams nothing, and the agent can't store transcripts.
+- **Set `TWIN_REDACT_SECRET` in `apps/payload/.env`** (listed in `apps/payload/.env.example`) to the same value as in the agent and web env. Without it, `/api/twin/redact-terms` answers 401, the BFF streams nothing, and the agent can't store transcripts.
 - **Create the MCP key** in the admin with only the three twin tools (see [Payload](#payload-mcp-key-and-knowledge)).
 - **The CMS dev server pushes its schema into `apps/payload/payload.db` on start.** Never reset or delete `payload.db`. Before anything that changes the CMS schema, back it up next to it: `cp apps/payload/payload.db apps/payload/payload.db.pre-<label>-$(date +%Y%m%d%H%M%S).bak`. Generate migrations against a throwaway database, as described in [docs/deploy-easypanel.md](../../docs/deploy-easypanel.md#updating).
 
@@ -407,8 +410,8 @@ export default defineMcpClientConnection({
 
 Read this before you choose B:
 
-- **eve adds `connection_search`/`connection_execute` whenever a static connection exists, even with `defaultTools: false`.** They can't be disabled, and they sit outside `toolGranted` skill gating. A static connection is therefore offered to every visitor on every turn.
-- To gate it, make the file a `defineDynamic` connection resolved on `turn.started`. It reads conversation state and returns `null` when no active skill should reach it.
+- **eve adds `connection_search`/`connection_execute` whenever the agent has a static connection or a dynamic connection resolver, even with `defaultTools: false`.** eve's built-in tools page says: "eve adds both when the agent has a static connection or a dynamic connection resolver, even when `defaultTools` is `false`", and "An agent without connections has neither tool." The tools "cannot be replaced or disabled", and they sit outside `toolGranted` skill gating. A static connection is therefore offered to every visitor on every turn.
+- To gate the connection itself, make the file a `defineDynamic` connection resolved on `turn.started`. It reads conversation state and returns `null` when no active skill should reach it. **That does not remove the two tools.** A resolver that returns `null` still leaves `connection_search` and `connection_execute` in the tool list, with nothing behind them.
 - Tool results come back raw, without `<untrusted>` wrapping or caching.
 
 This repo has no eve connection, so path B has not been exercised here.
@@ -603,7 +606,7 @@ Put the key in `PAYLOAD_MCP_API_KEY`.
   A failure is logged and rethrown, so the run is recorded as failed. The visitor cookie also lasts 90 days.
 - **eve run data** is set to `experimental.workflow.retention: 0`: a session-owning run's data is deleted when the run finishes. There are caveats:
   - eve applies it only to session-owning runs. Workflow tools (`request_disclosure`) and session timeouts keep the world's default retention.
-  - eve's docs say custom worlds may ignore it. **Nobody has checked whether `@workflow/world-postgres` honours it.**
+  - eve's docs say custom worlds may ignore it. `@workflow/world-postgres` implements it (`dist/retention.js` clears the payload columns of a finished run and stamps `expired_at`), but this is **implemented in the package, not yet verified at runtime** here.
   - The Postgres world caps hook retention with `WORKFLOW_POSTGRES_HOOK_RETENTION_LIMIT_DAYS`, which defaults to 30.
 - **Deletion endpoint:** `DELETE /api/twin/me`, called with the visitor's cookie. It does three things:
   1. It resets each of the visitor's eve sessions. A 404 or 409 counts as already gone.
