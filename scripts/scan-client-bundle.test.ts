@@ -32,7 +32,7 @@ describe('findLeaks', () => {
     for (const name of [
       'TWIN_STABLE_KEY_SECRET',
       'TWIN_BOOKING_REF_SECRET',
-      'TELEGRAM_WEBHOOK_SECRET',
+      'SENDBLUE_WEBHOOK_SECRET',
       'CAL_WEBHOOK_SECRET',
       'PAYLOAD_MCP_API_KEY',
     ]) {
