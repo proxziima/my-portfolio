@@ -27,7 +27,11 @@ export async function currentVisitor(): Promise<string> {
   return id
 }
 
-/** The visitor id from the cookie without creating one (deletion endpoint). */
+/**
+ * The visitor id from a validly signed cookie, without creating or touching anything. Every path
+ * except session create uses this, so unauthenticated requests never write; a purged visitor's id
+ * owns no session, so ownership checks reject it.
+ */
 export async function existingVisitor(): Promise<string | null> {
   const jar = await cookies()
   return verifyVisitorCookie(jar.get(VISITOR_COOKIE)?.value, twinEnv().TWIN_COOKIE_SECRET)

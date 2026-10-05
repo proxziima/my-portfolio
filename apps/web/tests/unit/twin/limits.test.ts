@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createConversation, createVisitor, recordSpend, updateConversation } from '@repo/twin/db'
 import { createTestDb, type TestDb } from '@repo/twin/testing'
 import { TWIN_LIMITS } from '@repo/twin/contract'
-import { checkMessage } from '@/lib/twin/limits'
+import { checkCreate, checkMessage } from '@/lib/twin/limits'
 
 let t: TestDb
 let visitorId: string
@@ -38,5 +38,23 @@ describe('checkMessage', () => {
   it('goes offline when today’s spend reaches the cap', async () => {
     await recordSpend(t.db, { idempotencyKey: 'k', sessionId: 's1', modelId: 'm', costUsd: 5, inputTokens: 1, outputTokens: 1 })
     expect(await checkMessage(t.db, { ...base, text: 'hi' })).toBe('offline')
+  })
+})
+
+describe('checkCreate', () => {
+  it('throttles creates per IP per minute in their own namespace', async () => {
+    for (let i = 0; i < TWIN_LIMITS.ipPerMinute; i++) expect(await checkCreate(t.db, { ip: '9.9.9.9', now })).toBeNull()
+    expect(await checkCreate(t.db, { ip: '9.9.9.9', now })).toBe('throttled')
+    expect(await checkCreate(t.db, { ip: '8.8.8.8', now })).toBeNull()
+    // Messages from the throttled IP are counted separately.
+    expect(await checkMessage(t.db, { ...base, ip: '9.9.9.9', text: 'hi' })).toBeNull()
+  })
+
+  it('throttles creates per IP per day', async () => {
+    for (let i = 0; i < TWIN_LIMITS.ipPerDay; i++) {
+      const at = new Date(now.getTime() + Math.floor(i / TWIN_LIMITS.ipPerMinute) * 60_000)
+      expect(await checkCreate(t.db, { ip: '9.9.9.9', now: at })).toBeNull()
+    }
+    expect(await checkCreate(t.db, { ip: '9.9.9.9', now: new Date(now.getTime() + 3_600_000) })).toBe('throttled')
   })
 })

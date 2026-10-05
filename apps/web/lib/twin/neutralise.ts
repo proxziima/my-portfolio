@@ -4,17 +4,22 @@
  * web app never imports agent code. Only its opening `[context` matters for neutralising.
  */
 const CONTEXT_NOTE_OPENING = /\[context/gi
-
-/** Visitor text with every `[context` (any case) turned into `(context`, so it cannot forge a note. */
-export function neutraliseVisitorText(text: string): string {
-  return text.replace(CONTEXT_NOTE_OPENING, (m) => `(${m.slice(1)}`)
-}
+/** Invisible format characters (zero-width space/joiners, word joiner, soft hyphen, BOM...). */
+const FORMAT_CHARS = /\p{Cf}/gu
+/** How an encoded booking notice opens (`encodeNotice` in @repo/twin/contract). */
+const NOTICE_OPENING = '{"twinNotice"'
 
 /**
- * `clientContext` also reaches the model as user-role text, so it gets the same treatment. In
- * serialised JSON `[context` can only occur inside a string (key or value), so one pass over the
- * serialised form rewrites exactly the strings and nothing structural.
+ * Visitor text with every `[context` (any case) turned into `(context`, so it cannot forge a note.
+ * Normalised first (NFKC folds fullwidth `［ｃｏｎｔｅｘｔ`, then format characters are stripped), so
+ * look-alikes that a model reads as the same opening cannot slip past the match.
  */
-export function neutraliseVisitorContext<T>(value: T): T {
-  return JSON.parse(neutraliseVisitorText(JSON.stringify(value))) as T
+export function neutraliseVisitorText(text: string): string {
+  const defused = text
+    .normalize('NFKC')
+    .replace(FORMAT_CHARS, '')
+    .replace(CONTEXT_NOTE_OPENING, (m) => `(${m.slice(1)}`)
+  // `parseNotice` (@repo/twin/contract) reads any message starting `{"twinNotice":1` as a booking
+  // system line; a leading space keeps a visitor's own text from rendering as one.
+  return defused.startsWith(NOTICE_OPENING) ? ` ${defused}` : defused
 }

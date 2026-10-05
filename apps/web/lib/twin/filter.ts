@@ -34,22 +34,58 @@ const blankAction = (a: Data): Data => (isVisibleAction(a) ? a : { ...a, input: 
 const blankError = (d: Data): Data => (d.error === undefined ? {} : { error: { ...asData(d.error), message: '' } })
 
 /**
- * The output boundary (spec §10). Redacts never-tier terms, PII and the prompt canary from
- * assistant text, independent of what the model produced, and blanks reasoning and tool payloads.
- * Never drops or adds events: clients resume by absolute event index.
+ * Failure text (`turn.failed`, `step.failed`, `session.failed`) can carry provider or SQL errors:
+ * only `code` reaches the browser. Keys absent from the original stay absent.
  */
-export function createEventFilter(rules: RedactionRules, canary: string): (e: StreamEvent) => StreamEvent {
+const blankFailure = (d: Data): Data => ({ ...d, ...('message' in d ? { message: '' } : {}), ...('details' in d ? { details: undefined } : {}) })
+
+/**
+ * A `session-limit` request asks to raise the session's budget: the visitor can never answer it,
+ * so its prompt and options (which name the spend) are blanked.
+ */
+const isSessionLimit = (q: Data) => q.kind === 'session-limit'
+const blankRequest = (q: Data): Data => ({
+  ...q,
+  ...(isSessionLimit(q) ? { ...('prompt' in q ? { prompt: '' } : {}), ...('options' in q ? { options: [] } : {}) } : {}),
+  action: blankAction(asData(q.action)),
+})
+
+export interface EventFilterHooks {
+  /** Called once per filter when a `session-limit` request passes: the conversation is over. */
+  onSessionLimit?: () => void
+}
+
+/**
+ * The output boundary (spec §10). Redacts never-tier terms, PII and the prompt canary from
+ * assistant text, independent of what the model produced, and blanks reasoning, tool payloads and
+ * failure details. Never drops or adds events: clients resume by absolute event index.
+ */
+export function createEventFilter(rules: RedactionRules, canary: string, hooks: EventFilterHooks = {}): (e: StreamEvent) => StreamEvent {
   const withCanary: RedactionRules = { terms: [...rules.terms, canary], allow: rules.allow }
   const redactors = new Map<string, StreamRedactor>()
+  /*
+   * Steps whose `step.started` this filter saw. eve emits `step.started` before the step's first
+   * `message.appended` (harness/tool-loop.js, harness/step-hooks.js). A stream resumed mid-block
+   * starts without it: the redactor would begin mid-sentence (a term split across the cut, or a
+   * held-back tail, would stream unredacted), so that block's deltas are blanked and its
+   * `message.completed`, which replaces the streamed text, carries it fully redacted.
+   */
+  const started = new Set<string>()
+  let sessionLimitSeen = false
   const keyOf = (d: Data) => `${String(d.turnId)}:${String(d.stepIndex)}`
   const rewrite = (e: StreamEvent, data: Data): StreamEvent => ({ ...e, data })
 
   return (e) => {
+    if (typeof e.data !== 'object' || e.data === null) return e
     const d = e.data
     switch (e.type) {
+      case 'step.started':
+        started.add(keyOf(d))
+        return e
       case 'message.appended': {
         if (typeof d.messageDelta !== 'string') return e
         const key = keyOf(d)
+        if (!started.has(key)) return rewrite(e, { ...d, messageDelta: '' })
         const r = redactors.get(key) ?? new StreamRedactor(withCanary)
         redactors.set(key, r)
         return rewrite(e, { ...d, messageDelta: r.push(d.messageDelta) })
@@ -69,10 +105,15 @@ export function createEventFilter(rules: RedactionRules, canary: string): (e: St
         return d.toolName === VISIBLE_TOOL ? e : rewrite(e, { ...d, inputTextDelta: '' })
       case 'actions.requested':
         return Array.isArray(d.actions) ? rewrite(e, { ...d, actions: d.actions.map((a) => blankAction(asData(a))) }) : e
-      case 'input.requested':
-        return Array.isArray(d.requests)
-          ? rewrite(e, { ...d, requests: d.requests.map((q) => ({ ...asData(q), action: blankAction(asData(asData(q).action)) })) })
-          : e
+      case 'input.requested': {
+        if (!Array.isArray(d.requests)) return e
+        const requests = d.requests.map(asData)
+        if (!sessionLimitSeen && requests.some(isSessionLimit)) {
+          sessionLimitSeen = true
+          hooks.onSessionLimit?.()
+        }
+        return rewrite(e, { ...d, requests: requests.map(blankRequest) })
+      }
       case 'action.partial':
       case 'action.result': {
         const result = asData(d.result)
@@ -80,6 +121,10 @@ export function createEventFilter(rules: RedactionRules, canary: string): (e: St
       }
       case 'task.settled':
         return d.name === VISIBLE_TOOL ? e : rewrite(e, { ...d, ...('output' in d ? { output: null } : {}), ...blankError(d) })
+      case 'turn.failed':
+      case 'step.failed':
+      case 'session.failed':
+        return rewrite(e, blankFailure(d))
       default:
         return e
     }
@@ -122,9 +167,9 @@ export function filterStream(body: ReadableStream<Uint8Array>, filter: (e: Strea
       const { value, done } = await lines.next()
       if (done) return controller.close()
       if (value.trim() === '') return controller.enqueue(encoder.encode(`${value}\n`))
-      const record = JSON.parse(value) as Record<string, unknown>
-      // `$eve` control records (lease ended) are transport, not events: they pass verbatim.
-      if ('$eve' in record) return controller.enqueue(encoder.encode(`${value}\n`))
+      const record: unknown = JSON.parse(value)
+      // Non-object lines carry no event, and `$eve` control records (lease ended) are transport: both pass verbatim.
+      if (typeof record !== 'object' || record === null || Array.isArray(record) || '$eve' in record) return controller.enqueue(encoder.encode(`${value}\n`))
       controller.enqueue(encoder.encode(`${JSON.stringify(filter(record as unknown as StreamEvent))}\n`))
     },
     async cancel() {

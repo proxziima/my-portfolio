@@ -6,6 +6,12 @@ const rules = { terms: ['Acme Secret'], allow: [] }
 const canary = 'canary-0123456789abcdef'
 const ev = (type: string, data: Record<string, unknown>) => ({ type, data, meta: { id: `evt_${type}`, at: 't' } })
 const step = { turnId: 't', stepIndex: 0, sequence: 1 }
+/** A filter that has seen the step start, as on a stream read from the beginning of the block. */
+const started = (...args: Parameters<typeof createEventFilter>) => {
+  const f = createEventFilter(...args)
+  f(ev('step.started', { ...step, modelId: 'm' }))
+  return f
+}
 
 const streamOf = (chunks: string[]) =>
   new ReadableStream<Uint8Array>({
@@ -17,7 +23,7 @@ const streamOf = (chunks: string[]) =>
 
 describe('createEventFilter', () => {
   it('redacts deltas with holdback and puts the remainder in the completed event', () => {
-    const f = createEventFilter(rules, canary)
+    const f = started(rules, canary)
     const a = f(ev('message.appended', { ...step, messageDelta: 'I worked at Acme ' }))
     const b = f(ev('message.appended', { ...step, messageDelta: 'Secret for years.', sequence: 2 }))
     const c = f(ev('message.completed', { ...step, message: 'I worked at Acme Secret for years.', finishReason: 'stop', sequence: 3 }))
@@ -27,7 +33,7 @@ describe('createEventFilter', () => {
   })
 
   it('emits redacted text once it is past the holdback', () => {
-    const f = createEventFilter(rules, canary)
+    const f = started(rules, canary)
     const long = `${'word '.repeat(30)}Acme Secret ${'tail '.repeat(30)}`
     const out = String(f(ev('message.appended', { ...step, messageDelta: long })).data.messageDelta)
     expect(out.length).toBeGreaterThan(0)
@@ -35,7 +41,7 @@ describe('createEventFilter', () => {
   })
 
   it('replaces a reply containing the canary with the deflection', () => {
-    const f = createEventFilter(rules, canary)
+    const f = started(rules, canary)
     const a = f(ev('message.appended', { ...step, messageDelta: `marker ${canary}` }))
     const c = f(ev('message.completed', { ...step, message: `marker ${canary}`, finishReason: 'stop', sequence: 2 }))
     expect(String(a.data.messageDelta)).not.toContain(canary)
@@ -98,6 +104,55 @@ describe('createEventFilter', () => {
     expect(keep.data.output).toEqual({ a: 1 })
   })
 
+  it('blanks deltas of a block whose step start it did not see, and the completed event carries the redacted text', () => {
+    const f = createEventFilter(rules, canary)
+    const a = f(ev('message.appended', { ...step, messageDelta: `${'word '.repeat(30)}Acme ` }))
+    const b = f(ev('message.appended', { ...step, messageDelta: `Secret ${'tail '.repeat(30)}`, sequence: 2 }))
+    const c = f(ev('message.completed', { ...step, message: 'I worked at Acme Secret for years.', finishReason: 'stop', sequence: 3 }))
+    expect([a.data.messageDelta, b.data.messageDelta]).toEqual(['', ''])
+    expect(c.data.message).toBe('I worked at [redacted] for years.')
+    // The next step starts inside this connection, so its deltas stream normally.
+    f(ev('step.started', { ...step, stepIndex: 1, modelId: 'm' }))
+    expect(f(ev('message.appended', { ...step, stepIndex: 1, messageDelta: 'word '.repeat(40) })).data.messageDelta).not.toBe('')
+  })
+
+  it.each(['turn.failed', 'step.failed', 'session.failed'])('keeps only the code of %s', (type) => {
+    const f = createEventFilter(rules, canary)
+    const full = f(ev(type, { ...step, code: 'model_error', message: 'relation "twin.visitors" does not exist at 10.0.0.1', details: { sql: 'select 1' } }))
+    expect(full.data).toEqual({ ...step, code: 'model_error', message: '', details: undefined })
+    const bare = f(ev(type, { ...step, code: 'model_error', message: 'provider said no' }))
+    expect(bare.data).toEqual({ ...step, code: 'model_error', message: '' })
+    expect('details' in bare.data).toBe(false)
+  })
+
+  it('blanks the prompt and options of a session-limit request, reports it, and keeps other requests', () => {
+    const ended: string[] = []
+    const f = createEventFilter(rules, canary, { onSessionLimit: () => ended.push('x') })
+    const action = { kind: 'tool-call', callId: 'c', toolName: 'eve_session_limit', input: { used: 9 } }
+    const q = f(
+      ev('input.requested', {
+        ...step,
+        requests: [
+          { requestId: 'r1', kind: 'session-limit', prompt: 'Spent $4.20 of $5, continue?', options: [{ id: 'continue', label: 'Continue' }], action },
+          { requestId: 'r2', kind: 'question', prompt: 'Which slot?', options: [{ id: 'a', label: 'A' }], action },
+        ],
+      }),
+    )
+    const [limit, other] = q.data.requests as Record<string, unknown>[]
+    expect(limit).toMatchObject({ requestId: 'r1', kind: 'session-limit', prompt: '', options: [] })
+    expect(other).toMatchObject({ requestId: 'r2', prompt: 'Which slot?', options: [{ id: 'a', label: 'A' }] })
+    expect(ended).toHaveLength(1)
+    f(ev('input.requested', { ...step, requests: [{ requestId: 'r3', kind: 'question', prompt: 'p', action }] }))
+    expect(ended).toHaveLength(1)
+  })
+
+  it('tolerates events without data', () => {
+    const f = createEventFilter(rules, canary)
+    const e = { type: 'session.completed', meta: { id: 'e', at: 't' } } as unknown as Parameters<typeof f>[0]
+    expect(f(e)).toBe(e)
+    expect(f({ ...e, type: 'turn.failed' })).toEqual({ ...e, type: 'turn.failed' })
+  })
+
   it('passes other events through untouched', () => {
     const f = createEventFilter(rules, canary)
     const e = ev('turn.completed', { turnId: 't', sequence: 9 })
@@ -122,5 +177,10 @@ describe('filterStream', () => {
     ])
     const text = await new Response(filterStream(body, createEventFilter(rules, canary))).text()
     expect(text).toBe(`${JSON.stringify(ev('reasoning.appended', { ...step, reasoningDelta: '' }))}\n\n{"$eve":"stream.lease-ended","version":1}\n`)
+  })
+
+  it('passes non-object JSON lines through unchanged', async () => {
+    const text = await new Response(filterStream(streamOf(['null\n42\n"s"\n[1]\n']), createEventFilter(rules, canary))).text()
+    expect(text).toBe('null\n42\n"s"\n[1]\n')
   })
 })

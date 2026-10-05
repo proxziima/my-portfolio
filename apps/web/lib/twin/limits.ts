@@ -8,6 +8,15 @@ export type Refusal = TwinRefusal['kind']
 const startOfUtcDay = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
 
 /**
+ * The per-IP cap on session creates, message-free ones included: a create costs a visitor row, an
+ * eve session and a conversation row, so it is bounded like a message but counted on its own keys.
+ */
+export async function checkCreate(db: TwinDb, c: { ip: string; now: Date }): Promise<Refusal | null> {
+  const [perMinute, perDay] = await Promise.all([hitRateLimit(db, `create:${c.ip}:m`, 60, c.now), hitRateLimit(db, `create:${c.ip}:d`, 86_400, c.now)])
+  return perMinute > TWIN_LIMITS.ipPerMinute || perDay > TWIN_LIMITS.ipPerDay ? 'throttled' : null
+}
+
+/**
  * All per-message guardrails in one place, cheapest first. Each hit is durable (Postgres), so
  * limits survive restarts and apply across instances.
  */
