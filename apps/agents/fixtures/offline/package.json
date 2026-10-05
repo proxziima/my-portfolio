@@ -1,0 +1,11 @@
+{
+  "name": "twin-offline-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "eve eval --strict --junit .eve/junit.xml"
+  },
+  "dependencies": {
+    "eve": "0.71.0"
+  }
+}
