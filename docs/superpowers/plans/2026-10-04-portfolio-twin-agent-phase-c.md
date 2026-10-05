@@ -21,7 +21,7 @@ How this phase is laid out:
 
 **Files:**
 - Modify: `apps/agents/package.json`, `apps/agents/tsconfig.json`, `apps/agents/.gitignore`
-- Delete: `apps/agents/agent/instructions.md` (never committed: scaffold sample; replaced by `instructions.ts` in C4, and eve forbids both). Plain `rm`, nothing to stage.
+- Replace: `apps/agents/agent/instructions.md` with a minimal real first-person instruction. eve 0.71 refuses to compile a root agent without instructions (`discover/required-instructions-missing`), and C4 deletes this file when `instructions.ts` arrives. eve forbids having both.
 - Create: `apps/agents/vitest.config.ts`
 - Create: `apps/agents/agent/lib/models.ts`
 - Modify: `apps/agents/agent/agent.ts`
@@ -124,7 +124,7 @@ describe('modelIds', () => {
 })
 ```
 
-- [ ] **Step 3: Run.** Command: `bun run --cwd apps/agents test`. Expected: FAIL. (The `skills` script fails until C3 creates `scripts/bundle-skills.ts`. Until then, run `bunx --cwd apps/agents vitest run tests/models.test.ts` directly.)
+- [ ] **Step 3: Run.** Command: `bun run --cwd apps/agents test`. Expected: FAIL. (The `skills` script fails until C3 creates `scripts/bundle-skills.ts`. Until then, run `bun run --cwd apps/agents vitest run tests/models.test.ts` directly.)
 
 - [ ] **Step 4: Implement.**
 
@@ -193,7 +193,7 @@ export default defineAgent({
 
 - [ ] **Step 5: Run the test and discovery.**
 
-Run: `bunx --cwd apps/agents vitest run tests/models.test.ts`. Expected: PASS.
+Run: `bun run --cwd apps/agents vitest run tests/models.test.ts`. Expected: PASS.
 Run: `cd apps/agents && WORKFLOW_POSTGRES_URL=postgres://twin:twin@127.0.0.1:5433/twin bunx eve info`.
 Expected: the agent is discovered, the model shows as a runtime entry, and there are no `defaultTools` tools. If eve reports that `retention: 0` is unsupported by the Postgres world, keep it (the docs say it falls back to the world default), and note that in the README in E6.
 
@@ -267,7 +267,7 @@ describe('untrusted', () => {
 })
 ```
 
-- [ ] **Step 2: Run.** Command: `bunx --cwd apps/agents vitest run tests/identity.test.ts tests/untrusted.test.ts`. Expected: FAIL.
+- [ ] **Step 2: Run.** Command: `bun run --cwd apps/agents vitest run tests/identity.test.ts tests/untrusted.test.ts`. Expected: FAIL.
 
 - [ ] **Step 3: Implement.**
 
@@ -718,7 +718,7 @@ metadata:
 
 - [ ] **Step 5: Generate and run.**
 
-Run: `bun run --cwd apps/agents skills && bunx --cwd apps/agents vitest run tests/skills.test.ts tests/bundle-skills.test.ts`
+Run: `bun run --cwd apps/agents skills && bun run --cwd apps/agents vitest run tests/skills.test.ts tests/bundle-skills.test.ts`
 Expected: `agent/lib/skills/generated.ts` is written, and the tests PASS.
 
 - [ ] **Step 6: Commit**
@@ -737,6 +737,7 @@ git commit -m "feat(agents): six versioned skills composed per turn from convers
 - Create: `apps/agents/agent/lib/conversation.ts`
 - Create: `apps/agents/agent/lib/payload-mcp.ts` (the MCP client, also used by C6)
 - Create: `apps/agents/agent/instructions.ts`
+- Delete: `apps/agents/agent/instructions.md` (`git rm`). eve forbids an `.md` and a `.ts` side by side.
 - Create: `apps/agents/agent/hooks/conversation.ts` (`turn.started` part only; C9 and C12 extend it)
 - Test: `apps/agents/tests/state-digest.test.ts`, `apps/agents/tests/grounding.test.ts`
 
