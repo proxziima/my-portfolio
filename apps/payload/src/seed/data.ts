@@ -116,12 +116,6 @@ export const messenger = {
   contact: {
     name: 'Vinicius Queiroz',
     personalMessage: 'building things on the web, one pixel at a time',
-    replies: [
-      { text: 'hey! 👋 thanks for stopping by my desktop' },
-      { text: 'this is the old-school me, scripted for now. a version of me that really answers is on the way' },
-      { text: 'meanwhile, have a look at My Showcase or My Resume, everything I do is in there' },
-      { text: 'brb 🙂' },
-    ],
   },
   whatsNew: [
     { text: 'Vinicius added Messenger to his desktop.', linkLabel: 'See the site', url: '/' },

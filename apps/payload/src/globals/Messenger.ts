@@ -42,19 +42,8 @@ export const Messenger: GlobalConfig = {
     {
       name: 'contact',
       type: 'group',
-      admin: { description: 'The one contact (the owner), listed under Favorites and Friends.' },
-      fields: [
-        ...person('Vinicius Queiroz'),
-        {
-          name: 'replies',
-          type: 'array',
-          required: true,
-          minRows: 1,
-          defaultValue: [{ text: 'hey! 👋' }],
-          admin: { description: "Scripted replies: a visitor's Nth message gets the Nth reply; the last one repeats." },
-          fields: [{ name: 'text', type: 'textarea', required: true }],
-        },
-      ],
+      admin: { description: 'The one contact (the owner). Replies come from the twin agent.' },
+      fields: person('Vinicius Queiroz'),
     },
     {
       name: 'labels',
@@ -69,6 +58,16 @@ export const Messenger: GlobalConfig = {
         requiredText('conversation', '{name} - Conversation', "{name} is replaced by the contact's name."),
         requiredText('send', 'Send'),
         requiredText('listeningTo', 'Listening to:'),
+        requiredText('throttled', "Give me a minute, I'm getting a lot of messages. Try again shortly.", 'Shown when a visitor sends too fast.'),
+        requiredText('tooLong', 'That message is a bit long for me. Could you shorten it?', 'Shown when a message exceeds the length cap.'),
+        requiredText('ended', "I'll stop here for this conversation. Feel free to book a call instead.", 'Shown when a conversation reaches its limits.'),
+        requiredText('offline', "I can't reply right now. Try again in a little while.", 'Shown when the twin is unreachable.'),
+        requiredText('privacy', 'This chat is with an AI version of me. Messages are stored for 90 days, then deleted.', 'Footer of the conversation window.'),
+        requiredText('deleteData', 'Delete my data', 'Footer link that erases this visitor’s conversations.'),
+        requiredText('bookingTitle', 'Schedule a call', 'Title bar of the booking dialog.'),
+        requiredText('yourTime', 'Your time', 'Label before the visitor’s time zone.'),
+        requiredText('myTime', 'My time', 'Label before the owner’s time zone.'),
+        requiredText('bookingNotice', 'Call booked for {time}.', 'System line after a booking; {time} is the visitor’s local time.'),
         {
           name: 'menu',
           type: 'array',
