@@ -192,7 +192,7 @@ export async function findApprovalByCode(db: TwinDb, code: string, now = new Dat
     .select()
     .from(approvals)
     .where(and(eq(approvals.replyCode, code), ne(approvals.status, 'pending'), gt(approvals.decidedAt, new Date(now.getTime() - LATE_REPLY_WINDOW_MS))))
-    .orderBy(desc(approvals.decidedAt))
+    .orderBy(desc(approvals.decidedAt), desc(approvals.id))
     .limit(1)
   return settled ? toRecord(settled) : null
 }
@@ -206,6 +206,8 @@ export async function listPendingApprovals(db: TwinDb): Promise<ApprovalRecord[]
     .select()
     .from(approvals)
     .where(eq(approvals.status, 'pending'))
-    .orderBy(asc(approvals.requestedAt))
+    // requested_at can tie (rows inserted in the same instant), so the id breaks it: a stable order
+    // keeps the help text and the single-pending check deterministic.
+    .orderBy(asc(approvals.requestedAt), asc(approvals.id))
   return rows.map(toRecord)
 }

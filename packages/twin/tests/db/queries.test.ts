@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createTestDb, type TestDb } from '../../src/testing/test-db'
 import {
@@ -209,6 +210,12 @@ describe('approvals', () => {
     const settled = await createApproval(t.db, { ...pending, callId: 'call-4', sourceId: 'knowledge:11' })
     await decideApproval(t.db, settled, { status: 'denied', actor: 'imessage:owner', reasoning: 'no' })
     await setApprovalNotified(t.db, b)
+    // Inserts can share a now() timestamp, so give each row an explicit age instead of trusting insert order.
+    const minute = 60_000
+    const base = new Date('2026-10-05T10:00:00Z').getTime()
+    for (const [i, id] of [a, b, c].entries()) {
+      await t.db.update(schema.approvals).set({ requestedAt: new Date(base + i * minute) }).where(eq(schema.approvals.id, id))
+    }
     expect((await listPendingApprovals(t.db)).map((r) => r.id)).toEqual([a, b, c])
   })
 })
