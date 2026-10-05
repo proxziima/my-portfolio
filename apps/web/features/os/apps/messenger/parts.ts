@@ -20,8 +20,9 @@ export interface MessageLike {
 }
 
 /**
- * Flattens eve messages into the window's lines: visitor and twin text, the booking dialog
- * (the only tool with a visible result), and booking notices rendered as system lines.
+ * Flattens eve messages into the window's lines: visitor text, twin text split into one line per
+ * paragraph (as the owner texts in bursts), the booking dialog (the only tool with a visible
+ * result), and booking notices rendered as system lines.
  */
 export function toLines(messages: readonly MessageLike[]): Line[] {
   const lines: Line[] = []
@@ -31,7 +32,15 @@ export function toLines(messages: readonly MessageLike[]): Line[] {
       if (p.type === 'text' && p.text) {
         const notice = m.role === 'user' ? parseNotice(p.text) : null
         if (notice) lines.push({ kind: 'notice', id, notice })
-        else lines.push({ kind: 'text', id, from: m.role === 'user' ? 'viewer' : 'contact', text: p.text })
+        else if (m.role === 'user') lines.push({ kind: 'text', id, from: 'viewer', text: p.text })
+        else
+          // The twin texts in bursts: each paragraph is its own Messenger line, keyed by its index so
+          // a streaming reply appends lines without re-keying the earlier ones.
+          p.text
+            .split(/\n\s*\n/)
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .forEach((text, n) => lines.push({ kind: 'text', id: `${id}:${n}`, from: 'contact', text }))
       }
       if (p.type === 'dynamic-tool' && p.toolName === 'schedule_call' && p.state === 'output-available') {
         // A refused or absent descriptor renders nothing, as the spec defines.

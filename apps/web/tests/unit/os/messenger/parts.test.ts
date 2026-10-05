@@ -16,6 +16,23 @@ describe('toLines', () => {
     expect(lines[1]).toMatchObject({ from: 'contact', text: 'hey!' })
   })
 
+  it('splits a twin reply into one line per paragraph, with ids stable per paragraph', () => {
+    const lines = toLines([{ id: 'm1', role: 'assistant', parts: [{ type: 'text', text: 'Oi, tudo bom?\n\nTenho sim, pode falar\n\n\nÉ sobre alguma vaga?' }] }])
+    expect(lines).toEqual([
+      { kind: 'text', id: 'm1:0:0', from: 'contact', text: 'Oi, tudo bom?' },
+      { kind: 'text', id: 'm1:0:1', from: 'contact', text: 'Tenho sim, pode falar' },
+      { kind: 'text', id: 'm1:0:2', from: 'contact', text: 'É sobre alguma vaga?' },
+    ])
+  })
+
+  it('keeps single line breaks inside a paragraph and never splits visitor text', () => {
+    const lines = toLines([
+      { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'linha um\n\nlinha dois' }] },
+      { id: 'm1', role: 'assistant', parts: [{ type: 'text', text: 'a\nb' }] },
+    ])
+    expect(lines.map((l) => (l.kind === 'text' ? l.text : null))).toEqual(['linha um\n\nlinha dois', 'a\nb'])
+  })
+
   it('ignores other tools, refused widgets and empty text', () => {
     const lines = toLines([{ id: 'a', role: 'assistant', parts: [{ type: 'text', text: '' }, { type: 'dynamic-tool', toolName: 'schedule_call', toolCallId: 'c', state: 'output-available', input: {}, output: { status: 'refused', reason: 'not_hot' } }, { type: 'dynamic-tool', toolName: 'search_portfolio', toolCallId: 'd', state: 'output-available', input: {}, output: null }] }])
     expect(lines).toEqual([])
