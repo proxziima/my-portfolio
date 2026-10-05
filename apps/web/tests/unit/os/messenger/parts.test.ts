@@ -16,6 +16,39 @@ describe('toLines', () => {
     expect(lines[1]).toMatchObject({ from: 'contact', text: 'hey!' })
   })
 
+  // The model may call schedule_call before it writes; the answer still reads first, the widget last.
+  it("puts a message's booking dialog after its text, whatever the part order, with the same ids", () => {
+    const lines = toLines([
+      { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Como você refatora código legado?' }] },
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          { type: 'dynamic-tool', toolName: 'schedule_call', toolCallId: 'c', state: 'output-available', input: {}, output: rendered },
+          { type: 'text', text: 'Primeiro cubro com testes de caracterização.\n\nDepois extraio por partes.' },
+          { type: 'text', text: 'Se quiser, marca um horário aí embaixo.' },
+        ],
+      },
+      { id: 'u2', role: 'user', parts: [{ type: 'text', text: 'valeu' }] },
+    ])
+    expect(lines.map((l) => [l.kind, l.id])).toEqual([
+      ['text', 'u1:0'],
+      ['text', 'a1:1:0'],
+      ['text', 'a1:1:1'],
+      ['text', 'a1:2:0'],
+      ['booking', 'a1:0'],
+      ['text', 'u2:0'],
+    ])
+  })
+
+  it('keeps the booking dialog last while the text after it streams in', () => {
+    const tool = { type: 'dynamic-tool', toolName: 'schedule_call', toolCallId: 'c', state: 'output-available', input: {}, output: rendered }
+    for (const text of ['', 'Pri', 'Primeiro\n\nDepois']) {
+      const lines = toLines([{ id: 'a1', role: 'assistant', parts: [tool, { type: 'text', text }] }])
+      expect(lines.at(-1)).toMatchObject({ kind: 'booking', id: 'a1:0' })
+    }
+  })
+
   it('splits a twin reply into one line per paragraph, with ids stable per paragraph', () => {
     const lines = toLines([{ id: 'm1', role: 'assistant', parts: [{ type: 'text', text: 'Oi, tudo bom?\n\nTenho sim, pode falar\n\n\nÉ sobre alguma vaga?' }] }])
     expect(lines).toEqual([

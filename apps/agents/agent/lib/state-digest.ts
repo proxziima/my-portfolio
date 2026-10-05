@@ -18,7 +18,9 @@ export function callDirective(s: ConversationState): string {
   if (s.booking.status === 'cancelled') return 'cancelled: the visitor cancelled the booked call. Don’t raise it unless they do.'
   if (s.widgetShown) return 'shown: the booking dialog is already in the chat. Refer to it if relevant; never show it again.'
   if (s.callOfferDeclined) return 'declined: the visitor declined a call. Never offer again unless they explicitly ask.'
-  if (s.intent.tier === 'hot') return 'hot: call schedule_call with trigger hot_tier in this reply and introduce it in one short line.'
+  // Answer first: the dialog closes the reply, never replaces or precedes it (the UI also orders it last).
+  if (s.intent.tier === 'hot')
+    return "hot: answer the visitor's message first, then call schedule_call (trigger hot_tier) as the last action of this reply; introduce it in one short line, never instead of the answer."
   if (s.intent.tier === 'warm') {
     // Keyed to the offer turn, so a replayed step of that turn re-issues the same directive.
     return s.callOfferTurn === null || s.callOfferTurn === s.turnCount
