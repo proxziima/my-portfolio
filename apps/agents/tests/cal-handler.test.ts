@@ -1,0 +1,137 @@
+import { createHmac } from 'node:crypto'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const secret = 'w'.repeat(32)
+
+const mocks = vi.hoisted(() => ({
+  state: { booking: { status: 'none' }, intent: { lastEvaluationId: 'ev1' } } as {
+    booking: { status: string; uid?: string; startTime?: string }
+    intent: { lastEvaluationId: string | null }
+  },
+  failNextUpdate: false,
+  failOutcome: false,
+  upsert: vi.fn(),
+  setOutcome: vi.fn(),
+  send: vi.fn(),
+}))
+
+vi.mock('eve/channels', () => ({
+  defineChannel: (c: unknown) => c,
+  POST: (path: string, handler: unknown) => ({ path, handler }),
+}))
+vi.mock('../agent/lib/db', () => ({ db: () => ({}) }))
+vi.mock('../agent/lib/env', () => ({
+  getEnv: () => ({
+    CAL_WEBHOOK_SECRET: secret,
+    TWIN_BOOKING_REF_SECRET: 'r',
+    TELEGRAM_WEBHOOK_SECRET: 't',
+    TELEGRAM_OWNER_USER_ID: 1,
+  }),
+}))
+vi.mock('../agent/lib/booking-ref', () => ({ verifyBookingRef: () => 'sess1' }))
+vi.mock('../agent/lib/telegram', () => ({
+  answerCallback: vi.fn(),
+  markDecided: vi.fn(),
+  parseCallback: vi.fn(),
+  TelegramUpdate: { safeParse: vi.fn() },
+}))
+vi.mock('@repo/twin/db', () => ({
+  decideApproval: vi.fn(),
+  getApproval: vi.fn(),
+  getConversation: async () => ({ visitorId: 'v', state: mocks.state }),
+  upsertBooking: mocks.upsert,
+  setEvaluationOutcome: mocks.setOutcome,
+  updateConversation: async (_db: unknown, _id: string, update: (s: typeof mocks.state) => typeof mocks.state) => {
+    if (mocks.failNextUpdate) {
+      mocks.failNextUpdate = false
+      throw new Error('db down')
+    }
+    mocks.state = update(mocks.state)
+    return mocks.state
+  },
+}))
+
+import channel from '../agent/channels/webhooks'
+
+type Handler = (req: Request, ctx: unknown) => Promise<Response>
+const route = (channel as unknown as { routes: { path: string; handler: Handler }[] }).routes.find(
+  (r) => r.path === '/webhooks/cal',
+)!.handler
+
+const body = JSON.stringify({
+  triggerEvent: 'BOOKING_CREATED',
+  payload: {
+    uid: 'bk_1',
+    startTime: '2026-10-08T14:00:00Z',
+    endTime: '2026-10-08T14:30:00Z',
+    metadata: { bookingRef: 'abc.def' },
+  },
+})
+
+async function deliver(): Promise<Response> {
+  const req = new Request('http://x/webhooks/cal', {
+    method: 'POST',
+    body,
+    headers: { 'x-cal-signature-256': createHmac('sha256', secret).update(body).digest('hex') },
+  })
+  const waits: Promise<unknown>[] = []
+  const res = await route(req, {
+    attachSession: () => ({ send: mocks.send }),
+    waitUntil: (p: Promise<unknown>) => waits.push(p),
+  })
+  await Promise.all(waits)
+  return res
+}
+
+describe('cal webhook handler redelivery', () => {
+  beforeEach(() => {
+    mocks.state = { booking: { status: 'none' }, intent: { lastEvaluationId: 'ev1' } }
+    mocks.failNextUpdate = false
+    mocks.upsert.mockReset().mockResolvedValue({ previous: null, current: 'confirmed', changed: true })
+    mocks.setOutcome.mockReset().mockResolvedValue(undefined)
+    mocks.send.mockReset().mockResolvedValue({ status: 'accepted' })
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  it('records, sets the outcome and notifies on first delivery', async () => {
+    expect((await deliver()).status).toBe(200)
+    expect(mocks.state.booking).toMatchObject({ status: 'confirmed', uid: 'bk_1' })
+    expect(mocks.setOutcome).toHaveBeenCalledWith({}, 'ev1', 'booked')
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('a redelivery after a failed state update still records and notifies', async () => {
+    mocks.failNextUpdate = true
+    await expect(deliver()).rejects.toThrow('db down')
+    expect(mocks.send).not.toHaveBeenCalled()
+    // Cal.com redelivers: the bookings row is already committed, so the upsert reports no change.
+    mocks.upsert.mockResolvedValue({ previous: 'confirmed', current: 'confirmed', changed: false })
+    expect((await deliver()).status).toBe(200)
+    expect(mocks.state.booking).toMatchObject({ status: 'confirmed', uid: 'bk_1' })
+    expect(mocks.setOutcome).toHaveBeenCalledTimes(1)
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('a redelivery after full success neither sets the outcome nor notifies', async () => {
+    await deliver()
+    mocks.upsert.mockResolvedValue({ previous: 'confirmed', current: 'confirmed', changed: false })
+    expect((await deliver()).status).toBe(200)
+    expect(mocks.setOutcome).toHaveBeenCalledTimes(1)
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failed outcome write does not prevent the notice', async () => {
+    mocks.setOutcome.mockRejectedValue(new Error('outcome down'))
+    expect((await deliver()).status).toBe(200)
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('a late create for a cancelled uid keeps the cancelled status', async () => {
+    mocks.state = { booking: { status: 'cancelled', uid: 'bk_1' }, intent: { lastEvaluationId: 'ev1' } }
+    mocks.upsert.mockResolvedValue({ previous: 'cancelled', current: 'cancelled', changed: false })
+    await deliver()
+    expect(mocks.send).not.toHaveBeenCalled()
+    expect(mocks.state.booking.status).toBe('cancelled')
+  })
+})

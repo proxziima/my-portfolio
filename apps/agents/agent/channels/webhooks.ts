@@ -8,6 +8,7 @@ import {
   upsertBooking,
 } from '@repo/twin/db'
 import { defineChannel, POST } from 'eve/channels'
+import { bookingTransition } from '../lib/booking-transition'
 import { verifyBookingRef } from '../lib/booking-ref'
 import { bookingStatusOf, parseCalWebhook, verifyCalSignature } from '../lib/cal-webhook'
 import { db } from '../lib/db'
@@ -143,26 +144,42 @@ export default defineChannel({
       // A purged conversation can't take a booking.
       if (!(await getConversation(db(), sessionId)))
         return lostCause(`cal booking ${booking.uid} references an unknown session`)
-      const status = bookingStatusOf(booking.trigger)
+      const wanted = bookingStatusOf(booking.trigger)
       const change = await upsertBooking(db(), {
         uid: booking.uid,
         sessionId,
-        status,
+        status: wanted,
         startTime: new Date(booking.startTime),
         endTime: new Date(booking.endTime),
       })
-      // A redelivery, or a late create/reschedule for a cancelled uid, changes nothing: no state
-      // update and no second notice.
-      if (!change.changed) {
-        console.info(`[webhooks] cal ${booking.trigger} ${booking.uid} left booking ${change.current}`)
+      // Cancelled is terminal: a late create/reschedule for a cancelled uid resolves to cancelled.
+      const status = change.current === 'cancelled' ? 'cancelled' : wanted
+      // Idempotency rests on the conversation state, not the bookings row: the row commits first, so
+      // a redelivery after a later step failed sees an unchanged row but a stale state. Decided
+      // inside the locked update, so concurrent deliveries can't both write.
+      let transition = { write: false, notify: false }
+      const state = await updateConversation(db(), sessionId, (s) => {
+        transition = bookingTransition(s.booking, booking.uid, status)
+        return transition.write
+          ? { ...s, booking: { status, uid: booking.uid, startTime: booking.startTime } }
+          : s
+      })
+      if (!transition.notify) {
+        console.info(`[webhooks] cal ${booking.trigger} ${booking.uid} already recorded as ${status}`)
         return new Response('ok')
       }
-      const state = await updateConversation(db(), sessionId, (s) => ({
-        ...s,
-        booking: { status, uid: booking.uid, startTime: booking.startTime },
-      }))
-      if (status === 'confirmed' && state.intent.lastEvaluationId)
-        await setEvaluationOutcome(db(), state.intent.lastEvaluationId, 'booked')
+      // The state is written before the outcome and the notice, so a failure here is never the
+      // reason a redelivery skips them: both are caught and logged, and a failed outcome write
+      // doesn't block the notice. The one gap is the process dying between the state write and the
+      // notice send; a redelivery then finds the state matching and the notice is lost. A notice
+      // that was sent but whose acknowledgement failed is never repeated either.
+      if (status === 'confirmed' && state.intent.lastEvaluationId) {
+        try {
+          await setEvaluationOutcome(db(), state.intent.lastEvaluationId, 'booked')
+        } catch (e) {
+          console.error(`[webhooks] booked outcome for ${sessionId} failed: ${reason(e)}`)
+        }
+      }
       // The booking is recorded either way; the notice only prompts an in-character
       // acknowledgement, so an ended session just misses it.
       waitUntil(
