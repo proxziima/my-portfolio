@@ -25,7 +25,7 @@
   - stage only the listed files;
   - never stage `apps/payload/src/app/(payload)/admin/importMap.js` or the root `package.json`.
 - **Skills:** each skill is `apps/agents/skills/<name>/SKILL.md` plus `skill.ts`. After editing a SKILL.md, `bun run --cwd apps/agents skills` regenerates `apps/agents/agent/lib/skills/generated.ts`. That file is committed; check with `git status`. Bump `metadata.version` exactly as the task says.
-- **Privacy:** never copy anything from `C:\Users\felip\Downloads\chat-tone-training\`. All voice content is given below.
+- **Privacy:** never copy anything from the private chat export (kept outside the repo). All voice content is given below.
 
 ---
 
