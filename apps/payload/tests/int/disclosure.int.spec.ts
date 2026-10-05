@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { disclosureRead } from '@/access/disclosure-read'
-import { DISCLOSURE_TIERS, disclosureField } from '@/fields/disclosure'
+import { DISCLOSURE_TIERS, disclosureField, stricterTier } from '@/fields/disclosure'
 
 const call = (user: unknown) => disclosureRead({ req: { user } } as Parameters<typeof disclosureRead>[0])
 
@@ -16,5 +16,12 @@ describe('disclosure tiers', () => {
 
   it('shows signed-in editors everything', () => {
     expect(call({ id: 1 })).toBe(true)
+  })
+
+  it('combines two tiers into the stricter one', () => {
+    expect(stricterTier('public', 'public')).toBe('public')
+    expect(stricterTier('public', 'restricted')).toBe('restricted')
+    expect(stricterTier('never', 'restricted')).toBe('never')
+    expect(stricterTier('restricted', 'public')).toBe('restricted')
   })
 })

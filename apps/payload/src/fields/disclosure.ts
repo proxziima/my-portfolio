@@ -18,3 +18,7 @@ export const disclosureField = (): SelectField => ({
   ],
   admin: { position: 'sidebar' },
 })
+
+/** The stricter of two tiers: a fact is only as visible as the least visible thing it reveals. */
+export const stricterTier = (a: DisclosureTier, b: DisclosureTier): DisclosureTier =>
+  DISCLOSURE_TIERS[Math.max(DISCLOSURE_TIERS.indexOf(a), DISCLOSURE_TIERS.indexOf(b))]!
