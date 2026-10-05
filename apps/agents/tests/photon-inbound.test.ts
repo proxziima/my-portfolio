@@ -97,6 +97,13 @@ describe('handleOwnerMessage', () => {
     expect(logged).not.toContain(from)
   })
 
+  it.each(['', '   '])('never answers an owner event with no text (%j), which would loop on receipts', async (text) => {
+    m.listPendingApprovals.mockResolvedValue([pending])
+    expect(await handleOwnerMessage(ctx(), msg(text))).toBeNull()
+    noDatabaseCalls()
+    expect(m.post).not.toHaveBeenCalled()
+  })
+
   it('accepts the owner number written another way', async () => {
     m.findApprovalByCode.mockResolvedValue(pending)
     m.decideApproval.mockResolvedValue({ ...pending, status: 'approved', decidedAt: new Date() })

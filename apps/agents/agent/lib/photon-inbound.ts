@@ -27,6 +27,10 @@ const notified = (pending: readonly ApprovalRecord[]) => pending.filter((p) => p
 export async function handleOwnerMessage(ctx: PhotonInboundMessageContext, message: PhotonMessage): Promise<null> {
   const im = integrationConfig(getEnv(), 'imessage')
   if (!im || message.author.isBot || message.author.isMe || !ctx.thread.isDM) return null
+  // Receipts and other events with no text reach onMessage too (the adapter maps unknown content
+  // types to ''); eve's own dispatch skips them (photonInboundContent). Answering them loops: every
+  // reply makes the owner's phone send one back.
+  if (!message.text.trim()) return null
   // The handle itself is never logged: it is the sender's, not ours to keep.
   if (toE164(message.author.userId) !== im.OWNER_PHONE_NUMBER) {
     console.warn('[photon] message from a number other than the owner; ignored')
