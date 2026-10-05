@@ -210,8 +210,10 @@ Fill every required value (see the [Env manifest](#env-manifest)). `eve dev` loa
 ### 4a. The terminal UI
 
 ```bash
-bun run --cwd apps/agents dev                # bun run skills && eve dev
+bun run --cwd apps/agents dev                # bun run skills && eve dev --port 4100 --no-default-extensions
 ```
+
+`--no-default-extensions` keeps eve's bundled dev extensions off. The main one, self-modification, adds a `self-modification__agent` subagent that edits files under `agent/` on request. Visitors reach this same dev server through the Messenger, so the extension would let a chat message rewrite the twin's source. Never remove the flag.
 
 eve's TUI talks to the agent as the `local-dev` principal, which maps to the fixed visitor `00000000-0000-4000-8000-000000000001` (`DEV_VISITOR_ID`), created on demand. Every configured capability runs for real: OpenRouter, the CMS, and whichever of Google, Exa, Cal.com and Telegram are set.
 
