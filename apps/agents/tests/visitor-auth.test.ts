@@ -24,6 +24,12 @@ describe('toVisitorPrincipal', () => {
     expect(p).toEqual({ principalType: 'user', principalId: 'web:7f9c2a50-1d1e-4c1b-9a51-1f2a3b4c5d6e', authenticator: 'twin-web', issuer: 'portfolio-web', subject: '7f9c2a50-1d1e-4c1b-9a51-1f2a3b4c5d6e', attributes: { tz: 'Europe/Lisbon' } })
   })
 
+  it('copies only the tz attribute, dropping any other claim', () => {
+    const base = { principalType: 'service', principalId: 'x:y', authenticator: 'jwt-hmac', issuer: 'portfolio-web', subject: VISITOR } as const
+    expect(toVisitorPrincipal({ ...base, attributes: { tz: 'Europe/Lisbon', role: 'admin' } })?.attributes).toEqual({ tz: 'Europe/Lisbon' })
+    expect(toVisitorPrincipal({ ...base, attributes: { tz: 5 } })?.attributes).toEqual({})
+  })
+
   it('rejects a subject that is not a visitor uuid', () => {
     expect(toVisitorPrincipal({ principalType: 'service', principalId: 'x:y', authenticator: 'jwt-hmac', issuer: 'portfolio-web', subject: 'admin', attributes: {} })).toBeNull()
   })
@@ -33,6 +39,11 @@ describe('visitorAuth', () => {
   it('accepts a BFF-minted token and keeps the tz claim', async () => {
     const p = await visitorAuth(request(mint({ sub: VISITOR, tz: 'Europe/Lisbon' })))
     expect(p).toMatchObject({ principalType: 'user', principalId: `web:${VISITOR}`, attributes: { tz: 'Europe/Lisbon' } })
+  })
+
+  it('drops extra claims such as role', async () => {
+    const p = await visitorAuth(request(mint({ sub: VISITOR, tz: 'Europe/Lisbon', role: 'admin' })))
+    expect(p?.attributes).toEqual({ tz: 'Europe/Lisbon' })
   })
 
   it('skips a missing header, a bad signature, a wrong audience and a non-uuid subject', async () => {

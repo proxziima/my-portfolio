@@ -74,6 +74,8 @@ export const agentsEnvSchema = z.object({
   EXA_API_KEY: z.string().min(1),
   TWIN_APPROVAL_TIMEOUT: z.string().regex(/^\d+(s|m|h)$/).default('15m'),
   TWIN_CLASSIFIER_TIMEOUT_MS: z.coerce.number().int().positive().default(4_000),
+  // Shorter than the intent classifier's: the abuse check is on the critical path before every reply.
+  TWIN_ABUSE_TIMEOUT_MS: z.coerce.number().int().positive().default(1_500),
 })
 export type AgentsEnv = z.infer<typeof agentsEnvSchema>
 

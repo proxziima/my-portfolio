@@ -1,6 +1,6 @@
 import { MockLanguageModelV4 } from 'ai/test'
 import { describe, expect, it, vi } from 'vitest'
-import { AbuseVerdict, classifyAbuse, deflectionContext } from '../agent/lib/abuse'
+import { AbuseVerdict, CONTEXT_NOTE_PREFIX, classifyAbuse, closingContext, deflectionContext } from '../agent/lib/abuse'
 
 const mock = vi.hoisted(() => ({ model: null as unknown }))
 vi.mock('../agent/lib/models', () => ({ classifierModel: () => mock.model }))
@@ -44,8 +44,18 @@ describe('abuse', () => {
     expect(await classifyAbuse('hello', 20)).toBe('ok')
   })
 
-  it('rethrows failures that are not a timeout', async () => {
+  it('fails open and logs when the classifier fails for another reason', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mock.model = new MockLanguageModelV4({ doGenerate: async () => { throw new Error('boom') } })
-    await expect(classifyAbuse('hello', 1_000)).rejects.toThrow('boom')
+    expect(await classifyAbuse('hello', 1_000)).toBe('ok')
+    expect(spy).toHaveBeenCalledWith('[twin] abuse classifier failed', { name: 'Error', message: 'boom' })
+    spy.mockRestore()
+  })
+
+  it('shares the context-note prefix between deflection and closing notes', () => {
+    expect(CONTEXT_NOTE_PREFIX).toBe('[context, not from the visitor]')
+    expect(deflectionContext('harassment', false).startsWith(CONTEXT_NOTE_PREFIX)).toBe(true)
+    expect(closingContext().startsWith(CONTEXT_NOTE_PREFIX)).toBe(true)
+    expect(deflectionContext('spam', true)).toContain(closingContext().slice(CONTEXT_NOTE_PREFIX.length).trim())
   })
 })

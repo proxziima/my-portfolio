@@ -3,7 +3,7 @@ import { updateConversation } from '@repo/twin/db'
 import type { UserContent } from 'ai'
 import { localDev } from 'eve/channels/auth'
 import { defaultEveAuth, eveChannel } from 'eve/channels/eve'
-import { classifyAbuse, deflectionContext } from '../lib/abuse'
+import { classifyAbuse, closingContext, deflectionContext } from '../lib/abuse'
 import { ensureConversation } from '../lib/conversation'
 import { db } from '../lib/db'
 import { getEnv } from '../lib/env'
@@ -26,11 +26,14 @@ export default eveChannel({
   async onMessage(ctx, message) {
     const auth = defaultEveAuth(ctx)
     const sessionId = ctx.eve.sessionId
+    // The web BFF always creates the session without a message and then sends to /session/:id,
+    // so only `eve dev` or direct callers reach this point without a session id and skip the gate.
     if (!sessionId) return { auth }
-    const verdict = await classifyAbuse(textOf(message), getEnv().TWIN_CLASSIFIER_TIMEOUT_MS)
-    if (verdict === 'ok') return { auth }
     // The BFF creates the row for web visitors; `eve dev` sessions may not have one yet.
-    await ensureConversation(sessionId, auth)
+    const current = await ensureConversation(sessionId, auth)
+    if (current.ended) return { auth, context: [closingContext()] }
+    const verdict = await classifyAbuse(textOf(message), getEnv().TWIN_ABUSE_TIMEOUT_MS)
+    if (verdict === 'ok') return { auth }
     const state = await updateConversation(db(), sessionId, (s) => {
       const violations = s.violations + 1
       return { ...s, violations, ended: s.ended || violations >= TWIN_LIMITS.maxViolations }

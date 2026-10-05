@@ -12,7 +12,7 @@ export type VisitorPrincipal = Principal & { issuer?: string; subject?: string }
  */
 export function toVisitorPrincipal(p: VisitorPrincipal): VisitorPrincipal | null {
   if (!p.subject) return null
-  const visitor: VisitorPrincipal = { principalType: 'user', principalId: `web:${p.subject}`, authenticator: 'twin-web', issuer: p.issuer, subject: p.subject, attributes: p.attributes }
+  const visitor: VisitorPrincipal = { principalType: 'user', principalId: `web:${p.subject}`, authenticator: 'twin-web', issuer: p.issuer, subject: p.subject, attributes: typeof p.attributes?.tz === 'string' ? { tz: p.attributes.tz } : {} }
   return visitorIdOf(visitor) ? visitor : null
 }
 
@@ -28,6 +28,7 @@ export const visitorAuth: AuthFn<Request> = async (request) => {
     issuer: 'portfolio-web',
     audiences: ['portfolio-twin'],
     secret: getEnv().TWIN_JWT_SECRET,
+    clockSkewSeconds: 5,
   })
   return result.ok ? toVisitorPrincipal(result.sessionAuth) : null
 }

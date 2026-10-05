@@ -33,6 +33,7 @@ describe('env', () => {
     expect(env.TWIN_MODEL_FALLBACKS).toEqual(['deepseek/deepseek-v4.1-flash'])
     expect(env.TWIN_APPROVAL_TIMEOUT).toBe('15m')
     expect(env.GOOGLE_SERVICE_ACCOUNT_JSON.client_email).toBe('twin@p.iam.gserviceaccount.com')
+    expect(env.TWIN_ABUSE_TIMEOUT_MS).toBe(1_500)
     expect(env.CAL_ORIGIN).toBe('https://cal.com')
   })
 
