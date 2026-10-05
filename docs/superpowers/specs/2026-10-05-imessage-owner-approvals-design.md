@@ -1,35 +1,40 @@
-# Owner approvals over iMessage (Sendblue) instead of Telegram
+# Owner approvals over iMessage (Photon) instead of Telegram
 
-**Status:** approved by the owner's standing instruction to decide gaps without asking (2026-10-05).
+**Status:** approved by the owner on 2026-10-05 ("switch to Photon … use the personal-agent-template as reference … don't invent anything"). This revision replaces the Sendblue design that preceded it on the same branch: Sendblue's free sandbox has no receive webhooks and no outbound sends, so the flow could not run without the $100/month plan, while Photon's free tier covers it.
 **Supersedes:** the Telegram parts of [the twin spec](2026-10-04-portfolio-twin-agent-design.md) §6 (`request_disclosure`, owner approval transport). Everything else there is unchanged: the approval is a durable `task` that races a workflow webhook against `sleep`, the database is the source of truth, and every failure denies.
 
 ## Goal
 
-The owner approves or denies restricted disclosures from iMessage, through Sendblue, instead of Telegram. The integration stays optional: without it the twin works and offers nothing restricted.
+The owner approves or denies restricted disclosures from iMessage, through Photon, instead of Telegram. The integration stays optional: without it the twin works and offers nothing restricted.
 
-## Research summary
+## Sources (read, not recalled)
 
-- **The personal-agent-template reference** reaches iMessage through eve's first-class Photon channel (`eve/channels/photon`). Its `onMessage` normalises the sender's handle to E.164 and maps a known phone number to an identity. A stranger is answered with no access.
-- **eve documents Sendblue** as a Chat SDK integration (`eve add channel/chat-sdk-sendblue`, `chat-adapter-sendblue` 0.2.0, webhook `/eve/v1/sendblue`).
-- **Both are conversational channels.** Every inbound message is dispatched to an agent session. Our approvals are not a conversation with the agent: the owner answers a prompt about *another* session (the visitor's). eve's HITL (`respond`) cannot help either, because it parks and resumes the *requesting* session through *its* channel, which is the visitor's Messenger window.
-- **`chat-adapter-sendblue` 0.2.0 is unsuitable as the approval transport**, from its source:
-  - it compares `sb-signing-secret` with `!==`, which is not constant-time;
-  - it skips verification entirely when no secret is configured;
-  - `createSendblueAdapter()` throws at module evaluation when the env is absent, which breaks optional integrations and eve's build-time module evaluation;
-  - it needs a Chat SDK state store (Redis in production), which we do not run;
-  - it ignores inbound tapbacks.
+- **The reference, `vercel-labs/personal-agent-template`, `agent/channels/photon.ts`.** It reaches iMessage through eve's first-class channel: `photonIMessageChannel` from `eve/channels/photon`. Its `onMessage(_ctx, message)`:
+  - returns `null` for `message.author.isBot`;
+  - normalises `message.author.userId` to E.164 with `asPhoneNumber` ("iMessage handles are phone numbers or Apple IDs; only the former can match a profile");
+  - maps a known number to an identity, and answers anyone else as a stranger with no access.
+  The reference has no owner-approval flow over iMessage: its approvals are eve's in-session tool approvals for the same user.
+- **eve 0.71 docs, `docs/channels/photon.mdx`.** Off Vercel ("Other hosts"), the channel takes lazy `credentials()` returning `{ projectId, projectSecret }` from `IMESSAGE_PROJECT_ID` and `IMESSAGE_PROJECT_SECRET`, and `webhookSecret` from `IMESSAGE_WEBHOOK_SECRET`. `route` overrides the default `/eve/v1/photon`. "Return `null` to ignore a message."
+- **eve 0.71 types and source, `photonIMessageChannel`.** `onMessage(ctx, message)` gets `ctx.thread`, a Chat SDK `Thread`. When it returns `null`, nothing else happens: no read receipt, no agent turn. Chat SDK routes a DM only to the direct-message handler, so each inbound message reaches `onMessage` once. Group messages reach it too, through eve's catch-all pattern handler.
+- **eve 0.71 docs, `docs/patterns/durable-cross-channel-notifications.md`.** "To post a notification without a model call, use the destination platform's API instead." `to(channel, target).send(...)` would start an agent turn, which an approval prompt must not do.
+- **`@photon-ai/chat-adapter-imessage` 3.2.0**, the adapter eve bundles for this channel (`eve/package.json`). It exports `createiMessageAdapter({ credentials })`, whose lazy provider makes construction safe at build time, and the two calls a notification needs:
+  - `openDM(userId)`: "the bot can message a user it has never received from";
+  - `postMessage(threadId, text)`.
+  Sends build the Spectrum app on demand, without the Chat SDK runtime. Webhook deliveries are verified by `X-Spectrum-Signature` (HMAC-SHA256 of `v0:{timestamp}:{rawBody}`) and `X-Spectrum-Timestamp`, with a 5-minute tolerance.
+- **Photon's webhook docs, the `messages` event.** The payload is `{ event, space: { id, platform, type: 'dm' | 'group', phone }, message: { id, direction: 'inbound', timestamp, sender: { id, platform }, content } }`. It carries **no service field (iMessage, SMS or RCS) and no delivery-attempt marker.** Retries keep the same `message.id`. Photon asks for an immediate 2xx and asynchronous processing, which the adapter already does.
+- **Photon free tier:** a shared line pool, up to 10 users, unlimited daily messages. A shared line can only message a number after that number has texted it first. Your conversation keeps one stable number.
 
 ## Decision
 
-Keep the reference's pattern of identity by phone number, and call Sendblue's REST API through the official `sendblue` SDK (3.x) from our existing webhooks channel. This keeps every guarantee the Telegram transport had. No Chat SDK channel and no Photon.
+Inbound is eve's Photon channel, configured exactly as the eve docs and the reference do. Its `onMessage` handles the owner's reply itself, deterministically, then returns `null`. Outbound is the provider API, per eve's cross-channel notification pattern, through the same adapter package eve bundles. The database, reply codes, reply texts and approval workflow from the Sendblue revision are transport-neutral and stay.
 
-| Concern | Telegram (before) | iMessage via Sendblue (after) |
+| Concern | Telegram (before) | iMessage via Photon (after) |
 |---|---|---|
-| Owner prompt | `sendMessage` with inline Approve/Deny buttons | `messages.send` text ending in "Reply YES K7Q2 to share or NO K7Q2 to decline" |
-| Owner answer | `callback_query` tap | an inbound text reply, parsed by a strict grammar |
-| Answer feedback | `answerCallbackQuery` plus `editMessageText` | one short confirmation text ("Approved K7Q2: Compensation") |
-| Webhook auth | `x-telegram-bot-api-secret-token` | `sb-signing-secret` (a shared secret header), compared with `secretsEqual` |
-| Owner identity | `from.id === TELEGRAM_OWNER_USER_ID` | normalised E.164 `from_number === OWNER_PHONE_NUMBER` |
+| Owner prompt | `sendMessage` with inline Approve/Deny buttons | `openDM(owner)`, then `postMessage` with text ending in "Reply YES K7Q2 to share or NO K7Q2 to decline" |
+| Owner answer | `callback_query` tap | an inbound iMessage reply, parsed by a strict grammar in `onMessage` |
+| Answer feedback | `answerCallbackQuery` plus `editMessageText` | one short confirmation through `ctx.thread.post` ("Approved K7Q2: Notice period.") |
+| Webhook auth | `x-telegram-bot-api-secret-token` | the adapter verifies `X-Spectrum-Signature` with `IMESSAGE_WEBHOOK_SECRET` |
+| Owner identity | `from.id === TELEGRAM_OWNER_USER_ID` | `message.author.userId`, normalised to E.164, equals `OWNER_PHONE_NUMBER` |
 | Notified marker | `telegram_message_id` | `notified_at` |
 | Expiry | buttons edited to "Expired" | no message (the prompt states the deadline); a late reply gets "K7Q2 already expired; nothing was shared." |
 
@@ -37,19 +42,16 @@ Keep the reference's pattern of identity by phone number, and call Sendblue's RE
 
 ### Env: the `imessage` integration (replaces `telegram`)
 
-Like every integration, the variables are all or nothing (`INTEGRATIONS` in `packages/twin/src/env.ts`):
+Like every integration, the variables are all or nothing (`INTEGRATIONS` in `packages/twin/src/env.ts`). The names are Photon's, as eve and the adapter read them:
 
 | Variable | Rule | Purpose |
 |---|---|---|
-| `SENDBLUE_API_KEY` | non-empty | `sb-api-key-id` |
-| `SENDBLUE_API_SECRET` | non-empty | `sb-api-secret-key` |
-| `SENDBLUE_FROM_NUMBER` | E.164 | the Sendblue line that texts the owner |
-| `SENDBLUE_WEBHOOK_SECRET` | 16 to 256 characters of `[A-Za-z0-9_-]` | the value Sendblue sends in `sb-signing-secret` |
-| `OWNER_PHONE_NUMBER` | E.164 | the only number whose replies count |
+| `IMESSAGE_PROJECT_ID` | non-empty | Photon (Spectrum Cloud) project id |
+| `IMESSAGE_PROJECT_SECRET` | non-empty | Photon project secret |
+| `IMESSAGE_WEBHOOK_SECRET` | non-empty | the signing secret Photon returns, once, when the webhook is created |
+| `OWNER_PHONE_NUMBER` | E.164 | the only number whose replies count, and the number the prompt is sent to |
 
-Outside the group, `SENDBLUE_API_BASE` defaults to `https://api.sendblue.co`. The offline evals point it at a stub, so it is passed to the SDK as `baseURL`.
-
-### Data: `approvals` (migration 0002)
+### Data: `approvals` (migration 0002, unchanged from the Sendblue revision)
 
 - **Drop `telegram_message_id`.**
 - **Add `notified_at timestamptz`.** It is set once the owner has been texted, and is the idempotency marker for the notify step. `setApprovalNotified` sets it once: a later call does not move it.
@@ -57,77 +59,102 @@ Outside the group, `SENDBLUE_API_BASE` defaults to `https://api.sendblue.co`. Th
   - 4 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, an alphabet with no 0/O or 1/I/L;
   - unique among pending rows through the partial unique index `approvals_pending_code_uq ON (reply_code) WHERE status = 'pending'`;
   - assigned in `createApproval`, which retries with a fresh code on a collision on that index (5 attempts, then it throws).
-- **Add the query `findApprovalByCode(code)`.** It returns the pending row with that code, or the most recent settled row with that code from the last 24 hours, so a late reply gets the right message.
-- **Add the query `listPendingApprovals()`** (all pending rows, oldest first) for bare replies and for the help text.
-- **The migration is generated with drizzle-kit,** like 0000 and 0001. Existing local rows get a backfilled code: 4 hex characters derived from `md5(id)`, which may contain 0 or 1 (the grammar accepts them):
-  - the `NOT NULL` is added after the backfill;
-  - `notified_at` is backfilled only for settled rows that had a Telegram message. A Telegram-era pending row was never texted its iMessage code, so it stays un-notified and can't be answered by a bare reply;
-  - drizzle's generated SQL is edited for the backfill;
-  - a pglite test proves it.
+- **`findApprovalByCode(code)`** returns the pending row with that code, or the most recent settled row with that code from the last 24 hours, so a late reply gets the right message.
+- **`listPendingApprovals()`** returns all pending rows, oldest first. It feeds the help text.
+- **The migration** was generated with drizzle-kit and edited for the backfill. Existing rows get a code of 4 hex characters derived from `md5(id)`. `notified_at` is backfilled only for settled rows that had a Telegram message. A pglite test and a run on a clone of the local Postgres prove it.
 
-### Reply grammar (`agent/lib/imessage-reply.ts`, pure)
+### Reply grammar (`agent/lib/imessage-reply.ts`, pure, unchanged)
 
 The text is trimmed, upper-cased and stripped of trailing punctuation. Then:
 
 - `^(YES|Y|APPROVE|OK) ([A-Z0-9]{4})$` approves the code, and `^(NO|N|DENY) ([A-Z0-9]{4})$` denies it.
-- **A bare `YES`/`NO` fails closed.** It decides only when all of these hold:
-  - exactly one approval is pending in total (notified or not);
-  - that approval has `notified_at`;
-  - Sendblue's `date_sent` on the reply is present and not earlier than `notified_at`.
+- **Only a coded reply decides.** A bare `YES`/`NO`, or anything else, gets the help text: "Reply YES <code> or NO <code>. Waiting: K7Q2 (Notice period).", listing up to 3 notified codes with topics. The Sendblue revision let a bare reply decide when it was unambiguous. Its two guards came from Sendblue's `service` and `date_sent` fields, and Photon's payload has neither. Without them, a bare reply can't be told apart from:
+  - **a spoof.** SMS sender ids can be forged, and a forged bare `YES` would meet exactly the conditions a visitor's own request creates;
+  - **a retried old answer** landing on a newer approval.
+  The code is a secret that only reached the owner, so a coded reply is safe on every path.
+- No AI reads owner texts, so no prompt injection is possible.
 
-  Otherwise the twin replies with the help text, "Reply YES <code> or NO <code>. Waiting: K7Q2 (Notice period).", listing up to 3 notified codes with topics. The rule guards two cases:
-  - **Redelivery.** Sendblue retries on 5xx, so an old bare "yes" can arrive late. It predates the newer prompt's `notified_at` and can't decide it.
-  - **Send before mark.** The prompt is texted before `notified_at` is set. A reply in that window may be about it, so a row not yet marked counts as pending and blocks a bare reply instead of letting it decide something else.
-- Anything else from the owner gets the same help text. No AI is involved, so no prompt injection is possible.
-- **Only iMessage may answer without a code.** Sendblue reports the transport as `service` (`'iMessage' | 'SMS' | 'RCS'`). SMS and RCS sender ids can be spoofed, whereas Apple authenticates iMessage handles, and a spoofed bare `YES` would meet exactly the conditions a visitor's own request creates. So over any service other than `iMessage` (including a missing one), a coded reply is processed as usual (the code reached nobody but the owner), and anything else, bare or unrecognised, is ignored: 200, no reply, one log line without number or content.
+### Inbound: `agent/channels/photon.ts` and `agent/lib/photon-inbound.ts`
 
-### Inbound route `POST /webhooks/sendblue` (agent: routed in `agent/channels/webhooks.ts`, handled in `agent/lib/sendblue-webhook.ts`)
+The channel file follows the reference and eve's "Other hosts" example:
 
-1. The `imessage` integration is off → 404.
-2. `sb-signing-secret` fails `secretsEqual` → 401.
-3. The body fails the zod `SendblueInbound` schema (`content`, `from_number`, `is_outbound`, `status`, `message_handle`, optional `group_id`, `date_sent` and `service`) → acknowledged with 200 and logged by issue paths only.
-4. `is_outbound`, a status other than `RECEIVED`, a group message, or a sender other than `OWNER_PHONE_NUMBER` after normalisation → 200, logged without the number. Strangers are never answered: the reply would cost money and confirm the line is live.
-5. Parse the text. Over a service other than iMessage, a bare or unrecognised reply is ignored here (see the trust rule above). Then pick the approval (by code, or under the bare-reply rule above), then `decideApproval(id, { actor: 'imessage:owner', ... })`, then `planDecision`, then `deliver(webhook)`. `planDecision` is ported from the Telegram version: it takes a status instead of a button tap, returns a `reply` text instead of answer/markText, and has a still-pending branch that answers "Nothing changed. Try again." Then send the confirmation text. Sends are best effort: they are logged, never rethrown.
-6. A transient database failure throws, so the route returns 500 and Sendblue's documented retry on 5xx redelivers. A redelivery of the same decision by the same actor is re-delivered (the existing `planDecision` rule) and gets the same confirmation.
+- `photonIMessageChannel({ credentials, route: '/webhooks/photon', webhookSecret | webhookVerifier, onMessage })`.
+- `credentials()` is lazy, so eve's build-time module evaluation never needs secrets. It returns the project id and secret from the `imessage` integration and throws when the integration is off.
+- `webhookSecret` is `IMESSAGE_WEBHOOK_SECRET`, read when the module loads, as eve's example does. When it is unset, the channel gets `webhookVerifier: () => false`, which rejects every delivery. Without it, eve would fall back to Vercel OIDC, which this self-hosted app does not use.
+- `route: '/webhooks/photon'` keeps the agent's webhooks under one prefix, behind the web forwarder like Cal.com's.
 
-### Outbound (`agent/lib/imessage.ts`, replaces `telegram.ts`)
+`handleOwnerMessage(ctx, message)` in `agent/lib/photon-inbound.ts` always returns `null`, so no agent turn ever starts on this channel:
 
-- **Client.** `new SendblueAPI({ apiKey, apiSecret, baseURL: SENDBLUE_API_BASE, maxRetries: 0, timeout: 10_000 })`. Retries belong to the workflow step, not the SDK.
-- **Function.** `sendToOwner(text)` returns the message handle. The notify step builds the text with `requestText(row, timeout)` (`agent/lib/imessage-reply.ts`) and passes it in. It throws `FatalError` when the integration is not configured, since no retry would make the configuration appear before the approval expires.
-- **Error classes.** `APIError` 400, 401, 403, 404 and 422, and a response body with status `ERROR`, throw `FatalError`, which is permanent: bad credentials, a number Sendblue refuses, or content it rejects. 429, 5xx, timeouts and network errors stay retryable. A network error keeps its `cause`.
-- **Messages never contain the secrets.** Errors are built from the status and Sendblue's `error_message` only.
-- **Prompt text.** It is built from the row only (CMS topic, source id, reply code, timeout), never from the model's reason. This is unchanged from the original spec:
+1. Ignore the message when any of these hold:
+   - the `imessage` integration is off;
+   - `message.author.isBot` (the reference's rule);
+   - `message.author.isMe`;
+   - `ctx.thread.isDM` is false, i.e. a group message.
+2. Ignore it when `toE164(message.author.userId)` isn't `OWNER_PHONE_NUMBER`. This follows the reference's rule that only a phone number can match. Unlike the reference, which answers strangers, the twin never answers them: the line exists for owner approvals, and the twin's public conversation is the web Messenger. One log line is written, without the number.
+3. Parse `message.text`. If the reply is unrecognised or has no code, reply with the help text.
+4. `findApprovalByCode(code)`. If no row matches, reply "No approval ZZZZ is waiting."
+5. Then, in order:
+   - `decideApproval(id, { actor: 'imessage:owner', reasoning: 'Approved via iMessage' | 'Denied via iMessage' })`, which commits first;
+   - `planDecision`;
+   - `deliver(webhook)`;
+   - the confirmation text.
+   Replies go through `ctx.thread.post`, best effort: a failure is logged, never rethrown.
+6. **A database failure** is caught. Photon has already been answered with 200 (the adapter acknowledges before processing), so nothing would redeliver it. The handler logs the failure and replies "That reply could not be recorded. Send it again." If the owner doesn't resend, the approval auto-denies, which is fail-closed.
+7. **A retried delivery** (same `message.id`, or the owner sending the same coded reply twice) is safe to repeat. `decideApproval` only moves a pending row, and `planDecision` re-delivers and re-confirms the owner's own matching decision.
+
+### Outbound: `agent/lib/imessage.ts`
+
+- One lazily built adapter per process: `createiMessageAdapter({ credentials })`, with the same lazy provider as the channel.
+- `sendToOwner(text)`:
+  - **Integration off:** throws `FatalError('iMessage is not configured')`, since no retry would make the configuration appear before the approval expires.
+  - **Otherwise:** it calls `openDM(OWNER_PHONE_NUMBER)`, then `postMessage(threadId, text)`, and returns the sent message id.
+  - **Any adapter error** is rethrown as `Error('Photon send failed', { cause })`. That keeps it retryable by the workflow step: the adapter exposes no classification of permanent errors to build on. Messages never contain secrets.
+- The notify step builds the text with `requestText(row, timeout)` from the row only (CMS topic, source id, reply code, timeout), never from the model's reason:
   `Twin approval request\nTopic: <topic>\nItem: <sourceId>\nReply YES <code> to share or NO <code> to decline. Auto-denies after <timeout>.`
 
 ### Web forwarder
 
-`apps/web/app/api/twin/hooks/[provider]` replaces `telegram` with `sendblue`, forwarding the headers `['content-type', 'sb-signing-secret']`. Register `https://<web>/api/twin/hooks/sendblue` as the Sendblue **receive** webhook, with the same secret.
+`apps/web/app/api/twin/hooks/[provider]` replaces `sendblue` with `photon`. It forwards `content-type`, `x-spectrum-signature`, `x-spectrum-timestamp`, `x-spectrum-event` and `x-spectrum-webhook-id`, and the raw body, to agents `/webhooks/photon`. Register `https://<web>/api/twin/hooks/photon` as the Photon webhook for the `messages` event, and store its signing secret as `IMESSAGE_WEBHOOK_SECRET`.
+
+### Setup (owner)
+
+1. Create a Photon project at app.photon.codes (free tier) and copy the project id and secret.
+2. Create a webhook for `https://<web>/api/twin/hooks/photon` and copy its signing secret. It is shown once.
+3. Set the four variables.
+4. Text the Photon line once from your iPhone. A shared line can only message a number that has texted it first.
+5. Set iPhone Settings > Messages > Send & Receive > "Start New Conversations From" to your phone number. An Apple ID email can't match `OWNER_PHONE_NUMBER`.
 
 ### Unchanged
 
-The tool contract, the caps (3 per session, one per item), the offered-stub check, the 15-minute auto-deny, fail-closed handling, the search filtering when the integration is off (now keyed on `imessage`), and the visitor-facing behaviour.
+The tool contract, the caps (3 per session, one per item), the offered-stub check, the 15-minute auto-deny, fail-closed handling, the search filtering when the integration is off (keyed on `imessage`), and the visitor-facing behaviour.
 
 ## Testing
 
 - **Pure units:**
-  - the reply grammar (every accepted form, rejects, bare-reply ambiguity);
+  - the reply grammar;
   - E.164 normalisation;
-  - the error classification of `sendToOwner`, against a mocked SDK;
-  - `planDecision` with the new actor.
-- **pglite:**
-  - the migration (backfill plus `NOT NULL`);
-  - reply-code uniqueness and retry on a forced collision;
-  - `findApprovalByCode` for pending, recently settled and unknown codes.
-- **Route handler with mocks:**
-  - 404 off, 401 bad secret;
-  - stranger ignored, outbound ignored;
-  - approve, deny, late reply, bare reply with one pending and with two pending, and the bare-reply guards (not yet notified, a reply dated before `notified_at`);
-  - redelivery, and a transient database failure giving 500.
-- **Offline evals:** a Sendblue stub replaces the Telegram stub (it records `/api/send-message` bodies and answers `{ status: 'QUEUED', message_handle }`). No existing eval asserted the Telegram prompt, so none was ported; the prompt text is covered by the unit tests, and the timeout path by `tests/request-disclosure-body.test.ts`.
+  - `planDecision`.
+- **`sendToOwner`, against a mocked adapter module:**
+  - `openDM` gets the owner's number and `postMessage` gets the text;
+  - the credentials provider returns the project's credentials;
+  - an unconfigured integration throws `FatalError` without touching the adapter;
+  - an adapter error is retryable, carries its cause, and leaks no secret.
+- **`handleOwnerMessage`, with a fake thread and mocked queries:**
+  - integration off, a bot, `isMe`, a group, a stranger and an Apple ID are each ignored, with no post and no number in any log;
+  - the owner's number in another format is accepted;
+  - approve, deny, a late reply, an unknown code, and a redelivery that is delivered again and confirmed again;
+  - a bare `yes`, even with exactly one approval pending, gets the help text and decides nothing; so does `maybe`;
+  - a failing post leaves the decision committed;
+  - a database failure is logged and the owner is asked to resend, and the handler doesn't throw;
+  - it always returns `null`.
+- **pglite:** the migration, reply-code uniqueness and retries, `findApprovalByCode`, `listPendingApprovals`. These are unchanged.
+- **The web forwarder:** the photon headers are forwarded, others are dropped, and unknown or prototype-key providers get 404.
+- **`eve info`** registers the photon channel route `/webhooks/photon`.
+- **Offline evals:** Photon speaks gRPC to Spectrum Cloud, so there is no HTTP stub to point it at. The offline and CI evals leave iMessage unconfigured, as the live CI evals already do, and restricted entries are never offered there.
 - **Env tests:** the `imessage` group, plus a half-set group that fails.
 
 ## Out of scope
 
-- Talking to the twin over iMessage (a conversational channel).
-- SMS or RCS fallback: replies over SMS or RCS count only with a code. Bare replies and the help text need iMessage, whose sender is authenticated by Apple.
-- Tapback approvals: the Sendblue webhook docs and the adapter don't document inbound reactions. They can be added later if confirmed.
+- Talking to the twin over iMessage (an agent turn on this channel).
+- Bare YES/NO decisions. They need a sender-authenticity signal and a send time that Photon's webhook doesn't carry. They can return if Photon adds them.
+- Tapback approvals. Reactions reach the adapter, but not `onMessage`.
