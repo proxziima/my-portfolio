@@ -1,3 +1,4 @@
+import { requireIntegration } from '@repo/twin/env'
 import { JWT } from 'google-auth-library'
 import { z } from 'zod'
 import type { BusyInterval } from './availability'
@@ -12,7 +13,7 @@ const FreeBusyResponse = z.object({
  * the calendar is shared with as "See only free/busy" (freeBusyReader). It can't read or write events.
  */
 export async function queryBusy(timeMin: Date, timeMax: Date): Promise<BusyInterval[]> {
-  const env = getEnv()
+  const env = requireIntegration(getEnv(), 'google')
   const client = new JWT({
     email: env.GOOGLE_SERVICE_ACCOUNT_JSON.client_email,
     key: env.GOOGLE_SERVICE_ACCOUNT_JSON.private_key,

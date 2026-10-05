@@ -213,7 +213,7 @@ Fill every required value (see the [Env manifest](#env-manifest)). `eve dev` loa
 bun run --cwd apps/agents dev                # bun run skills && eve dev
 ```
 
-eve's TUI talks to the agent as the `local-dev` principal, which maps to the fixed visitor `00000000-0000-4000-8000-000000000001` (`DEV_VISITOR_ID`), created on demand. Every capability runs for real: OpenRouter, the CMS, Google, Exa, and Telegram if an approval is requested.
+eve's TUI talks to the agent as the `local-dev` principal, which maps to the fixed visitor `00000000-0000-4000-8000-000000000001` (`DEV_VISITOR_ID`), created on demand. Every configured capability runs for real: OpenRouter, the CMS, and whichever of Google, Exa, Cal.com and Telegram are set.
 
 ### 4b. Behind the web BFF
 
@@ -264,20 +264,29 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `CMS_URL` | A, W | required | CMS origin (redaction rules) | `http://cms:3001` in compose (agents) |
 | `PAYLOAD_MCP_URL` | A | required | Payload MCP endpoint | `<cms>/api/mcp` |
 | `PAYLOAD_MCP_API_KEY` | A | required | MCP key with only the three twin tools | CMS admin > MCP > API Keys |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | A | required | base64 JSON key (`client_email`, `private_key`) | Google Cloud > Service accounts > Keys |
-| `GOOGLE_CALENDAR_ID` | A | required | Calendar queried with `freeBusy` | Calendar settings > Integrate calendar |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | A | google integration | base64 JSON key (`client_email`, `private_key`) | Google Cloud > Service accounts > Keys |
+| `GOOGLE_CALENDAR_ID` | A | google integration | Calendar queried with `freeBusy` | Calendar settings > Integrate calendar |
 | `OWNER_TIMEZONE` | A | required, IANA zone | Owner's zone for availability and the dialog | e.g. `America/Sao_Paulo` |
-| `CAL_LINK` | A | required, `<user>/<slug>` | Event the booking dialog embeds | Cal.com event type URL |
+| `CAL_LINK` | A | cal integration, `<user>/<slug>` | Event the booking dialog embeds | Cal.com event type URL |
 | `CAL_ORIGIN` | A | `https://cal.com` | Cal origin (self-hosted only) | – |
 | `CAL_EMBED_SCRIPT_URL` | A | `https://app.cal.com/embed/embed.js` | Embed loader (self-hosted only) | – |
-| `CAL_WEBHOOK_SECRET` | A | required, ≥ 32 chars | Verifies `X-Cal-Signature-256` | Set on the Cal.com webhook |
-| `TWIN_BOOKING_REF_SECRET` | A | required, ≥ 32 chars | Signs the `bookingRef` metadata | `openssl rand -hex 32` |
+| `CAL_WEBHOOK_SECRET` | A | cal integration, ≥ 32 chars | Verifies `X-Cal-Signature-256` | Set on the Cal.com webhook |
+| `TWIN_BOOKING_REF_SECRET` | A | cal integration, ≥ 32 chars | Signs the `bookingRef` metadata | `openssl rand -hex 32` |
 | `TELEGRAM_API_BASE` | A | `https://api.telegram.org` | Bot API base (stubbed in offline evals) | – |
-| `TELEGRAM_BOT_TOKEN` | A | required, `<digits>:<token>` | Sends approvals, edits them, answers taps | @BotFather |
-| `TELEGRAM_WEBHOOK_SECRET` | A | required, 16–256 of `[A-Za-z0-9_-]` | Verifies `X-Telegram-Bot-Api-Secret-Token` | Chosen by you, passed to `setWebhook` |
-| `TELEGRAM_OWNER_USER_ID` | A | required, digits | Owner's chat id; only this user's taps count | @userinfobot |
+| `TELEGRAM_BOT_TOKEN` | A | telegram integration, `<digits>:<token>` | Sends approvals, edits them, answers taps | @BotFather |
+| `TELEGRAM_WEBHOOK_SECRET` | A | telegram integration, 16–256 of `[A-Za-z0-9_-]` | Verifies `X-Telegram-Bot-Api-Secret-Token` | Chosen by you, passed to `setWebhook` |
+| `TELEGRAM_OWNER_USER_ID` | A | telegram integration, digits | Owner's chat id; only this user's taps count | @userinfobot |
 | `TWIN_APPROVAL_TIMEOUT` | A | `15m` (`<n>s/m/h`) | Approval deadline before auto-deny | – |
-| `EXA_API_KEY` | A | required | `web_search` | exa.ai dashboard |
+| `EXA_API_KEY` | A | exa integration | `web_search` | exa.ai dashboard |
+
+**Integrations are optional, each all or nothing** (`INTEGRATIONS` in `packages/twin/src/env.ts`). The twin chats with none of them set. A half-set integration fails at startup and names the missing variables. While one is off:
+
+| Integration | Effect |
+|---|---|
+| `google` | `check_availability` is never offered |
+| `cal` | `schedule_call` is never offered; `/webhooks/cal` answers 404 |
+| `telegram` | searches drop restricted entries before caching, so nothing restricted is offered and `request_disclosure` refuses without contacting anyone; `/webhooks/telegram` answers 404 |
+| `exa` | `web_search` is never offered |
 
 The web BFF reads `webTwinEnvSchema`, from the same file:
 

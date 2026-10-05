@@ -4,7 +4,7 @@ import { approvalKeyboard, markDecided, parseCallback, sendApprovalRequest, Tele
 
 const TOKEN = '123456:SECRET-token_value'
 vi.mock('../agent/lib/env', () => ({
-  getEnv: () => ({ TELEGRAM_API_BASE: 'https://tg.test', TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_OWNER_USER_ID: '42' }),
+  getEnv: () => ({ TELEGRAM_API_BASE: 'https://tg.test', TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_WEBHOOK_SECRET: 'tg_secret_value_1234', TELEGRAM_OWNER_USER_ID: '42' }),
 }))
 
 afterEach(() => vi.unstubAllGlobals())

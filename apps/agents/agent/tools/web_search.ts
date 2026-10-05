@@ -1,5 +1,6 @@
 import { addUnique } from '@repo/twin/contract'
 import { updateConversation } from '@repo/twin/db'
+import { requireIntegration } from '@repo/twin/env'
 import Exa from 'exa-js'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
@@ -15,7 +16,7 @@ const tool = defineTool({
   inputSchema: z.object({ query: z.string().min(3).max(200) }),
   outputSchema: Result,
   async execute({ query }, ctx) {
-    const exa = new Exa(getEnv().EXA_API_KEY)
+    const exa = new Exa(requireIntegration(getEnv(), 'exa').EXA_API_KEY)
     // `searchAndContents` is deprecated in exa-js 2.25; `search` with `contents` is its replacement.
     const res = await exa.search(query, { numResults: 5, contents: { text: { maxCharacters: 600 } } })
     await updateConversation(db(), ctx.session.id, (s) => ({ ...s, toolsUsed: addUnique(s.toolsUsed, 'web_search') }))

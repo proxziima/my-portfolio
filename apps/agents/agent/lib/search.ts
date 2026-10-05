@@ -1,15 +1,23 @@
 import { addUnique, normalizeQuery, TwinSearchResult, type ConversationState } from '@repo/twin/contract'
 import { getCachedSearch, putCachedSearch } from '@repo/twin/db'
+import { integrationConfig } from '@repo/twin/env'
 import { db } from './db'
+import { getEnv } from './env'
 import { callPayloadTool } from './payload-mcp'
 import { untrusted } from './untrusted'
 
-/** Searches the knowledge base through Payload MCP, cached per session and normalised query. */
+/**
+ * Searches the knowledge base through Payload MCP, cached per session and normalised query.
+ * Without Telegram there is no owner to approve a restricted item, so restricted entries are left
+ * out before caching: the model never learns of them, and `request_disclosure`'s offered-stub
+ * check refuses any request without contacting anyone.
+ */
 export async function searchPortfolio(sessionId: string, query: string): Promise<TwinSearchResult> {
   const key = normalizeQuery(query)
   const cached = await getCachedSearch(db(), sessionId, key)
   if (cached !== null) return TwinSearchResult.parse(cached)
-  const result = await callPayloadTool('twinSearch', { query, limit: 6 }, TwinSearchResult)
+  const found = await callPayloadTool('twinSearch', { query, limit: 6 }, TwinSearchResult)
+  const result = integrationConfig(getEnv(), 'telegram') ? found : { ...found, restricted: [] }
   await putCachedSearch(db(), sessionId, key, result)
   return result
 }

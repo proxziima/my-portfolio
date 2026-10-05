@@ -7,6 +7,7 @@ import {
   updateConversation,
   upsertBooking,
 } from '@repo/twin/db'
+import { integrationConfig } from '@repo/twin/env'
 import { defineChannel, POST } from 'eve/channels'
 import { bookingTransition } from '../lib/booking-transition'
 import { verifyBookingRef } from '../lib/booking-ref'
@@ -47,6 +48,9 @@ function lostCause(message: string): Response {
   return new Response('ignored')
 }
 
+/** An unconfigured integration has no webhook: nothing could verify or act on the request. */
+const notConfigured = () => new Response('not found', { status: 404 })
+
 /**
  * Runs a Telegram Bot API call after the decision is committed. A failure is logged, never
  * rethrown: a non-2xx would make Telegram redeliver the same update over and over.
@@ -85,11 +89,12 @@ async function deliver(url: string, approvalId: string, status: string): Promise
 export default defineChannel({
   routes: [
     POST('/webhooks/telegram', async (request) => {
-      const env = getEnv()
+      const telegram = integrationConfig(getEnv(), 'telegram')
+      if (!telegram) return notConfigured()
       if (
         !secretsEqual(
           request.headers.get('x-telegram-bot-api-secret-token'),
-          env.TELEGRAM_WEBHOOK_SECRET,
+          telegram.TELEGRAM_WEBHOOK_SECRET,
         )
       )
         return new Response('unauthorized', { status: 401 })
@@ -101,7 +106,7 @@ export default defineChannel({
       // Anything but a well-formed decision tap (a chat message, a malformed id) is acknowledged.
       const tap = parseCallback(update.data)
       if (!tap) return new Response('ok')
-      if (tap.fromId !== env.TELEGRAM_OWNER_USER_ID) {
+      if (tap.fromId !== telegram.TELEGRAM_OWNER_USER_ID) {
         await bestEffort('answerCallbackQuery', () => answerCallback(tap.queryId, 'Not allowed.'))
         return new Response('ok')
       }
@@ -125,10 +130,11 @@ export default defineChannel({
       return new Response('ok')
     }),
     POST('/webhooks/cal', async (request, { attachSession, waitUntil }) => {
-      const env = getEnv()
+      const cal = integrationConfig(getEnv(), 'cal')
+      if (!cal) return notConfigured()
       const raw = await request.text()
       if (
-        !verifyCalSignature(raw, request.headers.get('x-cal-signature-256'), env.CAL_WEBHOOK_SECRET)
+        !verifyCalSignature(raw, request.headers.get('x-cal-signature-256'), cal.CAL_WEBHOOK_SECRET)
       )
         return new Response('unauthorized', { status: 401 })
       const parsed = parseCalWebhook(json(raw))
@@ -138,7 +144,7 @@ export default defineChannel({
       if (parsed.kind === 'invalid')
         return lostCause(`cal ${parsed.trigger} the twin can't use (${parsed.issues.join(', ')})`)
       const booking = parsed.booking
-      const sessionId = verifyBookingRef(booking.bookingRef, env.TWIN_BOOKING_REF_SECRET)
+      const sessionId = verifyBookingRef(booking.bookingRef, cal.TWIN_BOOKING_REF_SECRET)
       if (!sessionId)
         return lostCause(`cal ${booking.trigger} ${booking.uid} has an invalid or unverifiable booking ref`)
       // A purged conversation can't take a booking.

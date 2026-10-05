@@ -22,6 +22,7 @@ vi.mock('eve/channels', () => ({
 vi.mock('../agent/lib/db', () => ({ db: () => ({}) }))
 vi.mock('../agent/lib/env', () => ({
   getEnv: () => ({
+    CAL_LINK: 'vinicius/intro',
     CAL_WEBHOOK_SECRET: secret,
     TWIN_BOOKING_REF_SECRET: 'r',
     TELEGRAM_WEBHOOK_SECRET: 't',

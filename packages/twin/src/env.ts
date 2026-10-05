@@ -41,8 +41,20 @@ export const MODEL_DEFAULTS = {
   contextTokens: 1_000_000,
 } as const
 
-/** Every variable the agents service reads. Parsed once, lazily, on first use at runtime. */
-export const agentsEnvSchema = z.object({
+/**
+ * Optional integrations and the variables each needs. An integration is configured completely or
+ * not at all: the twin chats without any of them, and a half-set one fails at startup instead of
+ * at the first tool call.
+ */
+export const INTEGRATIONS = {
+  google: ['GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_CALENDAR_ID'],
+  cal: ['CAL_LINK', 'CAL_WEBHOOK_SECRET', 'TWIN_BOOKING_REF_SECRET'],
+  telegram: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET', 'TELEGRAM_OWNER_USER_ID'],
+  exa: ['EXA_API_KEY'],
+} as const
+export type Integration = keyof typeof INTEGRATIONS
+
+const agentsEnvObject = z.object({
   TWIN_DATABASE_URL: z.url(),
   WORKFLOW_POSTGRES_URL: z.url(),
   OPENROUTER_API_KEY: z.string().min(1),
@@ -57,29 +69,64 @@ export const agentsEnvSchema = z.object({
   CMS_URL: z.url(),
   PAYLOAD_MCP_URL: z.url(),
   PAYLOAD_MCP_API_KEY: z.string().min(1),
-  GOOGLE_SERVICE_ACCOUNT_JSON: serviceAccount,
-  GOOGLE_CALENDAR_ID: z.string().min(1),
+  GOOGLE_SERVICE_ACCOUNT_JSON: serviceAccount.optional(),
+  GOOGLE_CALENDAR_ID: z.string().min(1).optional(),
   OWNER_TIMEZONE: timeZone,
   CAL_ORIGIN: z.url().default('https://cal.com'),
   // Official embed loader (cal.com docs: embed snippet); differs for self-hosted Cal.diy.
   CAL_EMBED_SCRIPT_URL: z.url().default('https://app.cal.com/embed/embed.js'),
-  CAL_LINK: z.string().regex(/^[\w-]+\/[\w-]+$/, 'must be "<user>/<event-slug>"'),
-  CAL_WEBHOOK_SECRET: secret,
-  TWIN_BOOKING_REF_SECRET: secret,
+  CAL_LINK: z.string().regex(/^[\w-]+\/[\w-]+$/, 'must be "<user>/<event-slug>"').optional(),
+  CAL_WEBHOOK_SECRET: secret.optional(),
+  TWIN_BOOKING_REF_SECRET: secret.optional(),
   // Bot API base URL; Telegram documents running a local Bot API server, and offline evals use a stub.
   TELEGRAM_API_BASE: z.url().default('https://api.telegram.org'),
-  TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]+$/),
-  TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[\w-]{16,256}$/),
+  TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]+$/).optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[\w-]{16,256}$/).optional(),
   // The owner's numeric user id, used as the private chat id. The owner must /start the bot once
   // first: Telegram refuses messages to users who never did (403), so every approval would expire.
-  TELEGRAM_OWNER_USER_ID: z.string().regex(/^\d+$/),
-  EXA_API_KEY: z.string().min(1),
+  TELEGRAM_OWNER_USER_ID: z.string().regex(/^\d+$/).optional(),
+  EXA_API_KEY: z.string().min(1).optional(),
   TWIN_APPROVAL_TIMEOUT: z.string().regex(/^\d+(s|m|h)$/).default('15m'),
   TWIN_CLASSIFIER_TIMEOUT_MS: z.coerce.number().int().positive().default(4_000),
   // Shorter than the intent classifier's: the abuse check is on the critical path before every reply.
   TWIN_ABUSE_TIMEOUT_MS: z.coerce.number().int().positive().default(1_500),
 })
+
+/** Every variable the agents service reads. Parsed once, lazily, on first use at runtime. */
+export const agentsEnvSchema = agentsEnvObject.superRefine((env, ctx) => {
+  for (const [name, keys] of Object.entries(INTEGRATIONS)) {
+    const set = keys.filter((k) => env[k] !== undefined)
+    if (set.length === 0 || set.length === keys.length) continue
+    for (const k of keys.filter((k) => env[k] === undefined))
+      ctx.addIssue({ code: 'custom', path: [k], message: `required by the ${name} integration because ${set.join(', ')} is set` })
+  }
+})
 export type AgentsEnv = z.infer<typeof agentsEnvSchema>
+
+/** The variables of one integration, all present. */
+export type IntegrationConfig<I extends Integration> = {
+  [K in (typeof INTEGRATIONS)[I][number]]: NonNullable<AgentsEnv[K]>
+}
+
+/** The integration's variables, or null when it isn't configured (the schema rules out half-set). */
+export function integrationConfig<I extends Integration>(
+  env: Pick<AgentsEnv, (typeof INTEGRATIONS)[I][number]>,
+  name: I,
+): IntegrationConfig<I> | null {
+  const keys: readonly (typeof INTEGRATIONS)[I][number][] = INTEGRATIONS[name]
+  if (keys.some((k) => env[k] === undefined)) return null
+  return Object.fromEntries(keys.map((k) => [k, env[k]])) as IntegrationConfig<I>
+}
+
+/** Like `integrationConfig`, for code only reachable when the integration is on (gated tools). */
+export function requireIntegration<I extends Integration>(
+  env: Pick<AgentsEnv, (typeof INTEGRATIONS)[I][number]>,
+  name: I,
+): IntegrationConfig<I> {
+  const config = integrationConfig(env, name)
+  if (!config) throw new Error(`The ${name} integration is not configured`)
+  return config
+}
 
 /** Every variable the web BFF reads (server-only; never NEXT_PUBLIC_). */
 export const webTwinEnvSchema = z.object({

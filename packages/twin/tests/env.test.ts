@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { agentsEnvSchema, blankToUndefined, parseEnv, webTwinEnvSchema } from '../src/env'
+import {
+  agentsEnvSchema,
+  blankToUndefined,
+  INTEGRATIONS,
+  integrationConfig,
+  parseEnv,
+  requireIntegration,
+  webTwinEnvSchema,
+} from '../src/env'
 
 const secret = 'x'.repeat(32)
 const sa = Buffer.from(JSON.stringify({ client_email: 'twin@p.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n' })).toString('base64')
@@ -32,7 +40,7 @@ describe('env', () => {
     const env = parseEnv(agentsEnvSchema, agents)
     expect(env.TWIN_MODEL_FALLBACKS).toEqual(['deepseek/deepseek-v4.1-flash'])
     expect(env.TWIN_APPROVAL_TIMEOUT).toBe('15m')
-    expect(env.GOOGLE_SERVICE_ACCOUNT_JSON.client_email).toBe('twin@p.iam.gserviceaccount.com')
+    expect(requireIntegration(env, 'google').GOOGLE_SERVICE_ACCOUNT_JSON.client_email).toBe('twin@p.iam.gserviceaccount.com')
     expect(env.TWIN_ABUSE_TIMEOUT_MS).toBe(1_500)
     expect(env.CAL_ORIGIN).toBe('https://cal.com')
   })
@@ -59,6 +67,29 @@ describe('env', () => {
 
   it('still rejects an empty required variable', () => {
     expect(() => parseEnv(agentsEnvSchema, { ...agents, CMS_URL: '' })).toThrow(/CMS_URL/)
+  })
+
+  it('parses without any optional integration, each reported as off', () => {
+    const core = Object.fromEntries(
+      Object.entries(agents).filter(([k]) => !Object.values(INTEGRATIONS).flat().some((i) => i === k)),
+    )
+    const env = parseEnv(agentsEnvSchema, core)
+    for (const name of ['google', 'cal', 'telegram', 'exa'] as const) {
+      expect(integrationConfig(env, name)).toBeNull()
+      expect(() => requireIntegration(env, name)).toThrow(`The ${name} integration is not configured`)
+    }
+  })
+
+  it('treats blank integration variables as unset', () => {
+    const env = parseEnv(agentsEnvSchema, { ...agents, EXA_API_KEY: '' })
+    expect(integrationConfig(env, 'exa')).toBeNull()
+    expect(integrationConfig(env, 'cal')?.CAL_LINK).toBe('vinicius/intro')
+  })
+
+  it('rejects a half-configured integration, naming what is missing', () => {
+    expect(() => parseEnv(agentsEnvSchema, { ...agents, TELEGRAM_OWNER_USER_ID: '' })).toThrow(
+      /TELEGRAM_OWNER_USER_ID: required by the telegram integration because TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET is set/,
+    )
   })
 
   it('parses the web BFF env', () => {

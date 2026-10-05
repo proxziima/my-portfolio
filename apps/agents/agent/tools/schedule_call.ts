@@ -1,5 +1,6 @@
 import { addUnique, ScheduleCallResult, ScheduleTrigger } from '@repo/twin/contract'
 import { setEvaluationOutcome, updateConversation } from '@repo/twin/db'
+import { requireIntegration } from '@repo/twin/env'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { signBookingRef } from '../lib/booking-ref'
@@ -15,6 +16,7 @@ const tool = defineTool({
   outputSchema: ScheduleCallResult,
   async execute({ trigger }, ctx): Promise<ScheduleCallResult> {
     const env = getEnv()
+    const cal = requireIntegration(env, 'cal')
     // Decided inside the update so the once-only guard holds under the row lock. A box, not a
     // `let`: TypeScript can't see the callback's assignment and would keep the initial narrowing.
     const outcome: { decision: ScheduleDecision | null } = { decision: null }
@@ -31,8 +33,8 @@ const tool = defineTool({
       status: 'rendered',
       calOrigin: env.CAL_ORIGIN,
       embedScriptUrl: env.CAL_EMBED_SCRIPT_URL,
-      calLink: env.CAL_LINK,
-      bookingRef: signBookingRef(ctx.session.id, env.TWIN_BOOKING_REF_SECRET),
+      calLink: cal.CAL_LINK,
+      bookingRef: signBookingRef(ctx.session.id, cal.TWIN_BOOKING_REF_SECRET),
       ownerTimeZone: env.OWNER_TIMEZONE,
       visitorTimeZone: visitorTimeZoneOf(ctx.session.auth.current as Principal | null),
       prefillName: state.visitor.name,

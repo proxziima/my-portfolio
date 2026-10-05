@@ -1,3 +1,4 @@
+import { requireIntegration } from '@repo/twin/env'
 import { FatalError } from 'workflow'
 import { z } from 'zod'
 import { getEnv } from './env'
@@ -83,11 +84,12 @@ async function bot<T>(
   result: z.ZodType<T>,
 ): Promise<T> {
   const env = getEnv()
+  const token = requireIntegration(env, 'telegram').TELEGRAM_BOT_TOKEN
   const redact = (s: string) =>
-    s.replaceAll(env.TELEGRAM_API_BASE, '<api>').replaceAll(env.TELEGRAM_BOT_TOKEN, '<token>')
+    s.replaceAll(env.TELEGRAM_API_BASE, '<api>').replaceAll(token, '<token>')
   let res: Response
   try {
-    res = await fetch(`${env.TELEGRAM_API_BASE}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
+    res = await fetch(`${env.TELEGRAM_API_BASE}/bot${token}/${method}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -104,11 +106,13 @@ async function bot<T>(
   throw new Error(message)
 }
 
+const ownerChatId = () => requireIntegration(getEnv(), 'telegram').TELEGRAM_OWNER_USER_ID
+
 /** Sends the approval request to the owner; returns the message id to edit later. */
 export async function sendApprovalRequest(approvalId: string, text: string): Promise<number> {
   const msg = await bot(
     'sendMessage',
-    { chat_id: getEnv().TELEGRAM_OWNER_USER_ID, text, reply_markup: approvalKeyboard(approvalId) },
+    { chat_id: ownerChatId(), text, reply_markup: approvalKeyboard(approvalId) },
     z.object({ message_id: z.number() }),
   )
   return msg.message_id
@@ -118,7 +122,7 @@ export async function sendApprovalRequest(approvalId: string, text: string): Pro
 export async function markDecided(messageId: number, text: string): Promise<void> {
   await bot(
     'editMessageText',
-    { chat_id: getEnv().TELEGRAM_OWNER_USER_ID, message_id: messageId, text },
+    { chat_id: ownerChatId(), message_id: messageId, text },
     z.unknown(),
   )
 }
