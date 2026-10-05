@@ -127,15 +127,24 @@ export function toPostView(p: Post, base: string): PostView {
   }
 }
 
-/** The viewer and the contact share their person fields. */
-type CmsPerson = CmsMessenger['viewer'] | CmsMessenger['contact']
-
-const toPerson = (p: CmsPerson, base: string): MessengerPerson => ({
+const toViewer = (p: CmsMessenger['viewer'], base: string): MessengerPerson => ({
   name: p.name,
   status: p.status,
   personalMessage: p.personalMessage?.trim() || undefined,
   listeningTo: p.listeningTo?.trim() || undefined,
   avatar: mediaUrl(p.avatar, base),
+})
+
+/**
+ * The owner as Messenger shows them: name, status message and avatar from Profile, the song from
+ * Messenger. Always available: the twin answers around the clock.
+ */
+const toOwner = (owner: Profile, contact: CmsMessenger['contact'], base: string): MessengerPerson => ({
+  name: owner.name,
+  status: 'available',
+  personalMessage: owner.statusMessage?.trim() || undefined,
+  listeningTo: contact?.listeningTo?.trim() || undefined,
+  avatar: mediaUrl(owner.avatar, base),
 })
 
 const toSpotlight = (s: CmsMessenger['spotlight'], base: string): Spotlight | undefined => {
@@ -144,12 +153,13 @@ const toSpotlight = (s: CmsMessenger['spotlight'], base: string): Spotlight | un
   return { title, text: s.text?.trim() || undefined, href: safeHref(s.url), source: s.source?.trim() || undefined, image: mediaUrl(s.image, base) }
 }
 
-export function toMessenger(m: CmsMessenger, base: string): Messenger {
+/** The Messenger app's content; the contact is the owner's Profile, so it stays in step with the site. */
+export function toMessenger(m: CmsMessenger, owner: Profile, base: string): Messenger {
   return {
     title: m.title,
     shortcut: m.shortcut,
-    viewer: toPerson(m.viewer, base),
-    contact: toPerson(m.contact, base),
+    viewer: toViewer(m.viewer, base),
+    contact: toOwner(owner, m.contact, base),
     labels: { ...m.labels, menu: (m.labels.menu ?? []).map((item) => item.label) },
     whatsNew: (m.whatsNew ?? []).map((w, i) => {
       const href = safeHref(w.url)

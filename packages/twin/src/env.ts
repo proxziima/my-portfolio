@@ -35,10 +35,17 @@ const serviceAccount = z
  * env exists) and must resolve the same ids as the runtime schema.
  */
 export const MODEL_DEFAULTS = {
-  model: 'anthropic/claude-sonnet-5.5',
-  fallbacks: ['deepseek/deepseek-v4.1-flash'],
-  classifier: 'deepseek/deepseek-v4.1-flash',
+  // Cost-driven (2026-10-05): input tokens dominate the bill, and DeepSeek is ~7x cheaper than Sonnet.
+  model: 'deepseek/deepseek-v4.1-flash',
+  fallbacks: ['anthropic/claude-haiku-4.5'],
+  // Benchmarked 2026-10-05 on the gate's prompts: 12/12 correct, p90 under 0.9 s.
+  classifier: 'google/gemini-2.5-flash-lite',
+  classifierFallback: 'mistralai/ministral-8b-2512',
   contextTokens: 1_000_000,
+  light: 'deepseek/deepseek-v4.1-flash',
+  lightContextTokens: 1_000_000,
+  deep: 'anthropic/claude-opus-5.5',
+  deepContextTokens: 1_000_000,
 } as const
 
 /**
@@ -63,6 +70,10 @@ const agentsEnvObject = z.object({
   TWIN_MODEL: z.string().min(1).default(MODEL_DEFAULTS.model),
   TWIN_MODEL_FALLBACKS: csv.default([...MODEL_DEFAULTS.fallbacks]),
   TWIN_MODEL_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.contextTokens),
+  TWIN_MODEL_LIGHT: z.string().min(1).default(MODEL_DEFAULTS.light),
+  TWIN_MODEL_LIGHT_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.lightContextTokens),
+  TWIN_MODEL_DEEP: z.string().min(1).default(MODEL_DEFAULTS.deep),
+  TWIN_MODEL_DEEP_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.deepContextTokens),
   TWIN_CLASSIFIER_MODEL: z.string().min(1).default(MODEL_DEFAULTS.classifier),
   TWIN_JWT_SECRET: secret,
   TWIN_PROMPT_CANARY: z.string().min(16),
@@ -91,7 +102,7 @@ const agentsEnvObject = z.object({
   TWIN_APPROVAL_TIMEOUT: z.string().regex(/^\d+(s|m|h)$/).default('15m'),
   TWIN_CLASSIFIER_TIMEOUT_MS: z.coerce.number().int().positive().default(4_000),
   // Shorter than the intent classifier's: the abuse check is on the critical path before every reply.
-  TWIN_ABUSE_TIMEOUT_MS: z.coerce.number().int().positive().default(1_500),
+  TWIN_ABUSE_TIMEOUT_MS: z.coerce.number().int().positive().default(2_500),
 })
 
 /** Every variable the agents service reads. Parsed once, lazily, on first use at runtime. */

@@ -9,6 +9,10 @@ export type VisitorKind = z.infer<typeof VisitorKind>
 export const KnowledgeCategory = z.enum(['availability', 'compensation', 'logistics', 'background', 'voice', 'other'])
 export type KnowledgeCategory = z.infer<typeof KnowledgeCategory>
 
+/** The model tier a turn runs on: cheap for small talk and deflections, deep for hard technical questions. */
+export const ModelTier = z.enum(['light', 'standard', 'deep'])
+export type ModelTier = z.infer<typeof ModelTier>
+
 export const ApprovalStatus = z.enum(['pending', 'approved', 'denied', 'expired'])
 export type ApprovalStatus = z.infer<typeof ApprovalStatus>
 
@@ -96,6 +100,13 @@ export const ConversationState = z.object({
   approvalDecisions: z.array(ApprovalDecision).default([]),
   violations: z.number().int().nonnegative().default(0),
   ended: z.boolean().default(false),
+  // The tier the current turn runs on; written by the channel when a message arrives, before the turn
+  // starts. A message that steers an open turn rewrites it, so the latest message wins, and the model
+  // follows from the next step on.
+  modelTier: ModelTier.default('standard'),
+  // ISO time the message that decided `modelTier` began classifying. A steered message writes its tier
+  // only if it began no earlier, so classifications that finish out of order can't leave the older one.
+  modelTierAt: z.string().nullable().default(null),
 })
 export type ConversationState = z.infer<typeof ConversationState>
 

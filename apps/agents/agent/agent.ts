@@ -1,15 +1,27 @@
-import { defineAgent } from 'eve'
-import { modelIds, twinModel } from './lib/models'
+import { defineAgent, defineDynamic } from 'eve'
+import { currentTier, tierSelection } from './lib/model-router'
+import { modelIds, tierModel } from './lib/models'
 
-/** The portfolio twin: one root agent, no subagents (spec §11). */
+/** The portfolio twin: one root agent, no subagents (spec §11), with a model tier chosen per turn. */
 export default defineAgent({
   description: 'First-person twin of the portfolio owner for recruiters and clients.',
-  model: twinModel(),
-  // OpenRouter models are not in the AI Gateway catalog, so the window must be explicit. A blank
-  // var counts as absent (Number('') would be 0).
-  modelContextWindowTokens: modelIds(process.env).contextTokens,
+  // The gate picks light, standard or deep before each turn. Each selection carries its own context
+  // window, because a dynamic agent cannot set `modelContextWindowTokens` at the top level.
+  model: defineDynamic({
+    events: {
+      // The channel writes the tier when a message arrives, before its turn starts. A message steered into
+      // an open turn rewrites it (the latest message wins), so the model follows from the next step on.
+      'step.started': async (_event, ctx) => tierSelection(await currentTier(ctx.session.id)),
+    },
+  }),
   reasoning: 'low',
-  compaction: { thresholdPercent: 0.8 },
+  // Summaries always run on the standard tier. Otherwise they would follow whichever tier the turn that
+  // crossed the threshold used, and a light turn would summarize on a 200k window.
+  compaction: {
+    thresholdPercent: 0.8,
+    model: tierModel('standard'),
+    modelContextWindowTokens: modelIds(process.env).tiers.standard.contextTokens,
+  },
   limits: {
     maxInputTokensPerSession: 600_000,
     maxOutputTokensPerSession: 60_000,

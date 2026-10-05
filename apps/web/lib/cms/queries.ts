@@ -18,4 +18,7 @@ export const getPortfolio = cache(async (): Promise<Portfolio> => {
 })
 
 /** The Messenger app's content; only the OS desktop shows it, so only `/os` fetches it. */
-export const getMessenger = cache(async (): Promise<Messenger> => toMessenger(await cmsGlobal<CmsMessenger>('messenger'), cmsBaseUrl()))
+export const getMessenger = cache(async (): Promise<Messenger> => {
+  const [messenger, owner] = await Promise.all([cmsGlobal<CmsMessenger>('messenger'), cmsGlobal<Profile>('profile')])
+  return toMessenger(messenger, owner, cmsBaseUrl())
+})

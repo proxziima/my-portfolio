@@ -1349,7 +1349,14 @@ export interface Profile {
   headlineTail: string;
   email: string;
   location?: string | null;
+  /**
+   * Also your picture in Messenger.
+   */
   avatar?: (number | null) | Media;
+  /**
+   * Shown under your name in Messenger, like an MSN personal message.
+   */
+  statusMessage?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -1469,17 +1476,13 @@ export interface Messenger {
     avatar?: (number | null) | Media;
   };
   /**
-   * The one contact (the owner). Replies come from the twin agent.
+   * The one contact (the owner). Name, status message and avatar come from the Profile global; replies come from the twin agent.
    */
-  contact: {
-    name: string;
-    status: 'available' | 'busy' | 'away' | 'offline';
-    personalMessage?: string | null;
+  contact?: {
     /**
      * A song, shown as "♫ Listening to: …" under the personal message.
      */
     listeningTo?: string | null;
-    avatar?: (number | null) | Media;
   };
   /**
    * The fixed words of the Messenger windows.
@@ -1590,6 +1593,7 @@ export interface ProfileSelect<T extends boolean = true> {
   email?: T;
   location?: T;
   avatar?: T;
+  statusMessage?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
@@ -1688,11 +1692,7 @@ export interface MessengerSelect<T extends boolean = true> {
   contact?:
     | T
     | {
-        name?: T;
-        status?: T;
-        personalMessage?: T;
         listeningTo?: T;
-        avatar?: T;
       };
   labels?:
     | T

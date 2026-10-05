@@ -4,9 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ClientError } from 'eve/client'
 import { useEveAgent } from 'eve/react'
 import { REFUSAL_STATUS, type TwinRefusal } from '@repo/twin/contract'
-import { isParked, toLines, type Line } from './parts'
+import { hasFailed, isParked, toLines, type Line } from './parts'
 
 const SESSION_KEY = 'twin-session'
+
+/**
+ * How long a saved session may stay resuming before the window gives up on it. A healthy resume
+ * catches up in about a second; a session whose run died before publishing anything never does,
+ * because its stream serves no events up to the tail index eve waits for.
+ */
+const RESUME_STALL_MS = 10_000
 
 type Refusal = TwinRefusal['kind']
 
@@ -77,27 +84,35 @@ export function useTwin() {
   const typing = agent.status === 'submitted' || (agent.status === 'streaming' && !isParked(agent.events))
 
   const { send: sendTurn, reset: resetAgent } = agent
+  // Read inside callbacks, which must not be recreated on every status change.
+  const status = useRef(agent.status)
+  status.current = agent.status
+  /** A message sent while the saved session was still resuming, delivered once it settles. */
+  const held = useRef<string | null>(null)
   const reset = useCallback(() => {
     setRefusal(null)
     resetAgent()
   }, [resetAgent])
 
-  // A saved session the server dropped fails every stream open with 404, which would read as
-  // "offline" for good. The first time that happens the window starts a fresh session instead;
-  // after that a 404 is explained like any other failure, so a broken server can never loop us.
+  // A saved session the server dropped (404) or one that failed for good (`session.failed`) would
+  // read as "offline" forever. The first time either happens the window starts a fresh session
+  // instead; after that it is explained like any other failure, so a broken server can't loop us.
   const renewed = useRef(false)
+  /** Starts a fresh session, at most once per window; true when it did. */
+  const renew = useCallback((): boolean => {
+    if (renewed.current) return false
+    renewed.current = true
+    reset()
+    return true
+  }, [reset])
   /** Handles a failed turn; true when it started a fresh session instead of explaining it. */
   const fail = useCallback(
     (error: unknown): boolean => {
-      if (isGone(error) && !renewed.current) {
-        renewed.current = true
-        reset()
-        return true
-      }
+      if (isGone(error) && renew()) return true
       setRefusal(refusalOf(error))
       return false
     },
-    [reset],
+    [renew],
   )
 
   // The last text submitted through `send`, so a first turn whose session turned out to be gone
@@ -124,6 +139,11 @@ export function useTwin() {
       const text = input.trim()
       if (!text) return
       setRefusal(null)
+      // eve rejects a send while it resumes; hold the message until the resume settles or is renewed.
+      if (status.current === 'resuming') {
+        held.current = text
+        return
+      }
       lastSent.current = text
       // A first turn's HTTP failure lands in `agent.error`; a follow-up sent mid-turn rejects instead.
       try {
@@ -139,8 +159,23 @@ export function useTwin() {
     [sendTurn, fail, resend],
   )
 
+  // A failed session never answers the message that was in flight, so it goes to the fresh one.
+  // A saved session found already failed on load renews without resending anything.
+  const failed = hasFailed(agent.events)
   useEffect(() => {
-    if (!agent.error) return
+    if (!failed) return
+    const text = lastSent.current
+    if (!renew()) {
+      setRefusal('offline')
+      return
+    }
+    lastSent.current = null
+    if (text !== null) void resend(text)
+  }, [failed, renew, resend])
+
+  useEffect(() => {
+    // A failed session is handled above, from the stream; its error must not also become a refusal.
+    if (!agent.error || failed) return
     // Read before `fail`: a reset clears the messages.
     const text = lastSent.current
     const owed = text !== null && !acknowledged(messages.current, text) ? text : null
@@ -149,7 +184,25 @@ export function useTwin() {
       lastSent.current = null
       void resend(owed)
     }
-  }, [agent.error, fail, resend])
+  }, [agent.error, failed, fail, resend])
+
+  // A saved session stuck resuming would refuse every message as "offline": start over instead,
+  // under the same at-most-once rule as a 404 or a failed session.
+  useEffect(() => {
+    if (agent.status !== 'resuming') return
+    const timer = setTimeout(() => {
+      if (!renew()) setRefusal('offline')
+    }, RESUME_STALL_MS)
+    return () => clearTimeout(timer)
+  }, [agent.status, renew])
+
+  // Delivers the held message once the session can take it (resumed, or renewed and ready).
+  useEffect(() => {
+    if (agent.status === 'resuming' || held.current === null) return
+    const text = held.current
+    held.current = null
+    void send(text)
+  }, [agent.status, send])
 
   return { lines, typing, refusal, send, reset }
 }

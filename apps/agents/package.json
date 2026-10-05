@@ -10,7 +10,7 @@
   "scripts": {
     "skills": "bun scripts/bundle-skills.ts",
     "build": "bun run skills && eve build",
-    "dev": "bun run skills && eve dev --port 4100",
+    "dev": "bun run skills && eve dev --port 4100 --no-default-extensions",
     "start": "eve start --host 0.0.0.0",
     "world:setup": "bootstrap",
     "info": "bun run skills && eve info",

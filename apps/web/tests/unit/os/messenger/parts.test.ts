@@ -16,6 +16,41 @@ describe('toLines', () => {
     expect(lines[1]).toMatchObject({ from: 'contact', text: 'hey!' })
   })
 
+  it('splits a twin reply into one line per paragraph, with ids stable per paragraph', () => {
+    const lines = toLines([{ id: 'm1', role: 'assistant', parts: [{ type: 'text', text: 'Oi, tudo bom?\n\nTenho sim, pode falar\n\n\nÉ sobre alguma vaga?' }] }])
+    expect(lines).toEqual([
+      { kind: 'text', id: 'm1:0:0', from: 'contact', text: 'Oi, tudo bom?' },
+      { kind: 'text', id: 'm1:0:1', from: 'contact', text: 'Tenho sim, pode falar' },
+      { kind: 'text', id: 'm1:0:2', from: 'contact', text: 'É sobre alguma vaga?' },
+    ])
+  })
+
+  it('keeps line ids prefix-stable and never emits an empty line while a reply streams', () => {
+    const steps = ['Oi', 'Oi\n', 'Oi\n\n', 'Oi\n\nTenho', 'Oi\n\nTenho sim']
+    const idsAt = steps.map((text) => {
+      const lines = toLines([{ id: 'm1', role: 'assistant', parts: [{ type: 'text', text }] }])
+      for (const l of lines) expect(l.kind === 'text' && l.text.trim() !== '').toBe(true)
+      return lines.map((l) => l.id)
+    })
+    // Each step's ids start with the previous step's ids: earlier lines are never re-keyed.
+    idsAt.forEach((ids, i) => {
+      if (i > 0) expect(ids.slice(0, idsAt[i - 1]!.length)).toEqual(idsAt[i - 1])
+    })
+    expect(idsAt[0]).toEqual(['m1:0:0'])
+    expect(idsAt[2]).toEqual(['m1:0:0'])
+    expect(idsAt.at(-1)).toEqual(['m1:0:0', 'm1:0:1'])
+    const last = toLines([{ id: 'm1', role: 'assistant', parts: [{ type: 'text', text: steps.at(-1)! }] }])
+    expect(last.map((l) => (l.kind === 'text' ? l.text : null))).toEqual(['Oi', 'Tenho sim'])
+  })
+
+  it('keeps single line breaks inside a paragraph and never splits visitor text', () => {
+    const lines = toLines([
+      { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'linha um\n\nlinha dois' }] },
+      { id: 'm1', role: 'assistant', parts: [{ type: 'text', text: 'a\nb' }] },
+    ])
+    expect(lines.map((l) => (l.kind === 'text' ? l.text : null))).toEqual(['linha um\n\nlinha dois', 'a\nb'])
+  })
+
   it('ignores other tools, refused widgets and empty text', () => {
     const lines = toLines([{ id: 'a', role: 'assistant', parts: [{ type: 'text', text: '' }, { type: 'dynamic-tool', toolName: 'schedule_call', toolCallId: 'c', state: 'output-available', input: {}, output: { status: 'refused', reason: 'not_hot' } }, { type: 'dynamic-tool', toolName: 'search_portfolio', toolCallId: 'd', state: 'output-available', input: {}, output: null }] }])
     expect(lines).toEqual([])

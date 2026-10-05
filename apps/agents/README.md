@@ -23,7 +23,7 @@ A first-person "twin" of the portfolio owner that answers recruiters and clients
 What has been checked:
 
 - **Unit tests pass locally:** `apps/agents` has 33 files and 197 tests, `packages/twin` has 11 files and 77 tests, and `apps/web` has 65 files and 416 tests, at the commit that last updated these counts.
-- **The offline evals pass against local Postgres (`twin_eval`):** 4 evals and 18 gates, with the scripted model and local stubs, at the same commit.
+- **The offline evals pass against local Postgres (`twin_eval`):** 5 evals and 20 gates, with the scripted model and local stubs, at the same commit.
 - **The approval timeout has no offline eval.** It is proven by `tests/request-disclosure-body.test.ts` (the real workflow body, `workflow` mocked) plus the step tests in `tests/approval-steps.test.ts`; `eve build` proves the body compiles. See [Where the code differs from the spec](#where-the-code-differs-from-the-spec).
 - **CI has the jobs listed under [Testing](#testing).** No CI run result has been reviewed for this README.
 
@@ -211,8 +211,10 @@ Fill every required value (see the [Env manifest](#env-manifest)). `eve dev` loa
 ### 4a. The terminal UI
 
 ```bash
-bun run --cwd apps/agents dev                # bun run skills && eve dev
+bun run --cwd apps/agents dev                # bun run skills && eve dev --port 4100 --no-default-extensions
 ```
+
+`--no-default-extensions` keeps eve's bundled dev extensions off. The main one, self-modification, adds a `self-modification__agent` subagent that edits files under `agent/` on request. Visitors reach this same dev server through the Messenger, so the extension would let a chat message rewrite the twin's source. Never remove the flag.
 
 eve's TUI talks to the agent as the `local-dev` principal, which maps to the fixed visitor `00000000-0000-4000-8000-000000000001` (`DEV_VISITOR_ID`), created on demand. Every configured capability runs for real: OpenRouter, the CMS, and whichever of Google, Exa, Cal.com and iMessage are set.
 
@@ -252,12 +254,16 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `TWIN_DATABASE_URL` | A, W | required | Twin schema (state, approvals, ledger, limits) | Postgres; same DB for web and agents |
 | `WORKFLOW_POSTGRES_URL` | A | required | eve's durable Workflow world | Postgres (same DB is fine) |
 | `OPENROUTER_API_KEY` | A | required | Model and classifier calls | OpenRouter > Keys (set a credit limit) |
-| `TWIN_MODEL` | A | `anthropic/claude-sonnet-5.5` | Primary model | OpenRouter model id |
-| `TWIN_MODEL_FALLBACKS` | A | `deepseek/deepseek-v4.1-flash` | Comma list, OpenRouter `models` fallback chain | OpenRouter model ids |
-| `TWIN_MODEL_CONTEXT_TOKENS` | A | `1000000` | `modelContextWindowTokens` (not in eve's catalog) | The primary model's context window |
-| `TWIN_CLASSIFIER_MODEL` | A | `deepseek/deepseek-v4.1-flash` | Abuse gate and intent label | OpenRouter model id |
+| `TWIN_MODEL` | A | `deepseek/deepseek-v4.1-flash` | Primary (standard tier) model | OpenRouter model id |
+| `TWIN_MODEL_FALLBACKS` | A | `anthropic/claude-haiku-4.5` | Comma list, OpenRouter `models` fallback chain | OpenRouter model ids |
+| `TWIN_MODEL_CONTEXT_TOKENS` | A | `1000000` | Context window of the standard tier (not in eve's catalog) | The primary model's context window |
+| `TWIN_MODEL_LIGHT` | A | `deepseek/deepseek-v4.1-flash` | Light tier: greetings, small talk, logistics, deflections | OpenRouter model id |
+| `TWIN_MODEL_LIGHT_CONTEXT_TOKENS` | A | `1000000` | Context window of the light tier | The light model's context window |
+| `TWIN_MODEL_DEEP` | A | `anthropic/claude-opus-5.5` | Deep tier: in-depth technical questions | OpenRouter model id |
+| `TWIN_MODEL_DEEP_CONTEXT_TOKENS` | A | `1000000` | Context window of the deep tier | The deep model's context window |
+| `TWIN_CLASSIFIER_MODEL` | A | `google/gemini-2.5-flash-lite` (falls back to `mistralai/ministral-8b-2512`) | Pre-turn gate (abuse, scope, depth) and intent label; pick a model that answers in well under the gate timeout | OpenRouter model id |
 | `TWIN_CLASSIFIER_TIMEOUT_MS` | A | `4000` | Intent label timeout (post-reply) | – |
-| `TWIN_ABUSE_TIMEOUT_MS` | A | `1500` | Abuse gate timeout (pre-dispatch, fails open) | – |
+| `TWIN_ABUSE_TIMEOUT_MS` | A | `2500` | Pre-turn gate timeout (fails open to `ok`/`standard`) | – |
 | `TWIN_JWT_SECRET` | A, W | required, ≥ 32 chars | HS256 key of the 60 s visitor JWT | `openssl rand -hex 32` |
 | `TWIN_PROMPT_CANARY` | A, W | required, ≥ 16 chars | Prompt marker the BFF blocks | `openssl rand -hex 16` |
 | `TWIN_STABLE_KEY_SECRET` | A | required, ≥ 32 chars | HMAC of a volunteered email (returning visitors) | `openssl rand -hex 32` |
@@ -477,18 +483,39 @@ Change a weight, update its comment, and run `tests/intent.test.ts`.
 
 ### Model and classifiers
 
-**The chat model.** `twinModel()` uses `@openrouter/ai-sdk-provider`:
+**The chat model.** `tierModel(tier)` uses `@openrouter/ai-sdk-provider`; `twinModel()` is the standard tier (see [Model routing](#model-routing)):
 
-- **The model** is `TWIN_MODEL`, with OpenRouter's `models` routing set to `[TWIN_MODEL, ...TWIN_MODEL_FALLBACKS]`. That is how it fails over on provider errors, rate limits and downtime: eve has no fallback list of its own.
+- **The model** is `TWIN_MODEL` (standard tier), with OpenRouter's `models` routing set to `[TWIN_MODEL, ...TWIN_MODEL_FALLBACKS]`. That is how it fails over on provider errors, rate limits and downtime: eve has no fallback list of its own.
 - **Data collection:** `provider.data_collection: 'deny'`.
 - **Cost:** `usage.include: true`, so OpenRouter reports the cost.
 - **Token limits:** each session is limited to 600k input and 60k output tokens. When a session reaches them, eve asks for more budget with a `session-limit` request. The BFF hides that request and ends the conversation.
 
-**The classifier model** (`TWIN_CLASSIFIER_MODEL`) has no fallback chain and does two jobs:
+#### Model routing
 
-- **The abuse gate** runs in `onMessage`, before dispatch, with `TWIN_ABUSE_TIMEOUT_MS` (1.5 s). **It fails open:**
-  - A timeout yields `ok` silently.
-  - Any other failure yields `ok` and logs `[twin] abuse classifier failed`. eve turns an `onMessage` throw into HTTP 500 for every visitor, so the gate must not throw.
+Each turn runs on the cheapest model that answers it well. The tier is chosen before the turn starts and applied by `agent/agent.ts`.
+
+| Tier | Default model | Window | Used for |
+| --- | --- | --- | --- |
+| `light` | `deepseek/deepseek-v4.1-flash` | 1M | Greetings, small talk, thanks, logistics, simple facts; every off-scope or abusive message; the closing turn of an ended conversation |
+| `standard` | `deepseek/deepseek-v4.1-flash` (`TWIN_MODEL`) | 1M | Explaining the owner's work, projects, experience and opinions |
+| `deep` | `anthropic/claude-opus-5.5` | 1M | Architecture, system design, trade-offs, debugging reasoning, and short follow-ups inside such a thread |
+
+- **How the tier is chosen.** The abuse gate's single classifier call returns `{ verdict, depth }`. It sees the previous exchange (from `recentTurns`, 600 characters each) to judge depth only. The message and the exchange are fenced in `<message>` and `<previous>` tags, with angle brackets stripped from the visitor's text, and the system prompt calls their content data to classify, never instructions. The channel writes `modelTier` to the conversation state: `light` whenever the verdict is not `ok`, otherwise the classifier's `depth`. `agent.ts` sets `model` to `defineDynamic` with a `step.started` handler. It reads `modelTier` with `currentTier` and returns `tierSelection(tier)`: the OpenRouter model, its context window and its reasoning effort (`low`, `low`, `medium`). The channel stamps each write with when the message began classifying (`modelTierAt`) and, under the row lock, writes only if no later message has already written, so classifications that finish out of order can't leave the older tier. With `steer`, a message sent mid-turn rewrites the tier and the model follows from the next step on: the latest message wins, and a turn's steps are not guaranteed to share one model.
+- **Fallbacks.** Each tier fails over through the tiers below it, then `TWIN_MODEL_FALLBACKS`, de-duplicated: deep is `[deep, standard, ...fallbacks]`, standard is `[standard, ...fallbacks]`, light is `[light, ...fallbacks]`. A classifier timeout or failure gives `{ ok, standard }`, and a failed tier read gives `standard`: both are the behaviour before routing.
+- **Compaction** summarizes on the standard tier with its explicit window (`compaction.model` and `compaction.modelContextWindowTokens`), whichever tier the turn ran on.
+- **Why not eve's `auto()`:**
+  - It cannot carry a context window, and OpenRouter models are not in the AI Gateway catalog, so every routed turn would fail for lack of window metadata.
+  - It assumes Vercel AI Gateway and a paid evaluator, and the API is experimental.
+  - It adds a model call per turn, when the gate already runs one.
+- **Model ids stay server-side.** eve's `step.started` events carry `modelId`; the web filter (`apps/web/lib/twin/filter.ts`) blanks it, because the boundaries forbid revealing models and the id would reveal the tier.
+- **Prompt cache.** Changing model between turns loses the provider's prompt cache. Conversations are short, so the cost is small.
+- **Live eval.** `evals/skills/routing/routing.eval.ts` (tags `live`, `routing`) asserts the `modelId` of each turn's `step.started` events.
+
+**The classifier model** (`TWIN_CLASSIFIER_MODEL`) has one fallback, `mistralai/ministral-8b-2512`, through OpenRouter `models`, for a provider outage. It does two jobs:
+
+- **The abuse gate** runs in `onMessage`, before dispatch, with `TWIN_ABUSE_TIMEOUT_MS` (2.5 s). **It fails open:**
+  - A timeout yields `ok` on the `standard` tier, silently.
+  - Any other failure yields `ok` on the `standard` tier and logs `[twin] abuse classifier failed`. eve turns an `onMessage` throw into HTTP 500 for every visitor, so the gate must not throw.
   - A non-`ok` verdict adds a context note that makes the model deflect once, in character. The conversation ends after 3 violations.
   - `prompt_attack` is counted, not blocked: `boundaries` handles it.
 - **The intent label** runs after the reply (`TWIN_CLASSIFIER_TIMEOUT_MS`, 4 s), so it never adds time-to-first-token. Its failures leave the label `null`.
@@ -623,13 +650,13 @@ How the agent handles a delivery:
 
 Put the key in `PAYLOAD_MCP_API_KEY`.
 
-**Disclosure tiers.** Every portfolio collection (`experiences`, `projects`, `content`, `disciplines`) and **Twin knowledge** (`knowledge`) has a `disclosure` field:
+**Disclosure tiers.** Every portfolio collection (`experiences`, `projects`, `content`, `disciplines`) and the **Knowledge base** (`knowledge`, under **Context** in the admin) has a `disclosure` field:
 
 - `public`: the twin may share it;
 - `restricted`: it needs the owner's approval in each conversation;
 - `never`: the twin never sees it.
 
-**Fill in Twin knowledge:**
+**Fill in the Knowledge base:**
 
 - **Facts that aren't portfolio entries:** notice period, rates policy, relocation, work authorisation, preferences. Use the categories `availability`, `compensation`, `logistics`, `background` or `other`, and write each answer in the first person. Restricted `availability` and `compensation` requests feed call intent.
 - **`voice` samples:** 3–5 real pieces of the owner's writing, `public`. Up to 5 `voice` entries, in `order`, ground the twin's tone.
@@ -666,12 +693,12 @@ Put the key in `PAYLOAD_MCP_API_KEY`.
 
 **Offline evals** (`fixtures/offline/`). This is a separate eve app:
 
-- **The model** is a scripted `mockModel` with keyword-driven paths: `BOOK`, `PUSH`, `NO`, `FACT`.
+- **The model** is a scripted `mockModel` with keyword-driven paths (`BOOK`, `PUSH`, `NO`, `FACT`), one per routing tier, picked per step by the real `currentTier` through `defineDynamic`.
 - **The channels and tools** re-export the real ones from `agent/`.
 - **A stub** for Payload MCP (`:4310`) starts in the eval setup. Photon has none (it is gRPC, with no HTTP stub), so the fixture leaves iMessage unconfigured: restricted entries are never offered there.
 - **The database** is the real Postgres world on `twin_eval`.
 
-The evals cover widget guards, decline, portfolio search and the Cal.com booking webhook. **`request_disclosure` is not in the fixture**, because eve compiles workflow directives only under the app root. Its body is proven by `tests/request-disclosure-body.test.ts` instead, which runs it uncompiled with `workflow` mocked: approved, denied, deadline to expired, notification failure, failed release and an item the session was never offered.
+The evals cover widget guards, decline, portfolio search, the Cal.com booking webhook and the dynamic model resolver (the fixture's gate times out by design, so every step must start on the standard mock). **`request_disclosure` is not in the fixture**, because eve compiles workflow directives only under the app root. Its body is proven by `tests/request-disclosure-body.test.ts` instead, which runs it uncompiled with `workflow` mocked: approved, denied, deadline to expired, notification failure, failed release and an item the session was never offered.
 
 ```bash
 export TWIN_DATABASE_URL=postgres://twin:twin@127.0.0.1:5433/twin_eval WORKFLOW_POSTGRES_URL=postgres://twin:twin@127.0.0.1:5433/twin_eval
@@ -745,5 +772,5 @@ The `checks` job runs on every push to `main`/`develop` and on every PR:
 - **Hook and instrumentation files.** The spec's `hooks/intent.ts`, `hooks/transcript.ts` and `hooks/usage.ts` are `agent/hooks/conversation.ts` (turn bookkeeping, transcript and the post-reply intent evaluation) and `agent/instrumentation/spend.ts` (the spend ledger).
 - **No CI migration-drift check.** CI applies the committed twin migrations (`db:migrate`), and the `live-evals` job's throwaway CMS applies Payload's committed ones, but nothing fails when the Drizzle schema or the Payload config has changes without a generated migration.
 - **Classifier calls are not in the spend ledger.** The abuse gate and the intent label call `generateText` directly, outside eve's instrumentation, so their cost never reaches `twin.spend_ledger` and the daily cap undercounts by that much. The OpenRouter key's credit limit still covers them.
-- **The abuse gate adds latency.** It runs before dispatch, so every message waits up to `TWIN_ABUSE_TIMEOUT_MS` (1.5 s by default) before the model call starts: time-to-first-token grows by the classifier's latency.
+- **The abuse gate adds latency.** It runs before dispatch, so every message waits up to `TWIN_ABUSE_TIMEOUT_MS` (2.5 s by default) before the model call starts: time-to-first-token grows by the classifier's latency.
 - **`request_disclosure` takes `{ sourceId, reason }`.** The spec's model-supplied topic is gone: the topic shown to the owner and stored on the approval comes from the CMS stub this session's search listed, and a `sourceId` the session was never offered as restricted is denied.

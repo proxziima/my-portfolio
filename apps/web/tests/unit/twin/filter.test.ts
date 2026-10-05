@@ -184,6 +184,53 @@ describe('createEventFilter', () => {
     expect('providerMetadata' in without.data).toBe(false)
   })
 
+  it('blanks the model id (and model) on step.started, so visitors never see which model or tier ran', () => {
+    const f = createEventFilter(rules, canary)
+    const out = f(ev('step.started', { ...step, modelId: 'anthropic/claude-opus-5.5', model: 'opus' }))
+    expect(out.type).toBe('step.started')
+    expect(out.data).toEqual({ ...step, modelId: undefined, model: undefined })
+    expect(JSON.stringify(out)).not.toMatch(/claude|opus|anthropic/)
+    // Keys absent from the original stay absent.
+    const bare = f(ev('step.started', { ...step, stepIndex: 1, modelId: 'anthropic/claude-haiku-4.5' }))
+    expect('model' in bare.data).toBe(false)
+    expect('modelId' in bare.data).toBe(true)
+    expect(f(ev('step.started', { ...step, stepIndex: 2 })).data).toEqual({ ...step, stepIndex: 2 })
+  })
+
+  it.each(['compaction.requested', 'compaction.completed', 'step.completed', 'turn.waiting', 'some.future.event'])('blanks the model id on %s, whatever the event type', (type) => {
+    const f = createEventFilter(rules, canary)
+    const out = f(ev(type, { ...step, sessionId: 's', modelId: 'anthropic/claude-opus-5.5', model: 'opus' }))
+    expect(out.type).toBe(type)
+    expect(out.data).toMatchObject({ ...step, sessionId: 's' })
+    expect(out.data.modelId).toBeUndefined()
+    expect(out.data.model).toBeUndefined()
+    expect(JSON.stringify(out)).not.toMatch(/claude|opus|anthropic/)
+  })
+
+  it('blanks the model id in untyped records and through the NDJSON stream', async () => {
+    const meta = { id: 'e', at: 't' }
+    const lines = [
+      { type: 'compaction.requested', data: { ...step, modelId: 'anthropic/claude-opus-5.5', sessionId: 's', usageInputTokens: 9 }, meta },
+      { type: 7, data: { modelId: 'anthropic/claude-opus-5.5', keep: 1 } },
+    ].map((r) => `${JSON.stringify(r)}
+`)
+    const out = await new Response(filterStream(streamOf(lines), createEventFilter(rules, canary))).text()
+    expect(out).not.toMatch(/claude|opus|anthropic/)
+    expect(out).toContain('"keep":1')
+  })
+
+  it('still tracks a step whose model id was blanked: its deltas stream', () => {
+    const f = createEventFilter(rules, canary)
+    f(ev('step.started', { ...step, modelId: 'anthropic/claude-sonnet-5.5' }))
+    expect(f(ev('message.appended', { ...step, messageDelta: 'word '.repeat(40) })).data.messageDelta).not.toBe('')
+  })
+
+  it('leaves events other than step.started unchanged by the model id rule', () => {
+    const f = createEventFilter(rules, canary)
+    const turn = ev('turn.started', { turnId: 't', sequence: 1 })
+    expect(f(turn)).toEqual(turn)
+  })
+
   it('blanks deltas of a block whose step start it did not see, and the completed event carries the redacted text', () => {
     const f = createEventFilter(rules, canary)
     const a = f(ev('message.appended', { ...step, messageDelta: `${'word '.repeat(30)}Acme ` }))

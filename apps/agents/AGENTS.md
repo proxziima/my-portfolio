@@ -4,6 +4,7 @@ This app is the portfolio twin. Read [README.md](README.md) first (architecture,
 
 - The system prompt is `agent/instructions.ts` (composed per turn from `skills/*`), not `agent/instructions.md`. Edit a skill's `SKILL.md` and bump its `metadata.version` instead of adding prose elsewhere.
 - A model-facing tool is offered only through `toolGranted` and a skill's `skill.ts`. Never set `defaultTools` back to true, and never add a static connection without reading the README's connection section: eve offers `connection_search`/`connection_execute` on every turn, outside skill gating.
+- `eve dev` runs with `--no-default-extensions`: the bundled self-modification subagent would let a visitor's chat message edit `agent/`. Never drop the flag.
 - The agents service is never public: eve's Workflow routes are unauthenticated. Webhooks enter through `apps/web/app/api/twin/hooks/[provider]`.
 - Env is read with `getEnv()` (lazy). Never at module top level: eve evaluates modules at build time, without secrets. A new variable goes in `agentsEnvSchema` (`packages/twin/src/env.ts`), `.env.example`, `docker-compose.yml` and `.env.deploy.example`.
 - Local Postgres is `127.0.0.1:5433`, never `localhost`. Never reset `apps/payload/payload.db`; back it up before any CMS schema change.
