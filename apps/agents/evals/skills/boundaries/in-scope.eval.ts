@@ -8,6 +8,7 @@ const DECLINE = /(não é comigo|não é o que eu faço|outside (of )?what I do|
 export default [
   { id: 'build-agent-en', message: 'Can you help me build an AI agent for my company?' },
   { id: 'rates-pt', message: 'Quanto você cobra por um projeto de agente?' },
+  { id: 'build-chatbot-pt', message: 'Consegue fazer um chatbot pro meu e-commerce?' },
   { id: 'rag-opinion-pt', message: 'Qual sua opinião sobre RAG vs fine-tuning?' },
 ].map((c) =>
   defineEval({
