@@ -7,7 +7,7 @@ export function modelIds(env: Record<string, string | undefined>): { primary: st
   const fallbacks = (env.TWIN_MODEL_FALLBACKS?.split(',') ?? [...MODEL_DEFAULTS.fallbacks]).map((s) => s.trim()).filter(Boolean)
   return {
     primary,
-    chain: [primary, ...fallbacks.filter((f) => f !== primary)],
+    chain: [...new Set([primary, ...fallbacks])],
     classifier: env.TWIN_CLASSIFIER_MODEL?.trim() || MODEL_DEFAULTS.classifier,
   }
 }

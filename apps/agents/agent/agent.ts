@@ -6,8 +6,9 @@ import { twinModel } from './lib/models'
 export default defineAgent({
   description: 'First-person twin of the portfolio owner for recruiters and clients.',
   model: twinModel(),
-  // OpenRouter models are not in the AI Gateway catalog, so the window must be explicit.
-  modelContextWindowTokens: Number(process.env.TWIN_MODEL_CONTEXT_TOKENS ?? MODEL_DEFAULTS.contextTokens),
+  // OpenRouter models are not in the AI Gateway catalog, so the window must be explicit. An empty
+  // var counts as absent (Number('') would be 0).
+  modelContextWindowTokens: Number(process.env.TWIN_MODEL_CONTEXT_TOKENS || MODEL_DEFAULTS.contextTokens),
   reasoning: 'low',
   compaction: { thresholdPercent: 0.8 },
   limits: {

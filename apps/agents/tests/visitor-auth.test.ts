@@ -27,7 +27,7 @@ describe('toVisitorPrincipal', () => {
   it('copies only the tz attribute, dropping any other claim', () => {
     const base = { principalType: 'service', principalId: 'x:y', authenticator: 'jwt-hmac', issuer: 'portfolio-web', subject: VISITOR } as const
     expect(toVisitorPrincipal({ ...base, attributes: { tz: 'Europe/Lisbon', role: 'admin' } })?.attributes).toEqual({ tz: 'Europe/Lisbon' })
-    expect(toVisitorPrincipal({ ...base, attributes: { tz: 5 } })?.attributes).toEqual({})
+    expect(toVisitorPrincipal({ ...base, attributes: { tz: 5 } as unknown as Record<string, string> })?.attributes).toEqual({})
   })
 
   it('rejects a subject that is not a visitor uuid', () => {

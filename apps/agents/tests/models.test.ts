@@ -11,4 +11,8 @@ describe('modelIds', () => {
     expect(ids.chain).toEqual(['a/b', 'c/d'])
     expect(ids.classifier).toBe('e/f')
   })
+
+  it('dedupes repeated fallbacks', () => {
+    expect(modelIds({ TWIN_MODEL: 'a/b', TWIN_MODEL_FALLBACKS: 'c/d, c/d,a/b, e/f' }).chain).toEqual(['a/b', 'c/d', 'e/f'])
+  })
 })

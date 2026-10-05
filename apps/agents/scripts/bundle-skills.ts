@@ -14,7 +14,8 @@ export interface SkillFile {
 
 /** Parses the subset of YAML frontmatter eve reads: `description` and `metadata.version`. */
 export function parseSkillFile(name: string, source: string): SkillFile {
-  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(source)
+  // Windows checkouts may carry CRLF; normalise first so the body never keeps stray carriage returns.
+  const m = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(source.replace(/\r\n/g, '\n'))
   if (!m) throw new Error(`${name}: SKILL.md needs YAML frontmatter`)
   const front = m[1] ?? ''
   const description = /^description:\s*(.+)$/m.exec(front)?.[1]?.trim()

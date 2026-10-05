@@ -7,6 +7,11 @@ describe('parseSkillFile', () => {
     expect(f).toEqual({ name: 'x', description: 'Does X.', version: '1.2.0', body: '# X\n\nBody.' })
   })
 
+  it('normalises CRLF line endings (Windows checkouts)', () => {
+    const f = parseSkillFile('x', '---\r\ndescription: Does X.\r\nmetadata:\r\n  version: "1.2.0"\r\n---\r\n# X\r\n\r\nBody.\r\n')
+    expect(f).toEqual({ name: 'x', description: 'Does X.', version: '1.2.0', body: '# X\n\nBody.' })
+  })
+
   it('rejects a skill without a semver version', () => {
     expect(() => parseSkillFile('x', '---\ndescription: d\n---\nbody')).toThrow(/version/)
   })
