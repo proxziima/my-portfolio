@@ -27,7 +27,7 @@ export async function countTurn(sessionId: string, turnId: string): Promise<void
   await updateConversation(db(), sessionId, (s) => (s.lastTurnId === turnId ? s : { ...s, turnCount: s.turnCount + 1, lastTurnId: turnId }))
 }
 
-/** Session-scoped grounding: who I am and how I write, as untrusted data from the CMS. */
+/** Grounding (who I am and how I write) as untrusted CMS data; rendered per turn, cached per process. */
 export function groundingBlock(id: TwinIdentity, key: string): string {
   const facts = [
     `name: ${id.name}`,
