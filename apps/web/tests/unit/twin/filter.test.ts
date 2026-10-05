@@ -138,6 +138,23 @@ describe('createEventFilter', () => {
     expect(compaction.data.usageInputTokens).toBeNull()
   })
 
+  it('strips provider metadata (OpenRouter usage and cost) from any event, only where the key exists', () => {
+    const f = createEventFilter(rules, canary)
+    const providerMetadata = { openrouter: { usage: { cost: 0.0123, promptTokens: 10 }, provider: 'Anthropic' } }
+    for (const [type, data] of [
+      ['step.completed', { ...step, finishReason: 'stop', providerMetadata }],
+      ['turn.waiting', { on: 'input', sequence: 1, turnId: 't', providerMetadata }],
+    ] as const) {
+      const out = f(ev(type, data))
+      expect(out.type).toBe(type)
+      expect('providerMetadata' in out.data).toBe(true)
+      expect(out.data.providerMetadata).toBeUndefined()
+      expect(JSON.stringify(out)).not.toMatch(/openrouter|cost/)
+    }
+    const without = f(ev('step.completed', { ...step, finishReason: 'stop' }))
+    expect('providerMetadata' in without.data).toBe(false)
+  })
+
   it('blanks deltas of a block whose step start it did not see, and the completed event carries the redacted text', () => {
     const f = createEventFilter(rules, canary)
     const a = f(ev('message.appended', { ...step, messageDelta: `${'word '.repeat(30)}Acme ` }))

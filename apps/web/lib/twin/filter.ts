@@ -139,15 +139,22 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
 
 /**
  * Token counts and spend (`usage` on `session.waiting`, `turn.waiting`, `session.completed`,
- * `session.failed`, `step.completed`; `usageInputTokens` on `compaction.requested`) are the
- * operator's business. Only keys present on the original are touched, so no shape changes.
+ * `session.failed`, `step.completed`; `usageInputTokens` on `compaction.requested`;
+ * `providerMetadata` on `step.completed`, which carries OpenRouter usage and cost) are the
+ * operator's business. Stripped from any event that has the key. Only keys present on the original
+ * are touched, so no shape changes.
  */
 function stripUsage(e: StreamEvent): StreamEvent {
   const d = e.data
-  if (!('usage' in d) && !('usageInputTokens' in d)) return e
+  if (!('usage' in d) && !('usageInputTokens' in d) && !('providerMetadata' in d)) return e
   return {
     ...e,
-    data: { ...d, ...('usage' in d ? { usage: undefined } : {}), ...('usageInputTokens' in d ? { usageInputTokens: null } : {}) },
+    data: {
+      ...d,
+      ...('usage' in d ? { usage: undefined } : {}),
+      ...('usageInputTokens' in d ? { usageInputTokens: null } : {}),
+      ...('providerMetadata' in d ? { providerMetadata: undefined } : {}),
+    },
   }
 }
 
