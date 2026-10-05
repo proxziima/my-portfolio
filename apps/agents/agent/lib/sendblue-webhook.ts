@@ -19,6 +19,8 @@ const SendblueInbound = z.object({
   message_handle: z.string(),
   group_id: z.string().nullish(),
   date_sent: z.string().nullish(),
+  /** `'iMessage' | 'SMS' | 'RCS'`. */
+  service: z.string().nullish(),
 })
 
 const ok = () => new Response('ok')
@@ -38,7 +40,7 @@ const reply = (text: string) => bestEffort('sendblue reply', async () => void (a
 /**
  * The owner's iMessage replies to approval requests, forwarded by the web app. Verifies the
  * shared `sb-signing-secret`, accepts only the owner's number, and parses the text with a strict
- * grammar (no model reads it). Strangers are never answered: a reply costs money and confirms
+ * grammar (no model reads it). Over SMS or RCS only a coded reply counts. Strangers are never answered: a reply costs money and confirms
  * the line is live. Unusable events are acknowledged (2xx), since Sendblue retries only on 5xx; a
  * database failure throws, so Sendblue redelivers.
  */
@@ -60,6 +62,16 @@ export async function handleSendblueWebhook(request: Request): Promise<Response>
     return ok()
   }
   const answer = parseOwnerReply(msg.content ?? '')
+  // SMS and RCS sender ids can be spoofed; only Apple authenticates iMessage handles. A spoofed
+  // bare "YES" would meet the very preconditions a visitor's own request creates, so over any
+  // other service only a coded reply counts (the code reached nobody but the owner), and
+  // everything else is dropped without a reply, which would cost money and reach the spoofed number's owner.
+  if (msg.service !== 'iMessage' && (answer.kind === 'unrecognised' || !answer.code)) {
+    // The service is echoed only when known: it comes from a possibly spoofed sender.
+    const over = msg.service === 'SMS' || msg.service === 'RCS' ? msg.service : 'unknown service'
+    console.warn(`[webhooks] sendblue bare or unrecognised reply over ${over} ignored; only iMessage may answer without a code`)
+    return ok()
+  }
   if (answer.kind === 'unrecognised') {
     await reply(helpText(notified(await listPendingApprovals(db()))))
     return ok()

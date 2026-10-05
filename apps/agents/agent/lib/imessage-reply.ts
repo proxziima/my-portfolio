@@ -17,7 +17,7 @@ export function parseOwnerReply(text: string): OwnerReply {
   return /^[A-Z0-9]{4}$/.test(code) ? { kind: 'decision', status, code } : { kind: 'unrecognised' }
 }
 
-/** The approval prompt, built from the stored row only (never the model's reason; spec §8). */
+/** The approval prompt, built from the stored row only (never the model's reason; spec §6). */
 export function requestText(row: { topic: string; sourceId: string; replyCode: string }, timeout: string): string {
   return `Twin approval request\nTopic: ${row.topic}\nItem: ${row.sourceId}\nReply YES ${row.replyCode} to share or NO ${row.replyCode} to decline. Auto-denies after ${timeout}.`
 }

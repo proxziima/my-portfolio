@@ -1,6 +1,13 @@
-import { deliveryOutcome } from './owner-decision'
-
 const DELIVERY_TIMEOUT_MS = 10_000
+
+/**
+ * How a POST to the workflow webhook went. eve answers 404 once the hook is no longer pending
+ * (the run already settled and ended), which means there is nothing left to wake.
+ */
+export function deliveryOutcome(httpStatus: number): 'delivered' | 'gone' | 'failed' {
+  if (httpStatus >= 200 && httpStatus < 300) return 'delivered'
+  return httpStatus === 404 ? 'gone' : 'failed'
+}
 
 /** The message of a caught value, for logs (never the value itself, which may hold data). */
 export const reason = (e: unknown) => (e instanceof Error ? e.message : 'unknown error')

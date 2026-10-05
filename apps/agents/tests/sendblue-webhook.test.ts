@@ -269,6 +269,48 @@ describe('handleSendblueWebhook', () => {
     expect(m.send).toHaveBeenCalledWith('Nothing is waiting for approval.')
   })
 
+  describe('over a service whose sender can be spoofed', () => {
+    // An undefined service is dropped by JSON.stringify, i.e. the field is missing from the body.
+    const over = (service: string | undefined, content: string) => ({ ...inbound(content), service })
+
+    it.each(['SMS', 'RCS', undefined])('ignores a bare yes over %s without answering', async (service) => {
+      m.listPendingApprovals.mockResolvedValue([pending])
+      m.decideApproval.mockResolvedValue({ ...pending, status: 'approved', decidedAt: new Date() })
+      const res = await handleSendblueWebhook(req(over(service, 'yes')))
+      expect(res.status).toBe(200)
+      noDatabaseCalls()
+      expect(m.deliver).not.toHaveBeenCalled()
+      expect(m.send).not.toHaveBeenCalled()
+    })
+
+    it('ignores unrecognised text over SMS without answering', async () => {
+      m.listPendingApprovals.mockResolvedValue([pending])
+      const res = await handleSendblueWebhook(req(over('SMS', 'maybe')))
+      expect(res.status).toBe(200)
+      noDatabaseCalls()
+      expect(m.send).not.toHaveBeenCalled()
+    })
+
+    it('logs one line that names the service but never the number or the content', async () => {
+      await handleSendblueWebhook(req(over('SMS', 'secret words')))
+      const logged = [warn, error, log, info].flatMap((spy) => spy.mock.calls.flat())
+      expect(logged).toHaveLength(1)
+      expect(String(logged[0])).toContain('SMS')
+      expect(String(logged[0])).not.toContain('secret words')
+      expect(String(logged[0])).not.toContain('99999')
+    })
+
+    it('still decides a coded reply over SMS and confirms it, since the code only reached the owner', async () => {
+      m.findApprovalByCode.mockResolvedValue(pending)
+      m.decideApproval.mockResolvedValue({ ...pending, status: 'approved', decidedAt: new Date() })
+      const res = await handleSendblueWebhook(req(over('SMS', 'YES K7Q2')))
+      expect(res.status).toBe(200)
+      expect(m.decideApproval).toHaveBeenCalledWith(expect.anything(), 'ap-1', expect.objectContaining({ status: 'approved' }))
+      expect(m.deliver).toHaveBeenCalledWith('https://hook', 'ap-1', 'approved')
+      expect(m.send).toHaveBeenCalledWith('Approved K7Q2: Notice period.')
+    })
+  })
+
   it('still decides a coded reply without a send date', async () => {
     m.findApprovalByCode.mockResolvedValue(pending)
     m.decideApproval.mockResolvedValue({ ...pending, status: 'approved', decidedAt: new Date() })

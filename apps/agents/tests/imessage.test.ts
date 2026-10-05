@@ -5,7 +5,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const API_KEY = 'sb-key-VALUE'
 const API_SECRET = 'sb-secret-VALUE'
 
-const m = vi.hoisted(() => ({ send: vi.fn(), options: [] as unknown[] }))
+const IMESSAGE_ENV = {
+  SENDBLUE_API_BASE: 'https://sb.test',
+  SENDBLUE_API_KEY: 'sb-key-VALUE',
+  SENDBLUE_API_SECRET: 'sb-secret-VALUE',
+  SENDBLUE_FROM_NUMBER: '+15550000001',
+  SENDBLUE_WEBHOOK_SECRET: 'sb_secret_value_1234',
+  OWNER_PHONE_NUMBER: '+5511999998888',
+}
+
+const m = vi.hoisted(() => ({ send: vi.fn(), options: [] as unknown[], env: {} as Record<string, unknown> }))
 vi.mock('sendblue', async (importOriginal) => {
   const actual = await importOriginal<typeof import('sendblue')>()
   class FakeClient {
@@ -16,25 +25,25 @@ vi.mock('sendblue', async (importOriginal) => {
   }
   return { ...actual, default: FakeClient }
 })
-vi.mock('../agent/lib/env', () => ({
-  getEnv: () => ({
-    SENDBLUE_API_BASE: 'https://sb.test',
-    SENDBLUE_API_KEY: 'sb-key-VALUE',
-    SENDBLUE_API_SECRET: 'sb-secret-VALUE',
-    SENDBLUE_FROM_NUMBER: '+15550000001',
-    SENDBLUE_WEBHOOK_SECRET: 'sb_secret_value_1234',
-    OWNER_PHONE_NUMBER: '+5511999998888',
-  }),
-}))
+vi.mock('../agent/lib/env', () => ({ getEnv: () => m.env }))
 
 const { sendToOwner } = await import('../agent/lib/imessage')
 
 beforeEach(() => {
   m.send.mockReset()
   m.options.length = 0
+  m.env = IMESSAGE_ENV
 })
 
 describe('sendToOwner', () => {
+  it('fails permanently when iMessage is not configured, so the workflow step does not retry', async () => {
+    m.env = { SENDBLUE_API_BASE: 'https://sb.test' }
+    const err = await sendToOwner('x').catch((e: unknown) => e)
+    expect(FatalError.is(err)).toBe(true)
+    expect(String(err)).toContain('iMessage is not configured')
+    expect(m.send).not.toHaveBeenCalled()
+  })
+
   it('texts the owner from the Sendblue line with SDK retries off and a timeout', async () => {
     m.send.mockResolvedValue({ status: 'QUEUED', message_handle: 'h-1' })
     expect(await sendToOwner('hello')).toBe('h-1')

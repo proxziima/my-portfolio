@@ -47,12 +47,3 @@ export function planDecision(
     error: stored.webhookUrl ? null : noHook(stored.id),
   }
 }
-
-/**
- * How a POST to the workflow webhook went. eve answers 404 once the hook is no longer pending
- * (the run already settled and ended), which means there is nothing left to wake.
- */
-export function deliveryOutcome(httpStatus: number): 'delivered' | 'gone' | 'failed' {
-  if (httpStatus >= 200 && httpStatus < 300) return 'delivered'
-  return httpStatus === 404 ? 'gone' : 'failed'
-}

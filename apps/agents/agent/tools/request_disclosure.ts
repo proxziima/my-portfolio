@@ -15,7 +15,7 @@ import { disclosureForModel } from '../lib/disclosure'
 import { untrustedKey } from '../lib/untrusted'
 
 /**
- * Durable, asynchronous owner approval for restricted items (spec §8). A `task`, so the
+ * Durable, asynchronous owner approval for restricted items (spec §6). A `task`, so the
  * conversation continues; a webhook race against `sleep` is eve's documented deadline pattern.
  * Static, as workflow tools can't be dynamic; the portfolio-recall skill (always active) owns it.
  *

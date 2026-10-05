@@ -1,4 +1,4 @@
-import { requireIntegration } from '@repo/twin/env'
+import { integrationConfig } from '@repo/twin/env'
 import SendblueAPI, { APIConnectionTimeoutError, APIError } from 'sendblue'
 import { FatalError } from 'workflow'
 import { getEnv } from './env'
@@ -10,12 +10,14 @@ const PERMANENT = new Set([400, 401, 403, 404, 422])
 /**
  * Texts the owner from the Sendblue line and returns Sendblue's message handle. SDK retries are
  * off: the calling workflow step owns retries. Permanent failures throw `FatalError` so the step
- * doesn't retry them; 429, 5xx, timeouts and network errors stay retryable. Error messages carry
+ * doesn't retry them (so does an unconfigured integration); 429, 5xx, timeouts and network errors stay retryable. Error messages carry
  * the status and Sendblue's own message only, never credentials.
  */
 export async function sendToOwner(text: string): Promise<string | null> {
   const env = getEnv()
-  const im = requireIntegration(env, 'imessage')
+  const im = integrationConfig(env, 'imessage')
+  // Permanent: no retry makes the configuration appear before the approval expires.
+  if (!im) throw new FatalError('iMessage is not configured')
   const client = new SendblueAPI({
     apiKey: im.SENDBLUE_API_KEY,
     apiSecret: im.SENDBLUE_API_SECRET,

@@ -1,6 +1,6 @@
 import type { ApprovalRecord, DecidedApproval } from '@repo/twin/db'
 import { describe, expect, it } from 'vitest'
-import { deliveryOutcome, OWNER_ACTOR, planDecision } from '../agent/lib/owner-decision'
+import { OWNER_ACTOR, planDecision } from '../agent/lib/owner-decision'
 
 const id = '3f1c2b9e-8a7d-4c6b-9e5f-1a2b3c4d5e6f'
 const hook = 'https://agents.test/.well-known/workflow/v1/webhook/tok'
@@ -90,13 +90,5 @@ describe('owner decision plan', () => {
     const nothing = { deliverTo: null, reply: 'Nothing changed. Try again.', error: null }
     expect(planDecision('approved', null, null)).toEqual(nothing)
     expect(planDecision('approved', null, stored({ status: 'pending', actor: null, decidedAt: null }))).toEqual(nothing)
-  })
-
-  it('treats a hook that is no longer pending as nothing left to wake', () => {
-    expect(deliveryOutcome(200)).toBe('delivered')
-    expect(deliveryOutcome(202)).toBe('delivered')
-    expect(deliveryOutcome(404)).toBe('gone')
-    expect(deliveryOutcome(500)).toBe('failed')
-    expect(deliveryOutcome(400)).toBe('failed')
   })
 })
