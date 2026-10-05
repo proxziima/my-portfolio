@@ -8,7 +8,8 @@
     "./env": "./src/env.ts",
     "./db": "./src/db/index.ts",
     "./redact": "./src/redact/index.ts",
-    "./testing": "./src/testing/test-db.ts"
+    "./testing": "./src/testing/test-db.ts",
+    "./testing/network-guard": "./src/testing/network-guard.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
