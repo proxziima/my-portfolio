@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { intentClassifierModel, modelIds, tierModel, twinModel } from '../agent/lib/models'
+import { classifierModel, intentClassifierModel, modelIds, tierModel, twinModel } from '../agent/lib/models'
 
 describe('modelIds', () => {
   it('uses the documented defaults when env is absent (build time)', () => {
@@ -7,8 +7,8 @@ describe('modelIds', () => {
     expect(rest).toEqual({
       primary: 'deepseek/deepseek-v4.1-flash',
       chain: ['deepseek/deepseek-v4.1-flash', 'anthropic/claude-haiku-4.5'],
-      classifier: 'google/gemini-2.5-flash-lite',
-      intent: 'mistralai/ministral-14b-2512',
+      classifier: 'openai/gpt-4.1-mini',
+      intent: 'anthropic/claude-haiku-4.5',
       contextTokens: 1_000_000,
     })
     expect(tiers.standard).toMatchObject({ id: rest.primary, chain: rest.chain, contextTokens: rest.contextTokens })
@@ -41,7 +41,7 @@ describe('modelIds', () => {
   })
 
   it('reads the intent model on its own, independent of the gate classifier', () => {
-    expect(modelIds({ TWIN_CLASSIFIER_MODEL: 'e/f' }).intent).toBe('mistralai/ministral-14b-2512')
+    expect(modelIds({ TWIN_CLASSIFIER_MODEL: 'e/f' }).intent).toBe('anthropic/claude-haiku-4.5')
     expect(modelIds({ TWIN_INTENT_MODEL: ' g/h ' }).intent).toBe('g/h')
   })
 
@@ -98,7 +98,18 @@ describe('intent classifier model', () => {
     expect(model.modelId).toBe(modelIds(process.env).intent)
     const models = model.settings.models
     expect(models?.[0]).toBe(model.modelId)
-    expect(models).toContain('google/gemini-3.1-flash-lite')
+    expect(models).toContain('deepseek/deepseek-v4.1-flash')
+    expect(new Set(models).size).toBe(models?.length)
+  })
+})
+
+describe('gate classifier model', () => {
+  it('runs on the gate model, failing over to another provider', () => {
+    const model = classifierModel()
+    expect(model.modelId).toBe(modelIds(process.env).classifier)
+    const models = model.settings.models
+    expect(models?.[0]).toBe(model.modelId)
+    expect(models).toContain('anthropic/claude-haiku-4.5')
     expect(new Set(models).size).toBe(models?.length)
   })
 })

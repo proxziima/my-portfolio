@@ -481,8 +481,9 @@ The Cal.com route verifies `X-Cal-Signature-256`, verifies the signed `metadata.
 
 - **Primary:** `anthropic/claude-sonnet-5.5`, chosen for persona fidelity and injection resistance.
 - **Fallback:** `deepseek/deepseek-v4.1-flash`, through OpenRouter `models`.
-- **Classifier (abuse and depth):** `google/gemini-2.5-flash-lite`, falling back to `mistralai/ministral-8b-2512` (changed from `deepseek/deepseek-v4.1-flash`; see the model-routing spec).
-- **Intent label:** `mistralai/ministral-14b-2512`, falling back to `google/gemini-3.1-flash-lite`, chosen by its own benchmark (the gate's model read the twin's call offer as the visitor asking).
+- **Classifier (abuse and depth):** `openai/gpt-4.1-mini`, falling back to `anthropic/claude-haiku-4.5`, chosen by benchmark (see the model-routing spec and the README).
+- **Intent label:** `anthropic/claude-haiku-4.5`, falling back to `deepseek/deepseek-v4.1-flash`, chosen by its own benchmark (the gate's model read the twin's call offer as the visitor asking).
+- Only Anthropic, DeepSeek and OpenAI models are used (owner policy, 2026-10-05).
 - All are env-configurable (`TWIN_MODEL`, `TWIN_MODEL_FALLBACKS`, `TWIN_CLASSIFIER_MODEL`, `TWIN_INTENT_MODEL`).
 - `provider: { data_collection: "deny" }`.
 - The OpenRouter key also carries a spend limit, as documented in the README operations section.

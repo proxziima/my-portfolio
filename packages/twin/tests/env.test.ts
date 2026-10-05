@@ -4,6 +4,7 @@ import {
   blankToUndefined,
   INTEGRATIONS,
   integrationConfig,
+  MODEL_DEFAULTS,
   parseEnv,
   requireIntegration,
   webTwinEnvSchema,
@@ -77,11 +78,23 @@ describe('env', () => {
     expect([custom.TWIN_MODEL_LIGHT, custom.TWIN_MODEL_LIGHT_CONTEXT_TOKENS, custom.TWIN_MODEL_DEEP, custom.TWIN_MODEL_DEEP_CONTEXT_TOKENS]).toEqual(['a/light', 64_000, 'a/deep', 500_000])
   })
 
+  // Owner policy (2026-10-05): models come from Anthropic, DeepSeek or OpenAI only.
+  it('defaults every model to an allowed provider, each classifier failing over to another provider', () => {
+    const ids = Object.values(MODEL_DEFAULTS)
+      .flat()
+      .filter((v) => typeof v === 'string')
+    expect(ids.length).toBeGreaterThan(0)
+    for (const id of ids) expect(id).toMatch(/^(anthropic|deepseek|openai)\//)
+    const provider = (id: string) => id.split('/')[0]
+    expect(provider(MODEL_DEFAULTS.classifierFallback)).not.toBe(provider(MODEL_DEFAULTS.classifier))
+    expect(provider(MODEL_DEFAULTS.intentFallback)).not.toBe(provider(MODEL_DEFAULTS.intent))
+  })
+
   it('defaults the intent model apart from the gate classifier, blank meaning unset', () => {
     const env = parseEnv(agentsEnvSchema, agents)
-    expect(env.TWIN_INTENT_MODEL).toBe('mistralai/ministral-14b-2512')
-    expect(env.TWIN_CLASSIFIER_MODEL).toBe('google/gemini-2.5-flash-lite')
-    expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_INTENT_MODEL: ' ' }).TWIN_INTENT_MODEL).toBe('mistralai/ministral-14b-2512')
+    expect(env.TWIN_INTENT_MODEL).toBe('anthropic/claude-haiku-4.5')
+    expect(env.TWIN_CLASSIFIER_MODEL).toBe('openai/gpt-4.1-mini')
+    expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_INTENT_MODEL: ' ' }).TWIN_INTENT_MODEL).toBe('anthropic/claude-haiku-4.5')
     expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_INTENT_MODEL: 'a/intent' }).TWIN_INTENT_MODEL).toBe('a/intent')
   })
 
