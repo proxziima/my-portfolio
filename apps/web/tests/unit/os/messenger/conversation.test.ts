@@ -107,26 +107,9 @@ describe('Conversation', () => {
     expect(host.querySelector('[role="log"]')?.textContent).toBe('Call booked for ')
   })
 
-  it('erases the visitor data, then starts a fresh session', async () => {
-    const fetch = vi.fn(async () => new Response(null, { status: 204 }))
-    vi.stubGlobal('fetch', fetch)
+  it('shows the privacy note with no erase control', () => {
     render()
-    await act(async () => deleteButton()?.click())
-    expect(fetch).toHaveBeenCalledWith('/api/twin/me', { method: 'DELETE' })
-    expect(twin.reset).toHaveBeenCalledTimes(1)
-    expect(status()).toBe('')
-  })
-
-  it('keeps the session and says offline when the erase fails', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 500 })))
-    render()
-    await act(async () => deleteButton()?.click())
-    expect(twin.reset).not.toHaveBeenCalled()
-    expect(status()).toBe('Vinicius is offline')
-
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
-    await act(async () => deleteButton()?.click())
-    expect(twin.reset).not.toHaveBeenCalled()
-    expect(status()).toBe('Vinicius is offline')
+    expect(host.querySelector('footer')?.textContent).toBe(data.messenger.labels.privacy)
+    expect(deleteButton()).toBeUndefined()
   })
 })

@@ -38,14 +38,12 @@ function noticeLine(notice: TwinNotice, labels: MessengerLabels): string {
 /** The Conversation window with the owner: pictures on the left, the chat on the right. */
 export function Conversation({ data }: OsAppProps) {
   const { viewer, contact, labels } = data.messenger
-  const { lines, typing, refusal, send, reset } = useTwin()
+  const { lines, typing, refusal, send } = useTwin()
   const [draft, setDraft] = useState('')
-  const [deleteFailed, setDeleteFailed] = useState(false)
   const box = useRef<HTMLTextAreaElement>(null)
 
   // Send disables itself once the draft empties, so focus goes back to the message box
   const submit = () => {
-    setDeleteFailed(false)
     void send(draft)
     setDraft('')
     box.current?.focus()
@@ -57,18 +55,6 @@ export function Conversation({ data }: OsAppProps) {
     submit()
   }
   const nameOf = (from: Sender) => (from === 'viewer' ? viewer : contact).name
-  // Erases this visitor's conversations on the server, then starts over with a fresh session.
-  const deleteData = async () => {
-    setDeleteFailed(false)
-    const erased = await fetch('/api/twin/me', { method: 'DELETE' }).then(
-      (res) => res.ok,
-      () => false,
-    )
-    // Nothing was erased, so the session stays and the window says the twin is unreachable.
-    if (!erased) return setDeleteFailed(true)
-    reset()
-  }
-  const shownRefusal = refusal ?? (deleteFailed ? 'offline' : null)
 
   return (
     <div className={styles.conversation}>
@@ -104,7 +90,7 @@ export function Conversation({ data }: OsAppProps) {
           </p>
           {/* always mounted, like the typing line: a live region that appears with text already in it isn't reliably announced */}
           <p className={styles.refusal} role="status">
-            {shownRefusal ? labels[refusalLabel[shownRefusal]] : ''}
+            {refusal ? labels[refusalLabel[refusal]] : ''}
           </p>
           <form
             className={styles.compose}
@@ -143,9 +129,6 @@ export function Conversation({ data }: OsAppProps) {
           </form>
           <footer className={styles.privacy}>
             <span>{labels.privacy}</span>
-            <button type="button" onClick={() => void deleteData()}>
-              {labels.deleteData}
-            </button>
           </footer>
         </div>
       </div>

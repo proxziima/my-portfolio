@@ -198,9 +198,9 @@ test('Messenger lists the owner and converses with the twin', async ({ page }) =
   await expect(log.getByText("Hey! I'm around. What are you working on?")).toBeVisible({ timeout: 10_000 })
   // the schedule_call result opens the MSN-style booking dialog (title from the seeded labels)
   await expect(chat.getByRole('region', { name: 'Schedule a call' })).toBeVisible()
-  // the privacy footer, with its erase control
+  // the privacy footer, without an erase control
   await expect(chat.getByText(/This chat is with an AI version of me/)).toBeVisible()
-  await expect(chat.getByRole('button', { name: 'Delete my data' })).toBeVisible()
+  await expect(chat.getByRole('button', { name: 'Delete my data' })).toHaveCount(0)
   // the only expected console error is the blocked Cal.com embed script
   expect(errors().filter((e) => !/127\.0\.0\.1:1|ERR_FAILED|Failed to load resource/i.test(e))).toEqual([])
 })

@@ -710,19 +710,7 @@
   margin: 0;
 }
 .privacy {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
   margin: 6px 0 0 6px;
   font-size: 11px;
   color: var(--msn-muted);
-}
-.privacy button {
-  padding: 0;
-  border: 0;
-  font: inherit;
-  color: var(--msn-link);
-  text-decoration: underline;
-  background: none;
-  cursor: pointer;
 }
