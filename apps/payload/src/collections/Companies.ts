@@ -4,6 +4,7 @@ import { publicContentAccess } from '../access/public-read'
 import { brandFields } from '../fields/brand'
 import { disclosureField } from '../fields/disclosure'
 import { withFaviconHooks } from '../favicons/hooks'
+import { guardCompanyDelete } from '../hooks/guard-company-delete'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
 
 /**
@@ -16,6 +17,6 @@ export const Companies: CollectionConfig = {
   admin: { useAsTitle: 'name', defaultColumns: ['name', 'url', 'disclosure'] },
   defaultSort: 'name',
   access: { ...publicContentAccess, read: disclosureRead },
-  hooks: withFaviconHooks(revalidateCollectionHooks),
+  hooks: { ...withFaviconHooks(revalidateCollectionHooks), beforeDelete: [guardCompanyDelete] },
   fields: [{ name: 'name', type: 'text', required: true, unique: true }, ...brandFields(), disclosureField()],
 }

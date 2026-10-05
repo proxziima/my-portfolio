@@ -15,7 +15,7 @@ export const portfolioMcp = mcpPlugin({
     companies: {
       enabled: crud,
       description:
-        'Companies referenced by experiences, projects and bio links: name, favicon chip, url, optional logo, disclosure tier. The icon shown is the logo, else the favicon fetched from the url, else the chip.',
+        'Companies referenced by experiences, projects and bio links: name, favicon chip, url, optional logo, disclosure tier. The icon shown is the logo, else the favicon fetched from the url, else the chip. `favicon` is filled automatically from the url; do not set it. `chip` is required, up to 3 characters.',
     },
     experiences: {
       enabled: crud,
@@ -25,7 +25,7 @@ export const portfolioMcp = mcpPlugin({
     projects: {
       enabled: crud,
       description:
-        'Portfolio projects: name, favicon chip, url, optional logo, one-line summary, optional company, disciplines. The icon shown is the logo, else the favicon fetched from the url, else the chip.',
+        'Portfolio projects: name, favicon chip, url, optional logo, one-line summary, optional company, disciplines. The icon shown is the logo, else the favicon fetched from the url, else the chip. `favicon` is filled automatically from the url; do not set it. `chip` is required, up to 3 characters.',
     },
     content: { enabled: crud, description: 'Content & community: articles, talks, podcasts, open-source and community work.' },
     knowledge: { enabled: crud, description: 'Knowledge base: facts and writing samples, each with a disclosure tier.' },
