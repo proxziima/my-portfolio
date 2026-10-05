@@ -28,6 +28,24 @@ const DELIVERY_TIMEOUT_MS = 10_000
 
 const reason = (e: unknown) => (e instanceof Error ? e.message : 'unknown error')
 
+/** A request body as JSON, or null when it isn't (the shape checks below then reject it). */
+function json(raw: string): unknown {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * A 2xx for an event that can never succeed, logged loudly. Providers redeliver anything else, so
+ * a non-2xx is kept for transient failures worth retrying.
+ */
+function lostCause(message: string): Response {
+  console.warn(`[webhooks] ${message}; acknowledged and ignored`)
+  return new Response('ignored')
+}
+
 /**
  * Runs a Telegram Bot API call after the decision is committed. A failure is logged, never
  * rethrown: a non-2xx would make Telegram redeliver the same update over and over.
@@ -74,7 +92,13 @@ export default defineChannel({
         )
       )
         return new Response('unauthorized', { status: 401 })
-      const tap = parseCallback(TelegramUpdate.parse(await request.json()))
+      const update = TelegramUpdate.safeParse(json(await request.text()))
+      if (!update.success)
+        return lostCause(
+          `telegram update with an unexpected shape (${update.error.issues.map((i) => i.path.map(String).join('.') || '(root)').join(', ')})`,
+        )
+      // Anything but a well-formed decision tap (a chat message, a malformed id) is acknowledged.
+      const tap = parseCallback(update.data)
       if (!tap) return new Response('ok')
       if (tap.fromId !== env.TELEGRAM_OWNER_USER_ID) {
         await bestEffort('answerCallbackQuery', () => answerCallback(tap.queryId, 'Not allowed.'))
@@ -106,23 +130,33 @@ export default defineChannel({
         !verifyCalSignature(raw, request.headers.get('x-cal-signature-256'), env.CAL_WEBHOOK_SECRET)
       )
         return new Response('unauthorized', { status: 401 })
-      const booking = parseCalWebhook(JSON.parse(raw))
-      if (!booking) return new Response('ignored')
+      const parsed = parseCalWebhook(json(raw))
+      if (parsed.kind === 'other') return new Response('ignored')
+      // Booked directly on Cal.com (no twin booking ref), malformed times or no uid: Cal.com would
+      // redeliver the same body forever. Issue paths only, never values, so no attendee data.
+      if (parsed.kind === 'invalid')
+        return lostCause(`cal ${parsed.trigger} the twin can't use (${parsed.issues.join(', ')})`)
+      const booking = parsed.booking
       const sessionId = verifyBookingRef(booking.bookingRef, env.TWIN_BOOKING_REF_SECRET)
-      if (!sessionId) return new Response('bad booking ref', { status: 400 })
-      // A purged conversation can't take a booking; a 2xx stops Cal.com retrying a lost cause.
-      if (!(await getConversation(db(), sessionId))) {
-        console.warn(`[webhooks] booking ${booking.uid} references an unknown session`)
-        return new Response('ignored')
-      }
+      if (!sessionId)
+        return lostCause(`cal ${booking.trigger} ${booking.uid} has an invalid or unverifiable booking ref`)
+      // A purged conversation can't take a booking.
+      if (!(await getConversation(db(), sessionId)))
+        return lostCause(`cal booking ${booking.uid} references an unknown session`)
       const status = bookingStatusOf(booking.trigger)
-      await upsertBooking(db(), {
+      const change = await upsertBooking(db(), {
         uid: booking.uid,
         sessionId,
         status,
         startTime: new Date(booking.startTime),
         endTime: new Date(booking.endTime),
       })
+      // A redelivery, or a late create/reschedule for a cancelled uid, changes nothing: no state
+      // update and no second notice.
+      if (!change.changed) {
+        console.info(`[webhooks] cal ${booking.trigger} ${booking.uid} left booking ${change.current}`)
+        return new Response('ok')
+      }
       const state = await updateConversation(db(), sessionId, (s) => ({
         ...s,
         booking: { status, uid: booking.uid, startTime: booking.startTime },

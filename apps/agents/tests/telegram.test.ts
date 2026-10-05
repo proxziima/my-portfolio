@@ -58,6 +58,31 @@ describe('telegram', () => {
       ),
     ).toBeNull()
   })
+
+  it('ignores a tap whose id is not a strict uuid (version and variant nibbles included)', () => {
+    const tap = (data: string) =>
+      parseCallback({
+        update_id: 3,
+        callback_query: { id: 'q', from: { id: 42 }, data, message: { message_id: 7, chat: { id: 42 } } },
+      })
+    expect(tap('a:3f1c2b9e-8a7d-4c6b-9e5f-1a2b3c4d5e6f')).not.toBeNull()
+    for (const bad of [
+      'a:------------------------------------',
+      'a:3f1c2b9e8a7d4c6b9e5f1a2b3c4d5e6f----',
+      'a:3f1c2b9e-8a7d-0c6b-9e5f-1a2b3c4d5e6f', // version 0
+      'a:3f1c2b9e-8a7d-4c6b-7e5f-1a2b3c4d5e6f', // variant 7
+      'a:3f1c2b9e-8a7d-4c6b-9e5f-1a2b3c4d5e6f0',
+      'x:3f1c2b9e-8a7d-4c6b-9e5f-1a2b3c4d5e6f',
+    ])
+      expect(tap(bad)).toBeNull()
+  })
+})
+
+describe('update shape', () => {
+  it('rejects an update Telegram would keep redelivering without throwing', () => {
+    expect(TelegramUpdate.safeParse({ update_id: 'x' }).success).toBe(false)
+    expect(TelegramUpdate.safeParse(null).success).toBe(false)
+  })
 })
 
 describe('bot api calls', () => {

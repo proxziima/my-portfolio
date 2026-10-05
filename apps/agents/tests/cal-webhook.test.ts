@@ -31,39 +31,69 @@ describe('cal webhook', () => {
 
   it('extracts only ids, times and the booking ref, never attendee data', () => {
     expect(parseCalWebhook(JSON.parse(body))).toEqual({
-      trigger: 'BOOKING_CREATED',
-      uid: 'bk_1',
-      startTime: '2026-10-08T14:00:00Z',
-      endTime: '2026-10-08T14:30:00Z',
-      bookingRef: 'abc.def',
+      kind: 'booking',
+      booking: {
+        trigger: 'BOOKING_CREATED',
+        uid: 'bk_1',
+        startTime: '2026-10-08T14:00:00Z',
+        endTime: '2026-10-08T14:30:00Z',
+        bookingRef: 'abc.def',
+      },
     })
   })
 
   it('yields a start time ConversationState accepts (Cal.com sends ISO with Z)', () => {
-    const booking = parseCalWebhook(JSON.parse(body))
-    expect(booking).not.toBeNull()
+    const parsed = parseCalWebhook(JSON.parse(body))
+    if (parsed.kind !== 'booking') throw new Error(`expected a booking, got ${parsed.kind}`)
     const state = ConversationState.parse({
-      booking: { status: 'confirmed', uid: 'bk_1', startTime: booking?.startTime },
+      booking: { status: 'confirmed', uid: 'bk_1', startTime: parsed.booking.startTime },
     })
     expect(state.booking.startTime).toBe('2026-10-08T14:00:00Z')
   })
 
-  it('rejects a booking trigger with malformed times or no booking ref', () => {
-    expect(() =>
-      parseCalWebhook({ ...envelope, payload: { ...envelope.payload, startTime: 'tomorrow' } }),
-    ).toThrow()
-    expect(() =>
-      parseCalWebhook({ ...envelope, payload: { ...envelope.payload, metadata: {} } }),
-    ).toThrow()
+  it('reports a booking the twin cannot use with the trigger and issue paths, never throwing', () => {
+    const invalid = (payload: Record<string, unknown>, triggerEvent = 'BOOKING_CREATED') =>
+      parseCalWebhook({ ...envelope, triggerEvent, payload: { ...envelope.payload, ...payload } })
+    // Booked directly on Cal.com: no twin booking ref.
+    expect(invalid({ metadata: {} })).toEqual({
+      kind: 'invalid',
+      trigger: 'BOOKING_CREATED',
+      issues: ['payload.metadata.bookingRef'],
+    })
+    expect(invalid({ metadata: undefined }, 'BOOKING_CANCELLED')).toEqual({
+      kind: 'invalid',
+      trigger: 'BOOKING_CANCELLED',
+      issues: ['payload.metadata'],
+    })
+    expect(invalid({ startTime: 'tomorrow', endTime: '2026-10-08' })).toEqual({
+      kind: 'invalid',
+      trigger: 'BOOKING_CREATED',
+      issues: ['payload.startTime', 'payload.endTime'],
+    })
+    expect(invalid({ uid: undefined }, 'BOOKING_RESCHEDULED')).toEqual({
+      kind: 'invalid',
+      trigger: 'BOOKING_RESCHEDULED',
+      issues: ['payload.uid'],
+    })
+    expect(parseCalWebhook({ triggerEvent: 'BOOKING_CREATED' })).toEqual({
+      kind: 'invalid',
+      trigger: 'BOOKING_CREATED',
+      issues: ['payload'],
+    })
+  })
+
+  it('never echoes attendee data in the reported issues', () => {
+    const parsed = parseCalWebhook({ ...envelope, payload: { ...envelope.payload, metadata: {} } })
+    expect(JSON.stringify(parsed)).not.toMatch(/Ada|a@b\.c|Lisbon/)
   })
 
   it('maps triggers to booking statuses and ignores the rest', () => {
     expect(bookingStatusOf('BOOKING_CREATED')).toBe('confirmed')
     expect(bookingStatusOf('BOOKING_RESCHEDULED')).toBe('rescheduled')
     expect(bookingStatusOf('BOOKING_CANCELLED')).toBe('cancelled')
-    expect(parseCalWebhook({ triggerEvent: 'MEETING_ENDED' })).toBeNull()
-    expect(parseCalWebhook({ triggerEvent: 'PING' })).toBeNull()
-    expect(parseCalWebhook(null)).toBeNull()
+    expect(parseCalWebhook({ triggerEvent: 'MEETING_ENDED' })).toEqual({ kind: 'other' })
+    expect(parseCalWebhook({ triggerEvent: 'PING' })).toEqual({ kind: 'other' })
+    expect(parseCalWebhook(null)).toEqual({ kind: 'other' })
   })
 
   it('compares secrets in constant time', () => {

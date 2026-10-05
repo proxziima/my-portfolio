@@ -1,16 +1,21 @@
 import { defineHook } from 'eve/hooks'
-import { countTurn, ensureConversation } from '../lib/conversation'
+import { countTurn, ensureConversation, pruneSettledApprovals } from '../lib/conversation'
 import type { Principal } from '../lib/identity'
 import { evaluateCallIntent } from '../lib/intent/evaluate'
 import { recordMessage } from '../lib/transcript'
 
-/** Conversation bookkeeping: turn count, redacted transcript, and post-reply intent evaluation. */
+/**
+ * Conversation bookkeeping: turn count, stale approval entries, redacted transcript, and post-reply
+ * intent evaluation.
+ */
 export default defineHook({
   events: {
     async 'turn.started'(event, ctx) {
       try {
         await ensureConversation(ctx.session.id, ctx.session.auth.current as Principal | null)
         await countTurn(ctx.session.id, event.data.turnId)
+        // Before the instructions resolver renders state: no pending entry outlives its approval.
+        await pruneSettledApprovals(ctx.session.id)
       } catch (err) {
         // Without its state row the turn can't be guarded or counted: stop it before the model call.
         console.error(`[conversation] turn.started failed for session ${ctx.session.id}; cancelling the turn`, err)

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const conv = vi.hoisted(() => ({ ensureConversation: vi.fn(), countTurn: vi.fn() }))
+const conv = vi.hoisted(() => ({ ensureConversation: vi.fn(), countTurn: vi.fn(), pruneSettledApprovals: vi.fn() }))
 const transcript = vi.hoisted(() => ({ recordMessage: vi.fn() }))
 const intent = vi.hoisted(() => ({ evaluateCallIntent: vi.fn() }))
 vi.mock('../agent/lib/conversation', () => conv)
@@ -31,6 +31,24 @@ describe('conversation hook', () => {
     await turnStarted(event, ctxOf(cancel))
     expect(conv.countTurn).toHaveBeenCalledWith('s1', 't1')
     expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('prunes approvals settled while their run was gone, after counting the turn', async () => {
+    const order: string[] = []
+    conv.countTurn.mockImplementationOnce(async () => void order.push('count'))
+    conv.pruneSettledApprovals.mockImplementationOnce(async () => void order.push('prune'))
+    await turnStarted(event, ctxOf())
+    expect(conv.pruneSettledApprovals).toHaveBeenCalledWith('s1')
+    expect(order).toEqual(['count', 'prune'])
+  })
+
+  it('fails closed when pruning stale approvals fails', async () => {
+    conv.pruneSettledApprovals.mockRejectedValueOnce(new Error('db down'))
+    const cancel = vi.fn()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(turnStarted(event, ctxOf(cancel))).rejects.toThrow('db down')
+    expect(cancel).toHaveBeenCalledOnce()
+    log.mockRestore()
   })
 
   it('cancels the turn, logs the session and rethrows when bookkeeping fails', async () => {

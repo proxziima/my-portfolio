@@ -14,7 +14,7 @@ export function verifyCalSignature(
 }
 
 const BookingTrigger = z.enum(['BOOKING_CREATED', 'BOOKING_RESCHEDULED', 'BOOKING_CANCELLED'])
-type BookingTrigger = z.infer<typeof BookingTrigger>
+export type BookingTrigger = z.infer<typeof BookingTrigger>
 
 // Cal.com's envelope is `{ triggerEvent, createdAt, payload }`. Objects strip unknown keys, so
 // attendee data and everything else Cal.com sends is dropped at the boundary. Times must carry an
@@ -38,19 +38,39 @@ export interface CalBooking {
   bookingRef: string
 }
 
-/** The booking fields the twin keeps; other triggers (pings, meeting events) return null. */
-export function parseCalWebhook(json: unknown): CalBooking | null {
+/**
+ * A Cal.com webhook as the twin sees it: a usable booking, a trigger the twin doesn't handle
+ * (pings, meeting events), or a booking trigger it can't use (booked directly on Cal.com without a
+ * twin booking ref, malformed times, no uid). `issues` are zod issue paths only, never values, so
+ * attendee data can't reach a log line.
+ */
+export type CalWebhook =
+  | { kind: 'booking'; booking: CalBooking }
+  | { kind: 'other' }
+  | { kind: 'invalid'; trigger: BookingTrigger; issues: string[] }
+
+/** Classifies a Cal.com webhook body; never throws, whatever the shape. */
+export function parseCalWebhook(json: unknown): CalWebhook {
   const trigger = BookingTrigger.safeParse(
     (json as { triggerEvent?: unknown } | null)?.triggerEvent,
   )
-  if (!trigger.success) return null
-  const e = Envelope.parse(json)
+  if (!trigger.success) return { kind: 'other' }
+  const e = Envelope.safeParse(json)
+  if (!e.success)
+    return {
+      kind: 'invalid',
+      trigger: trigger.data,
+      issues: e.error.issues.map((i) => i.path.map(String).join('.') || '(root)'),
+    }
   return {
-    trigger: e.triggerEvent,
-    uid: e.payload.uid,
-    startTime: e.payload.startTime,
-    endTime: e.payload.endTime,
-    bookingRef: e.payload.metadata.bookingRef,
+    kind: 'booking',
+    booking: {
+      trigger: e.data.triggerEvent,
+      uid: e.data.payload.uid,
+      startTime: e.data.payload.startTime,
+      endTime: e.data.payload.endTime,
+      bookingRef: e.data.payload.metadata.bookingRef,
+    },
   }
 }
 

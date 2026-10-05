@@ -1,4 +1,11 @@
-import { createConversation, getConversation, updateConversation, visitorExists, schema } from '@repo/twin/db'
+import {
+  createConversation,
+  getConversation,
+  listSettledApprovalIds,
+  updateConversation,
+  visitorExists,
+  schema,
+} from '@repo/twin/db'
 import type { ConversationState, TwinIdentity } from '@repo/twin/contract'
 import { db } from './db'
 import { visitorIdOf, type Principal } from './identity'
@@ -25,6 +32,28 @@ export async function ensureConversation(sessionId: string, principal: Principal
 /** Counts a turn exactly once, even when the hook is delivered twice. */
 export async function countTurn(sessionId: string, turnId: string): Promise<void> {
   await updateConversation(db(), sessionId, (s) => (s.lastTurnId === turnId ? s : { ...s, turnCount: s.turnCount + 1, lastTurnId: turnId }))
+}
+
+/**
+ * Drops pending-approval entries whose approval is already settled. Pure; returns the same state
+ * when nothing is stale.
+ */
+export function withoutSettledApprovals(state: ConversationState, settledIds: readonly string[]): ConversationState {
+  const settled = new Set(settledIds)
+  const pendingApprovals = state.pendingApprovals.filter((p) => !settled.has(p.approvalId))
+  return pendingApprovals.length === state.pendingApprovals.length ? state : { ...state, pendingApprovals }
+}
+
+/**
+ * A run that dies while parked on an approval never finalises it, so its `pendingApprovals` entry
+ * would stay forever. Prunes entries whose approval is settled: one query, and a write only when
+ * the session has settled approvals. Settled ids (not pending ones) are matched, since a settled
+ * approval never reopens, so this can't race a run opening a new approval.
+ */
+export async function pruneSettledApprovals(sessionId: string): Promise<void> {
+  const settledIds = await listSettledApprovalIds(db(), sessionId)
+  if (settledIds.length === 0) return
+  await updateConversation(db(), sessionId, (s) => withoutSettledApprovals(s, settledIds))
 }
 
 /** Grounding (who I am and how I write) as untrusted CMS data; rendered per turn, cached per process. */

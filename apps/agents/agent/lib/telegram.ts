@@ -1,6 +1,7 @@
 import { FatalError } from 'workflow'
 import { z } from 'zod'
 import { getEnv } from './env'
+import { isUuid } from './uuid'
 
 /** The subset of a Telegram Update the twin reads (Bot API: Update, CallbackQuery). */
 export const TelegramUpdate = z.object({
@@ -29,7 +30,7 @@ export function approvalKeyboard(approvalId: string) {
   }
 }
 
-/** A decision tap, or null for anything else. */
+/** A decision tap, or null for anything else (including an id that is not a strict UUID). */
 export function parseCallback(u: TelegramUpdate): {
   queryId: string
   fromId: string
@@ -39,12 +40,13 @@ export function parseCallback(u: TelegramUpdate): {
   messageId: number
 } | null {
   const q = u.callback_query
-  const m = q?.data ? /^([ad]):([0-9a-f-]{36})$/.exec(q.data) : null
-  if (!q || !m || !q.message) return null
+  const m = q?.data ? /^([ad]):(.+)$/.exec(q.data) : null
+  const approvalId = m?.[2]
+  if (!q || !m || !approvalId || !isUuid(approvalId) || !q.message) return null
   return {
     queryId: q.id,
     fromId: String(q.from.id),
-    approvalId: m[2] ?? '',
+    approvalId,
     status: m[1] === 'a' ? 'approved' : 'denied',
     chatId: q.message.chat.id,
     messageId: q.message.message_id,
