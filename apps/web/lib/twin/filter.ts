@@ -63,7 +63,18 @@ export interface EventFilterHooks {
  */
 export function createEventFilter(rules: RedactionRules, canary: string, hooks: EventFilterHooks = {}): (e: StreamEvent) => StreamEvent {
   const withCanary: RedactionRules = { terms: [...rules.terms, canary], allow: rules.allow }
-  const redactors = new Map<string, StreamRedactor>()
+  // Case-insensitive, like the redactor's own term matching.
+  const needle = canary.toLowerCase()
+  const hasCanary = (text: string) => text.toLowerCase().includes(needle)
+  /*
+   * Per text block: its redactor, the raw tail that might hold the start of a split canary, and
+   * whether the canary has appeared. The canary is the first line of the system prompt, so seeing
+   * it means the model is dumping the prompt: every later delta of that block is blanked, not just
+   * the canary itself, and `message.completed` carries the deflection. The redactor holds back at
+   * least the canary's length, so no part of it, nor anything after it, was emitted before the
+   * raw text reveals it.
+   */
+  const blocks = new Map<string, { redactor: StreamRedactor; tail: string; leaked: boolean }>()
   /*
    * Steps whose `step.started` this filter saw. eve emits `step.started` before the step's first
    * `message.appended` (harness/tool-loop.js, harness/step-hooks.js). A stream resumed mid-block
@@ -86,14 +97,22 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
         if (typeof d.messageDelta !== 'string') return e
         const key = keyOf(d)
         if (!started.has(key)) return rewrite(e, { ...d, messageDelta: '' })
-        const r = redactors.get(key) ?? new StreamRedactor(withCanary)
-        redactors.set(key, r)
-        return rewrite(e, { ...d, messageDelta: r.push(d.messageDelta) })
+        const block = blocks.get(key) ?? { redactor: new StreamRedactor(withCanary), tail: '', leaked: false }
+        blocks.set(key, block)
+        if (block.leaked) return rewrite(e, { ...d, messageDelta: '' })
+        const raw = block.tail + d.messageDelta
+        if (hasCanary(raw)) {
+          block.leaked = true
+          return rewrite(e, { ...d, messageDelta: '' })
+        }
+        block.tail = raw.slice(Math.max(0, raw.length - canary.length + 1))
+        return rewrite(e, { ...d, messageDelta: block.redactor.push(d.messageDelta) })
       }
       case 'message.completed': {
         if (typeof d.message !== 'string') return e
-        redactors.delete(keyOf(d))
-        const leaked = d.message.includes(canary)
+        const key = keyOf(d)
+        const leaked = blocks.get(key)?.leaked === true || hasCanary(d.message)
+        blocks.delete(key)
         if (leaked) console.warn(`[twin] canary leak blocked in turn ${String(d.turnId)}`)
         return rewrite(e, { ...d, message: leaked ? LEAK_DEFLECTION : redactText(d.message, withCanary) })
       }

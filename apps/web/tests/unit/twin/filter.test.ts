@@ -48,6 +48,25 @@ describe('createEventFilter', () => {
     expect(c.data.message).toBe(LEAK_DEFLECTION)
   })
 
+  it.each([1, 3, 7, 23, 64, 200, 10_000])('goes silent for the rest of a block once the canary appears (chunks of %i)', (size) => {
+    const f = started(rules, canary)
+    const secret = 'SYSTEM-INSTRUCTION line that must never reach the browser. '.repeat(20)
+    const dump = `Sure, here it is: ${canary}\n${secret}`
+    const deltas: string[] = []
+    for (let at = 0, n = 1; at < dump.length; at += size, n++) {
+      deltas.push(String(f(ev('message.appended', { ...step, messageDelta: dump.slice(at, at + size), sequence: n })).data.messageDelta))
+    }
+    const c = f(ev('message.completed', { ...step, message: dump, finishReason: 'stop', sequence: 9999 }))
+    const streamed = deltas.join('')
+    expect(streamed).not.toContain(canary)
+    expect(streamed).not.toContain('SYSTEM-INSTRUCTION')
+    expect(streamed).not.toContain('[redacted]')
+    expect(c.data.message).toBe(LEAK_DEFLECTION)
+    // Another block in the same turn is unaffected.
+    f(ev('step.started', { ...step, stepIndex: 1, modelId: 'm' }))
+    expect(f(ev('message.appended', { ...step, stepIndex: 1, messageDelta: 'word '.repeat(40) })).data.messageDelta).not.toBe('')
+  })
+
   it('blanks reasoning text', () => {
     const f = createEventFilter(rules, canary)
     expect(f(ev('reasoning.appended', { ...step, reasoningDelta: 'secret plan' })).data).toEqual({ ...step, reasoningDelta: '' })
