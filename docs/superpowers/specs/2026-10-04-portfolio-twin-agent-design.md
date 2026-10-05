@@ -253,7 +253,7 @@ Its result drives the **next** turn through the state digest. The consequences:
 
 - **`classify.ts`:** AI SDK `generateText` with `Output.choice` over the stable enum
   `requesting_call | hiring_signal | evaluating | browsing | unrelated`. It reads the last 6 messages and
-  runs on `TWIN_CLASSIFIER_MODEL` (cheap model, OpenRouter).
+  runs on `TWIN_INTENT_MODEL` (cheap model, OpenRouter, chosen by the intent-label benchmark).
 - **`signals.ts`:** deterministic, from state only:
   - turn count
   - distinct topics cited
@@ -481,8 +481,9 @@ The Cal.com route verifies `X-Cal-Signature-256`, verifies the signed `metadata.
 
 - **Primary:** `anthropic/claude-sonnet-5.5`, chosen for persona fidelity and injection resistance.
 - **Fallback:** `deepseek/deepseek-v4.1-flash`, through OpenRouter `models`.
-- **Classifier (intent, abuse and depth):** `google/gemini-2.5-flash-lite`, falling back to `mistralai/ministral-8b-2512` (changed from `deepseek/deepseek-v4.1-flash`; see the model-routing spec).
-- All are env-configurable (`TWIN_MODEL`, `TWIN_MODEL_FALLBACKS`, `TWIN_CLASSIFIER_MODEL`).
+- **Classifier (abuse and depth):** `google/gemini-2.5-flash-lite`, falling back to `mistralai/ministral-8b-2512` (changed from `deepseek/deepseek-v4.1-flash`; see the model-routing spec).
+- **Intent label:** `mistralai/ministral-14b-2512`, falling back to `google/gemini-3.1-flash-lite`, chosen by its own benchmark (the gate's model read the twin's call offer as the visitor asking).
+- All are env-configurable (`TWIN_MODEL`, `TWIN_MODEL_FALLBACKS`, `TWIN_CLASSIFIER_MODEL`, `TWIN_INTENT_MODEL`).
 - `provider: { data_collection: "deny" }`.
 - The OpenRouter key also carries a spend limit, as documented in the README operations section.
 

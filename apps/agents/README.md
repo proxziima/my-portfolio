@@ -260,7 +260,8 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `TWIN_MODEL_LIGHT_CONTEXT_TOKENS` | A | `1000000` | Context window of the light tier | The light model's context window |
 | `TWIN_MODEL_DEEP` | A | `anthropic/claude-opus-5.5` | Deep tier: in-depth technical questions | OpenRouter model id |
 | `TWIN_MODEL_DEEP_CONTEXT_TOKENS` | A | `1000000` | Context window of the deep tier | The deep model's context window |
-| `TWIN_CLASSIFIER_MODEL` | A | `google/gemini-2.5-flash-lite` (falls back to `mistralai/ministral-8b-2512`) | Pre-turn gate (abuse, scope, depth) and intent label; pick a model that answers in well under the gate timeout | OpenRouter model id |
+| `TWIN_CLASSIFIER_MODEL` | A | `google/gemini-2.5-flash-lite` (falls back to `mistralai/ministral-8b-2512`) | Pre-turn gate (abuse, scope, depth); pick a model that answers in well under the gate timeout | OpenRouter model id |
+| `TWIN_INTENT_MODEL` | A | `mistralai/ministral-14b-2512` (falls back to `google/gemini-3.1-flash-lite`) | Post-reply call-intent label; re-run the intent-label eval before changing it | OpenRouter model id |
 | `TWIN_CLASSIFIER_TIMEOUT_MS` | A | `4000` | Intent label timeout (post-reply) | – |
 | `TWIN_ABUSE_TIMEOUT_MS` | A | `2500` | Pre-turn gate timeout (fails open to `ok`/`standard`) | – |
 | `TWIN_JWT_SECRET` | A, W | required, ≥ 32 chars | HS256 key of the 60 s visitor JWT | `openssl rand -hex 32` |
@@ -510,14 +511,15 @@ Each turn runs on the cheapest model that answers it well. The tier is chosen be
 - **Prompt cache.** Changing model between turns loses the provider's prompt cache. Conversations are short, so the cost is small.
 - **Live eval.** `evals/skills/routing/routing.eval.ts` (tags `live`, `routing`) asserts the `modelId` of each turn's `step.started` events.
 
-**The classifier model** (`TWIN_CLASSIFIER_MODEL`) has one fallback, `mistralai/ministral-8b-2512`, through OpenRouter `models`, for a provider outage. It does two jobs:
+**Two classifier models**, one per job, each with one fallback through OpenRouter `models` for a provider outage. The gate (`TWIN_CLASSIFIER_MODEL`) falls back to `mistralai/ministral-8b-2512`; the intent label (`TWIN_INTENT_MODEL`) falls back to `google/gemini-3.1-flash-lite`. They are separate because they were benchmarked on different tasks, and the gate's model misread the twin's own call offer as the visitor asking:
 
 - **The abuse gate** runs in `onMessage`, before dispatch, with `TWIN_ABUSE_TIMEOUT_MS` (2.5 s). **It fails open:**
   - A timeout yields `ok` on the `standard` tier, silently.
   - Any other failure yields `ok` on the `standard` tier and logs `[twin] abuse classifier failed`. eve turns an `onMessage` throw into HTTP 500 for every visitor, so the gate must not throw.
   - A non-`ok` verdict adds a context note that makes the model deflect once, in character. The conversation ends after 3 violations.
   - `prompt_attack` is counted, not blocked: `boundaries` handles it.
-- **The intent label** runs after the reply (`TWIN_CLASSIFIER_TIMEOUT_MS`, 4 s), so it never adds time-to-first-token. Its failures leave the label `null`.
+- **The intent label** runs after the reply (`TWIN_CLASSIFIER_TIMEOUT_MS`, 4 s), so it never adds time-to-first-token. Its failures leave the label `null`. Its prompt (`INTENT_SYSTEM` in `agent/lib/intent/classify.ts`) keeps `requesting_call` for a live conversation: asking the owner to tell or talk about something ("fala mais", "tell me more") is information, and the twin's own call offer never counts as the visitor asking.
+- **Choosing the intent model.** `evals/skills/scheduling/intent-label.eval.ts` (tags `live`, `scheduling`) calls `classifyIntent` directly on the multi-turn PT/EN regression set in `intent-label.json`, so it checks the model and prompt without the agent. Re-run it (`bunx eve eval skills/scheduling/intent-label`) before changing `TWIN_INTENT_MODEL` or the prompt, and add every misread from production to the set. The default was picked on 2026-10-05: the most accurate model with p90 under 3 s, the cheaper on a tie (75/75 over 3 runs, p50 0.8 s, p90 1.0 s).
 
 ### Spend
 

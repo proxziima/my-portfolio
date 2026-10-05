@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { modelIds, tierModel, twinModel } from '../agent/lib/models'
+import { intentClassifierModel, modelIds, tierModel, twinModel } from '../agent/lib/models'
 
 describe('modelIds', () => {
   it('uses the documented defaults when env is absent (build time)', () => {
     const { tiers, ...rest } = modelIds({})
-    expect(rest).toEqual({ primary: 'deepseek/deepseek-v4.1-flash', chain: ['deepseek/deepseek-v4.1-flash', 'anthropic/claude-haiku-4.5'], classifier: 'google/gemini-2.5-flash-lite', contextTokens: 1_000_000 })
+    expect(rest).toEqual({
+      primary: 'deepseek/deepseek-v4.1-flash',
+      chain: ['deepseek/deepseek-v4.1-flash', 'anthropic/claude-haiku-4.5'],
+      classifier: 'google/gemini-2.5-flash-lite',
+      intent: 'mistralai/ministral-14b-2512',
+      contextTokens: 1_000_000,
+    })
     expect(tiers.standard).toMatchObject({ id: rest.primary, chain: rest.chain, contextTokens: rest.contextTokens })
   })
 
@@ -14,6 +20,7 @@ describe('modelIds', () => {
       TWIN_MODEL: blank,
       TWIN_MODEL_FALLBACKS: blank,
       TWIN_CLASSIFIER_MODEL: blank,
+      TWIN_INTENT_MODEL: blank,
       TWIN_MODEL_CONTEXT_TOKENS: blank,
       TWIN_MODEL_LIGHT: blank,
       TWIN_MODEL_LIGHT_CONTEXT_TOKENS: blank,
@@ -31,6 +38,11 @@ describe('modelIds', () => {
     const ids = modelIds({ TWIN_MODEL: 'a/b', TWIN_MODEL_FALLBACKS: 'c/d, a/b', TWIN_CLASSIFIER_MODEL: 'e/f' })
     expect(ids.chain).toEqual(['a/b', 'c/d'])
     expect(ids.classifier).toBe('e/f')
+  })
+
+  it('reads the intent model on its own, independent of the gate classifier', () => {
+    expect(modelIds({ TWIN_CLASSIFIER_MODEL: 'e/f' }).intent).toBe('mistralai/ministral-14b-2512')
+    expect(modelIds({ TWIN_INTENT_MODEL: ' g/h ' }).intent).toBe('g/h')
   })
 
   it('dedupes repeated fallbacks', () => {
@@ -77,5 +89,16 @@ describe('tier models', () => {
     expect(twinModel().modelId).toBe(tierModel('standard').modelId)
     expect(tierModel('light').modelId).toBe(modelIds(process.env).tiers.light.id)
     expect(tierModel('deep').modelId).toBe(modelIds(process.env).tiers.deep.id)
+  })
+})
+
+describe('intent classifier model', () => {
+  it('runs on the intent model, failing over to another provider', () => {
+    const model = intentClassifierModel()
+    expect(model.modelId).toBe(modelIds(process.env).intent)
+    const models = model.settings.models
+    expect(models?.[0]).toBe(model.modelId)
+    expect(models).toContain('google/gemini-3.1-flash-lite')
+    expect(new Set(models).size).toBe(models?.length)
   })
 })

@@ -77,6 +77,14 @@ describe('env', () => {
     expect([custom.TWIN_MODEL_LIGHT, custom.TWIN_MODEL_LIGHT_CONTEXT_TOKENS, custom.TWIN_MODEL_DEEP, custom.TWIN_MODEL_DEEP_CONTEXT_TOKENS]).toEqual(['a/light', 64_000, 'a/deep', 500_000])
   })
 
+  it('defaults the intent model apart from the gate classifier, blank meaning unset', () => {
+    const env = parseEnv(agentsEnvSchema, agents)
+    expect(env.TWIN_INTENT_MODEL).toBe('mistralai/ministral-14b-2512')
+    expect(env.TWIN_CLASSIFIER_MODEL).toBe('google/gemini-2.5-flash-lite')
+    expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_INTENT_MODEL: ' ' }).TWIN_INTENT_MODEL).toBe('mistralai/ministral-14b-2512')
+    expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_INTENT_MODEL: 'a/intent' }).TWIN_INTENT_MODEL).toBe('a/intent')
+  })
+
   it('treats blank tier variables as unset so the tier defaults apply', () => {
     const env = parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL_LIGHT: '', TWIN_MODEL_DEEP_CONTEXT_TOKENS: ' ' })
     expect(env.TWIN_MODEL_LIGHT).toBe('deepseek/deepseek-v4.1-flash')

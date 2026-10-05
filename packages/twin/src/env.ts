@@ -41,6 +41,11 @@ export const MODEL_DEFAULTS = {
   // Benchmarked 2026-10-05 on the gate's prompts: 12/12 correct, p90 under 0.9 s.
   classifier: 'google/gemini-2.5-flash-lite',
   classifierFallback: 'mistralai/ministral-8b-2512',
+  // Benchmarked 2026-10-05 on the intent label's 25-case PT/EN regression set, 3 runs: 75/75 correct,
+  // p90 about 1 s and the cheapest of the models with no misses (the gate's model read the twin's own
+  // call offer as the visitor asking). The fallback is another provider, for an outage.
+  intent: 'mistralai/ministral-14b-2512',
+  intentFallback: 'google/gemini-3.1-flash-lite',
   contextTokens: 1_000_000,
   light: 'deepseek/deepseek-v4.1-flash',
   lightContextTokens: 1_000_000,
@@ -73,6 +78,7 @@ const agentsEnvObject = z.object({
   TWIN_MODEL_DEEP: z.string().min(1).default(MODEL_DEFAULTS.deep),
   TWIN_MODEL_DEEP_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.deepContextTokens),
   TWIN_CLASSIFIER_MODEL: z.string().min(1).default(MODEL_DEFAULTS.classifier),
+  TWIN_INTENT_MODEL: z.string().min(1).default(MODEL_DEFAULTS.intent),
   TWIN_JWT_SECRET: secret,
   TWIN_PROMPT_CANARY: z.string().min(16),
   TWIN_STABLE_KEY_SECRET: secret,
