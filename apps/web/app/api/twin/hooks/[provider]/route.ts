@@ -5,11 +5,11 @@ export const dynamic = 'force-dynamic'
 /** Signature headers each provider sends; nothing else (cookies, auth) is forwarded. */
 const PROVIDERS = {
   cal: ['content-type', 'x-cal-signature-256', 'x-cal-webhook-version'],
-  sendblue: ['content-type', 'sb-signing-secret'],
+  photon: ['content-type', 'x-spectrum-signature', 'x-spectrum-timestamp', 'x-spectrum-event', 'x-spectrum-webhook-id'],
 } as const
 
 /**
- * Public entry points for Cal.com and Sendblue webhooks. The agent is not public (its workflow
+ * Public entry points for Cal.com and Photon webhooks. The agent is not public (its workflow
  * routes are unauthenticated), so these forward raw bodies; the agent verifies signatures.
  * Only TWIN_AGENT_URL is read (a narrow z.url() parse, not the full twinEnv()), so a webhook
  * delivery never depends on unrelated BFF secrets.
