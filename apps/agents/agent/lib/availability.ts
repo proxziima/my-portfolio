@@ -14,6 +14,8 @@ export interface DayAvailability {
 
 const WORK_START_HOUR = 9
 const WORK_END_HOUR = 18
+/** How far ahead a visitor may ask about. */
+export const MAX_DAYS_AHEAD = 90
 
 /** UTC offset in minutes of `zone` at `instant` (Intl only; no tz library). */
 function offsetMinutes(zone: string, instant: Date): number {
@@ -41,6 +43,41 @@ function addDays(date: string, n: number): string {
   const d = new Date(`${date}T12:00:00Z`)
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
+}
+
+/** Today's calendar date (YYYY-MM-DD) in `zone`, which is not the UTC date near midnight. */
+export function ownerToday(zone: string, now: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+}
+
+/** True when `date` is YYYY-MM-DD and names a real calendar day (so not 2026-02-31). */
+function isCalendarDate(date: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  const d = new Date(`${date}T12:00:00Z`)
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === date
+}
+
+/**
+ * The first day to report: `startDate` when given, else today in the owner's zone. A date that is
+ * not a real day, is before the owner's today or is more than `MAX_DAYS_AHEAD` days out throws,
+ * with a message the model can act on (eve reports tool errors to the model).
+ */
+export function resolveStartDate(startDate: string | undefined, zone: string, now: Date): string {
+  const today = ownerToday(zone, now)
+  if (startDate === undefined) return today
+  // YYYY-MM-DD strings compare in calendar order.
+  if (!isCalendarDate(startDate) || startDate < today || startDate > addDays(today, MAX_DAYS_AHEAD)) {
+    throw new Error(`startDate must be a real YYYY-MM-DD date between today (${today}) and ${MAX_DAYS_AHEAD} days ahead`)
+  }
+  return startDate
+}
+
+/**
+ * The free/busy query window: from the start of `startDate` to the end of its last day, both in
+ * the owner's zone, so days on either side of a DST change keep their own offset.
+ */
+export function availabilityWindow(startDate: string, days: number, zone: string): { from: Date; to: Date } {
+  return { from: zonedInstant(startDate, 0, zone), to: zonedInstant(addDays(startDate, days), 0, zone) }
 }
 
 /**

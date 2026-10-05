@@ -76,6 +76,15 @@ describe('turn instructions', () => {
     expect(out.content).toContain('call: warm:')
   })
 
+  it('keeps the offer turn when the evaluation outcome write fails, logging instead of falling back', async () => {
+    m.ensureConversation.mockResolvedValue(warm())
+    m.setEvaluationOutcome.mockRejectedValueOnce(new Error('label write failed'))
+    const out = await resolve({}, ctx)
+    expect(out.content).not.toContain(NOTES_UNAVAILABLE)
+    expect(out.content).toContain('call: warm:')
+    expect(console.error).toHaveBeenCalledWith('[twin] evaluation outcome write failed', expect.any(Error))
+  })
+
   it('re-issues the offer on a replayed step without writing again', async () => {
     m.ensureConversation.mockResolvedValue(warm({ callOfferTurn: 3 }))
     const out = await resolve({}, ctx)

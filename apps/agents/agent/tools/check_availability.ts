@@ -2,7 +2,7 @@ import { addUnique } from '@repo/twin/contract'
 import { updateConversation } from '@repo/twin/db'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
-import { summarizeAvailability } from '../lib/availability'
+import { availabilityWindow, resolveStartDate, summarizeAvailability } from '../lib/availability'
 import { db } from '../lib/db'
 import { getEnv } from '../lib/env'
 import { queryBusy } from '../lib/google-freebusy'
@@ -18,15 +18,14 @@ const Output = z.object({
 const tool = defineTool({
   description: 'How open my calendar is over the next days, in both time zones. Read-only; it never books.',
   inputSchema: z.object({
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('First day, YYYY-MM-DD; defaults to today'),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('First day, YYYY-MM-DD, from today to 90 days ahead; defaults to today in my time zone'),
     days: z.number().int().min(1).max(14).default(7),
   }),
   outputSchema: Output,
   async execute({ startDate, days }, ctx) {
     const env = getEnv()
-    const start = startDate ?? new Date().toISOString().slice(0, 10)
-    const from = new Date(`${start}T00:00:00Z`)
-    const to = new Date(from.getTime() + (days + 1) * 86_400_000)
+    const start = resolveStartDate(startDate, env.OWNER_TIMEZONE, new Date())
+    const { from, to } = availabilityWindow(start, days, env.OWNER_TIMEZONE)
     const visitorTimeZone = visitorTimeZoneOf(ctx.session.auth.current as Principal | null)
     const summary = summarizeAvailability({ busy: await queryBusy(from, to), startDate: start, days, ownerTimeZone: env.OWNER_TIMEZONE, visitorTimeZone })
     await updateConversation(db(), ctx.session.id, (s) => ({ ...s, toolsUsed: addUnique(s.toolsUsed, 'check_availability') }))

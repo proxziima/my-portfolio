@@ -34,7 +34,15 @@ export default defineDynamic({
         // sees callOfferTurn === turnCount and re-issues the same directive without writing again.
         if (state.intent.tier === 'warm' && state.callOfferTurn === null && !state.callOfferDeclined && !state.widgetShown) {
           state = await updateConversation(db(), ctx.session.id, (s) => (s.callOfferTurn === null ? { ...s, callOfferTurn: s.turnCount } : s))
-          if (state.intent.lastEvaluationId) await setEvaluationOutcome(db(), state.intent.lastEvaluationId, 'offered')
+          // The outcome is a tuning label only: once the offer is recorded, losing the label must
+          // never turn this into a fallback turn, so its failure is logged and the turn goes on.
+          if (state.intent.lastEvaluationId) {
+            try {
+              await setEvaluationOutcome(db(), state.intent.lastEvaluationId, 'offered')
+            } catch (err) {
+              console.error('[twin] evaluation outcome write failed', err)
+            }
+          }
         }
         return defineInstructions({ content: buildTurnPrompt({ canary: env.TWIN_PROMPT_CANARY, grounding, state }), role: 'system' })
       } catch (err) {
