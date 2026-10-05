@@ -25,9 +25,13 @@ export function searchTerms(query: string): string[] {
   return [...new Set(words)]
 }
 
-/** Scores one entry: a title hit is worth three body hits. */
+/**
+ * Scores one entry: a title hit is worth three body hits. Restricted entries match on their title
+ * (the topic) only, so a visitor cannot probe the hidden body with guessed values.
+ */
 function score(entry: CorpusEntry, terms: readonly string[]): number {
   const title = entry.item.title.toLowerCase()
+  if (entry.disclosure === 'restricted') return terms.reduce((sum, t) => sum + (title.includes(t) ? 3 : 0), 0)
   const body = entry.item.text.toLowerCase()
   return terms.reduce((sum, t) => sum + (title.includes(t) ? 3 : 0) + (body.includes(t) ? 1 : 0), 0)
 }
@@ -56,8 +60,13 @@ export function rankCorpus(corpus: readonly CorpusEntry[], query: string, limit:
 export function lexicalText(value: unknown): string {
   const walk = (node: unknown): string => {
     if (!node || typeof node !== 'object') return ''
-    const n = node as { text?: unknown; children?: unknown[]; type?: unknown }
+    const n = node as { text?: unknown; children?: unknown[]; type?: unknown; fields?: { label?: unknown; word?: unknown } }
     if (typeof n.text === 'string') return n.text
+    // Inline blocks (chipLink, curiousToggle) carry company and project names in their fields.
+    if (n.type === 'inlineBlock') {
+      const name = n.fields?.label ?? n.fields?.word
+      return typeof name === 'string' ? name : ''
+    }
     const inner = (n.children ?? []).map(walk).join('')
     return n.type === 'paragraph' ? `${inner}\n` : inner
   }

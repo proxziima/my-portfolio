@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { redactTermsResponse } from '@/endpoints/redact-terms'
+import { richText, chip, curious, b } from '@/seed/lexical'
 import { lexicalText, rankCorpus, searchTerms, type CorpusEntry } from '@/mcp/twin-corpus'
 
 const entry = (sourceId: string, title: string, text: string, disclosure: CorpusEntry['disclosure'] = 'public', category: CorpusEntry['category'] = null): CorpusEntry => ({
@@ -36,6 +37,20 @@ describe('twin corpus', () => {
   it('flattens lexical bios', () => {
     const bio = { root: { children: [{ type: 'paragraph', children: [{ text: 'I build ' }, { text: 'tools.' }] }, { type: 'paragraph', children: [{ text: 'Second.' }] }] } }
     expect(lexicalText(bio)).toBe('I build tools.\nSecond.')
+  })
+
+  it('scores restricted entries on their title only, so hidden text cannot be probed', () => {
+    const c = [entry('knowledge:7', 'Notice period', 'Thirty days in Berlin', 'restricted', 'availability')]
+    expect(rankCorpus(c, 'berlin', 5).restricted).toEqual([])
+    expect(rankCorpus(c, 'notice', 5).restricted).toEqual([{ sourceId: 'knowledge:7', topic: 'Notice period', category: 'availability' }])
+  })
+
+  it('keeps inline block names (chip labels, curious words) in flattened bios', () => {
+    const bio = richText([['Worked at ', chip('Autodoc', 'co'), ' and ', b('Acme'), ' being ', curious('curious'), '.']])
+    const text = lexicalText(bio)
+    expect(text).toContain('Autodoc')
+    expect(text).toContain('Acme')
+    expect(text).toContain('curious')
   })
 
   it('collects never-tier terms and allow-lists public contact values', () => {
