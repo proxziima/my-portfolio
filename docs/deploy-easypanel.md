@@ -11,7 +11,7 @@ Production runs as one Easypanel **Compose** service built from this repository'
 
 The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload.db`) and the uploads (`/data/media`, `/data/scenes`). The `twin-pg` volume holds the portfolio twin's Postgres database `twin`. That database contains both the twin's own tables (schema `twin`) and eve's durable Workflow runtime (schemas `workflow` and `graphile_worker`). Every image is built from the repository root, and every setting is read at runtime, so nothing environment-specific is baked into an image.
 
-**`agents` must never get a domain.** It serves eve's Workflow routes (`/.well-known/workflow/v1/*`), which are unauthenticated: anyone who can reach them can forge or replay workflow steps. Only `web` talks to it, over the compose network (`http://agents:3000`). That covers the visitor BFF and the two webhook forwarders `https://<web>/api/twin/hooks/cal` and `https://<web>/api/twin/hooks/sendblue`. How the twin works: [apps/agents/README.md](../apps/agents/README.md).
+**`agents` must never get a domain.** It serves eve's Workflow routes (`/.well-known/workflow/v1/*`), which are unauthenticated: anyone who can reach them can forge or replay workflow steps. Only `web` talks to it, over the compose network (`http://agents:3000`). That covers the visitor BFF and the two webhook forwarders `https://<web>/api/twin/hooks/cal` and `https://<web>/api/twin/hooks/photon`. How the twin works: [apps/agents/README.md](../apps/agents/README.md).
 
 ## Before you start
 
@@ -59,7 +59,7 @@ The portfolio twin adds the variables below. Each one is described in [`.env.dep
 | `PAYLOAD_MCP_API_KEY` | agents | The twin's Payload MCP key ([step 6](#6-set-up-the-portfolio-twin)). |
 | `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_CALENDAR_ID`, `OWNER_TIMEZONE` | agents | Optional (all of the group or none; `OWNER_TIMEZONE` stands apart): free/busy access ([step 6](#6-set-up-the-portfolio-twin)) and the owner's IANA zone. |
 | `CAL_LINK`, `CAL_WEBHOOK_SECRET`, `TWIN_BOOKING_REF_SECRET` | agents | Optional (all of the group or none): Cal.com event (`<user>/<event-slug>`), the webhook secret you set in Cal.com, and a random key for booking references. `CAL_ORIGIN` and `CAL_EMBED_SCRIPT_URL` are only for self-hosted Cal. |
-| `SENDBLUE_API_KEY`, `SENDBLUE_API_SECRET`, `SENDBLUE_FROM_NUMBER`, `SENDBLUE_WEBHOOK_SECRET`, `OWNER_PHONE_NUMBER` | agents | Optional (all of the group or none): owner approvals over iMessage ([step 6](#6-set-up-the-portfolio-twin)). Numbers are E.164 (`+15550000001`), and the webhook secret is 16–256 of `A-Z a-z 0-9 _ -`. `SENDBLUE_API_BASE` stays empty. |
+| `IMESSAGE_PROJECT_ID`, `IMESSAGE_PROJECT_SECRET`, `IMESSAGE_WEBHOOK_SECRET`, `OWNER_PHONE_NUMBER` | agents | Optional (all of the group or none): owner approvals over iMessage through Photon ([step 6](#6-set-up-the-portfolio-twin)). The first two come from your Photon project, the webhook secret is the one Photon shows once when you create the webhook, and the number is yours in E.164 (`+15550000001`). |
 | `EXA_API_KEY` | agents | Optional (a group of one): Exa key for the twin's narrow web search. |
 
 Generate each secret with `openssl rand -hex 32`. Don't reuse the development values. Origins are `https://`, with no trailing slash and no path.
@@ -114,13 +114,13 @@ The twin starts with the stack, but it needs these external pieces before it can
 
    Set each portfolio entry's **Disclosure** in its sidebar (`public`, `restricted` or `never`).
 3. **iMessage approvals.**
-   1. Get a Sendblue line and API keys (Sendblue dashboard → **API Keys**). Set `SENDBLUE_API_KEY` and `SENDBLUE_API_SECRET`, and the line, in E.164, as `SENDBLUE_FROM_NUMBER`.
-   2. Set your own phone number, in E.164, as `OWNER_PHONE_NUMBER`. Only replies from it decide approvals.
-   3. Pick a secret of 16–256 characters from `A-Z a-z 0-9 _ -` (`openssl rand -hex 32` works) and set it as `SENDBLUE_WEBHOOK_SECRET`.
-   4. In Sendblue, add a **receive** webhook with URL `https://<web>/api/twin/hooks/sendblue` and, as its secret, the value of `SENDBLUE_WEBHOOK_SECRET`. Update it if the domain or the secret changes.
-   5. **Text the Sendblue line once from your phone,** so the conversation exists before the first approval.
+   1. Create a Photon project at app.photon.codes (the free tier works). Copy the project id and secret into `IMESSAGE_PROJECT_ID` and `IMESSAGE_PROJECT_SECRET`.
+   2. In the project, create a webhook for `https://<web>/api/twin/hooks/photon` (event `messages`). Copy its signing secret, which Photon shows once, into `IMESSAGE_WEBHOOK_SECRET`. Update the webhook if the domain changes.
+   3. Set your own phone number, in E.164, as `OWNER_PHONE_NUMBER`. Only replies from it decide approvals. Redeploy with the four variables set.
+   4. **Text the Photon line once from your iPhone.** The free tier is a shared line, and a shared line can only message a number after that number has texted it first.
+   5. On the iPhone, set **Settings > Messages > Send & Receive > Start New Conversations From** to your phone number. An Apple ID email address can't match `OWNER_PHONE_NUMBER`.
 
-   An approval arrives as a text with a four-character code. Reply `YES <code>` to share or `NO <code>` to decline. A bare `YES`/`NO` works only when a single approval is waiting and was texted before your reply.
+   An approval arrives as a text with a four-character code. Reply `YES <code>` to share or `NO <code>` to decline. Only a reply with the code decides: a bare `YES` or `NO` gets a help text listing what is waiting.
 4. **Cal.com.**
    1. Create the event type the twin offers and set `CAL_LINK=<user>/<event-slug>`.
    2. Under **Settings → Developer → Webhooks**, add a webhook:
@@ -241,11 +241,11 @@ Possible causes:
 ### iMessage approvals always expire
 
 - Check that `OWNER_PHONE_NUMBER` is your number in E.164 (`+`, country code, digits). Replies from any other number are ignored without an answer.
-- Check that the Sendblue **receive** webhook points at `https://<web>/api/twin/hooks/sendblue` and that its secret equals `SENDBLUE_WEBHOOK_SECRET`. A mismatch answers 401.
-- Look in the `agents` logs for `Sendblue send failed: HTTP …`: the approval text never reached you. A 401 or 403 means bad credentials; a 400, 404 or 422 means Sendblue refused the number or the content. Check the keys and `SENDBLUE_FROM_NUMBER`.
-- If a bare `YES` gets a "Reply YES <code>…" help text, more than one approval is waiting or the reply predates the prompt. Reply with the code, e.g. `YES K7Q2`.
-- If your iPhone starts conversations from an Apple ID email address, Sendblue reports that email as the sender and the replies are ignored. Set iPhone **Settings > Messages > Send & Receive > Start New Conversations From** to your phone number.
-- Replies sent as SMS (green bubbles) count only with the code, e.g. `YES K7Q2`. A bare `YES` or `NO` over SMS is ignored without an answer, because SMS sender ids can be spoofed and only iMessage is authenticated.
+- Check that the Photon webhook points at `https://<web>/api/twin/hooks/photon` and that its signing secret equals `IMESSAGE_WEBHOOK_SECRET`. A mismatch is rejected and the reply never reaches the approval.
+- Look in the `agents` logs for `Photon send failed`: the approval text never reached you. Check `IMESSAGE_PROJECT_ID` and `IMESSAGE_PROJECT_SECRET`, and that you texted the Photon line once from your phone (a shared line can only message numbers that texted it first).
+- If your iPhone starts conversations from an Apple ID email address, the reply doesn't match `OWNER_PHONE_NUMBER` and is ignored. Set iPhone **Settings > Messages > Send & Receive > Start New Conversations From** to your phone number.
+- Reply with the code, e.g. `YES K7Q2`. A bare `YES` or `NO` only returns the help text, because Photon's webhook carries nothing that tells a real answer from a spoofed or replayed one. SMS replies count only if Photon delivers them, and they need the code too.
+- If `/webhooks/photon` returns 500 after a Photon or network outage, restart the `agents` service: the channel's adapter initialises on the first webhook after boot, and a failed first initialisation stays cached until restart.
 
 ### `cms` stays unhealthy, so `web` never starts
 

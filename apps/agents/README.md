@@ -2,7 +2,7 @@
 
 ## What it is
 
-A first-person "twin" of the portfolio owner that answers recruiters and clients in the Messenger window on `/os`, using only what the Payload CMS says about the owner. It offers a call when the conversation warrants it, asks the owner over iMessage (Sendblue) before it shares anything restricted, and shows the Cal.com booker inline. It is an [eve](https://eve.dev) 0.71 agent on OpenRouter with a Postgres-backed durable runtime, designed in [the spec](../../docs/superpowers/specs/2026-10-04-portfolio-twin-agent-design.md); this README describes the code as it is now, and [Where the code differs from the spec](#where-the-code-differs-from-the-spec) lists where the two disagree.
+A first-person "twin" of the portfolio owner that answers recruiters and clients in the Messenger window on `/os`, using only what the Payload CMS says about the owner. It offers a call when the conversation warrants it, asks the owner over iMessage (Photon) before it shares anything restricted, and shows the Cal.com booker inline. It is an [eve](https://eve.dev) 0.71 agent on OpenRouter with a Postgres-backed durable runtime, designed in [the spec](../../docs/superpowers/specs/2026-10-04-portfolio-twin-agent-design.md); this README describes the code as it is now, and [Where the code differs from the spec](#where-the-code-differs-from-the-spec) lists where the two disagree.
 
 ## Contents
 
@@ -32,7 +32,7 @@ What has **not** been verified:
 - **No Docker image has been built on the development machine**, which has no Docker. That covers `apps/agents/Dockerfile` and the compose stack (`docker-compose.yml`) with `postgres` and `agents`. CI builds the agent with `eve build` but not the image, so the first real image build happens in Easypanel or on a machine with Docker.
 - **The live evals (`evals/`) have not been run against a real model yet.** CI's `live-evals` job runs them against a real model with a throwaway CMS and agent inside the runner (see [Testing](#testing)), but no run of it has been reviewed. It has never run against the production CMS content.
 - **Grounding (acceptance criterion 1) is only partly checked:** it is live-eval checked for search-before-text and URL provenance; claim-level grounding relies on the `portfolio-recall` skill. There is no judge check (see [Where the code differs from the spec](#where-the-code-differs-from-the-spec)).
-- **None of the external integrations has run end to end against the real service:** Sendblue approvals, Cal.com webhooks, Google free/busy, OpenRouter fallback routing, and the spend ledger with real OpenRouter cost metadata. Each one is covered by unit tests with mocked HTTP. Sendblue and Payload MCP are also covered by local stubs in the offline evals.
+- **None of the external integrations has run end to end against the real service:** Photon approvals, Cal.com webhooks, Google free/busy, OpenRouter fallback routing, and the spend ledger with real OpenRouter cost metadata. Each one is covered by unit tests with mocked HTTP (Photon's adapter is mocked). Payload MCP is also covered by a local stub in the offline evals; Photon has none, so the offline evals leave iMessage unconfigured.
 - **`experimental.workflow.retention: 0` has not been verified at runtime on the Postgres world.** eve's docs warn that "Custom Worlds used with eve might not support this feature". The installed `@workflow/world-postgres` implements it (`dist/retention.js` clears the payload columns and stamps `expired_at` for runs started with `$retention: 0`), but no run has been inspected to confirm that the data is gone. See [Retention and deletion](#retention-and-deletion).
 
 ## Architecture
@@ -43,8 +43,8 @@ What has **not** been verified:
 browser ── /os Messenger (eve/react, host /api/twin) ──► web: /api/twin/eve/v1/* (BFF) ──(internal net, 60 s JWT)──► agents: eve start (/eve/v1/*)
                                                          │ signed cookie → visitor, session ownership,               │ OpenRouter (model + classifier)
                                                          │ rate limits and caps, spend cap, output filter            │ Payload MCP (twinIdentity/twinSearch/twinDisclose)
-Cal.com ── webhook ──► web /api/twin/hooks/cal ──────────(raw body + signature header)──► agents /webhooks/cal      │ Google freeBusy, Exa, Sendblue API
-Sendblue ─ webhook ──► web /api/twin/hooks/sendblue ──(raw body + sb-signing-secret)──► agents /webhooks/sendblue   │
+Cal.com ── webhook ──► web /api/twin/hooks/cal ──────────(raw body + signature header)──► agents /webhooks/cal      │ Google freeBusy, Exa, Photon (iMessage)
+Photon ─ webhook ──► web /api/twin/hooks/photon ──(raw body + x-spectrum-*)──► agents /webhooks/photon (eve photon channel)   │
                                                          └──────────── Postgres: schema `twin` + the Workflow world ───┘
 ```
 
@@ -70,7 +70,7 @@ Sendblue ─ webhook ──► web /api/twin/hooks/sendblue ──(raw body + sb
   - **Fail closed:** without redaction rules, nothing streams.
   - **Forged context notes:** visitor text has `[context` neutralised (`lib/twin/neutralise.ts`), so it can't forge the agent's `[context, not from the visitor]` notes.
 
-**Webhooks** enter through `apps/web/app/api/twin/hooks/[provider]/route.ts`. That route accepts `cal` and `sendblue` only. It forwards the raw body plus the provider's signature headers to `agents /webhooks/<provider>`, and the agent verifies the signature next to the secret (`agent/channels/webhooks.ts`).
+**Webhooks** enter through `apps/web/app/api/twin/hooks/[provider]/route.ts`. That route accepts `cal` and `photon` only. It forwards the raw body plus the headers the provider needs (the signature and event metadata) to `agents /webhooks/<provider>`, and the agent verifies the signature next to the secret: `agent/channels/webhooks.ts` for Cal.com, eve's Photon channel (`agent/channels/photon.ts`) for Photon.
 
 **Visitor deletion:** `DELETE /api/twin/me` (`apps/web/app/api/twin/me/route.ts`). See [Retention and deletion](#retention-and-deletion).
 
@@ -112,7 +112,8 @@ agent/
   instructions.ts           per-turn system prompt (defineDynamic on turn.started), fail-closed fallback
   sandbox.ts                pinned just-bash sandbox (no Docker dependency at build)
   channels/eve.ts           visitor channel: JWT auth, abuse gate, steer policy, uploads disabled
-  channels/webhooks.ts      POST /webhooks/sendblue and /webhooks/cal (signature checks, idempotent)
+  channels/webhooks.ts      POST /webhooks/cal (signature check, idempotent)
+  channels/photon.ts        eve's photonIMessageChannel at /webhooks/photon: the owner's approval replies, never an agent turn
   hooks/conversation.ts     turn bookkeeping, transcript, post-reply intent evaluation
   memory/visitor.ts         returning-visitor recall from Postgres
   instrumentation/spend.ts  spend ledger rows from eve events
@@ -128,7 +129,7 @@ agent/
     tool-gate.ts            toolGranted(sessionId, tool)
     prompt.ts, state-digest.ts, grounding.ts, conversation.ts
     payload-mcp.ts          callPayloadTool: official MCP SDK client over Streamable HTTP, 5 s timeouts
-    search.ts, disclosure.ts, approvals.ts (workflow steps), imessage.ts, imessage-reply.ts, sendblue-webhook.ts, owner-decision.ts, phone.ts
+    search.ts, disclosure.ts, approvals.ts (workflow steps), imessage.ts, imessage-reply.ts, photon-inbound.ts, owner-decision.ts, phone.ts
     google-freebusy.ts, availability.ts, scheduling.ts, booking-ref.ts, booking-transition.ts, cal-webhook.ts
     intent/                 signals.ts, classify.ts, score.ts, weights.ts (INTENT_WEIGHTS), evaluate.ts
     untrusted.ts            <untrusted nonce> wrapping for CMS, web and memory content
@@ -136,7 +137,7 @@ agent/
 skills/<name>/              SKILL.md (frontmatter description + metadata.version, then prose) and skill.ts
 evals/                      live suite: evals/skills/<skill>/*.eval.ts, evals/acceptance/*, evals/lib/*
 fixtures/offline/           offline eval app: scripted mockModel, re-exported real channels and tools,
-                            Payload MCP and Sendblue stubs (stubs/), evals/*.eval.ts, .env.example
+                            Payload MCP stub (stubs/), evals/*.eval.ts, .env.example
 scripts/bundle-skills.ts    SKILL.md → agent/lib/skills/generated.ts (run by every package script)
 scripts/mint-eval-token.ts  JWT for live evals (EVE_EVAL_AUTH_TOKEN)
 tests/                      vitest unit tests (pglite, no network)
@@ -272,12 +273,10 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `CAL_EMBED_SCRIPT_URL` | A | `https://app.cal.com/embed/embed.js` | Embed loader (self-hosted only) | – |
 | `CAL_WEBHOOK_SECRET` | A | cal integration, ≥ 32 chars | Verifies `X-Cal-Signature-256` | Set on the Cal.com webhook |
 | `TWIN_BOOKING_REF_SECRET` | A | cal integration, ≥ 32 chars | Signs the `bookingRef` metadata | `openssl rand -hex 32` |
-| `SENDBLUE_API_KEY` | A | imessage integration | Sends the approval texts (`sb-api-key-id`) | Sendblue dashboard > API Keys |
-| `SENDBLUE_API_SECRET` | A | imessage integration | Sendblue API secret (`sb-api-secret-key`) | Sendblue dashboard > API Keys |
-| `SENDBLUE_FROM_NUMBER` | A | imessage integration, E.164 | The Sendblue line that texts the owner | Your Sendblue line |
-| `SENDBLUE_WEBHOOK_SECRET` | A | imessage integration, 16–256 of `[A-Za-z0-9_-]` | Verifies `sb-signing-secret` | Chosen by you, set on the Sendblue receive webhook |
+| `IMESSAGE_PROJECT_ID` | A | imessage integration | Photon project id: sends the approval texts and starts the channel's adapter | app.photon.codes > your project |
+| `IMESSAGE_PROJECT_SECRET` | A | imessage integration | Photon project secret | app.photon.codes > your project |
+| `IMESSAGE_WEBHOOK_SECRET` | A | imessage integration | Verifies `X-Spectrum-Signature` on `/webhooks/photon` | Shown once when you create the Photon webhook |
 | `OWNER_PHONE_NUMBER` | A | imessage integration, E.164 | The only number whose replies decide approvals | Your own phone |
-| `SENDBLUE_API_BASE` | A | `https://api.sendblue.co` | REST base (stubbed in offline evals) | – |
 | `TWIN_APPROVAL_TIMEOUT` | A | `15m` (`<n>s/m/h`) | Approval deadline before auto-deny | – |
 | `EXA_API_KEY` | A | exa integration | `web_search` | exa.ai dashboard |
 
@@ -287,7 +286,7 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 |---|---|
 | `google` | `check_availability` is never offered |
 | `cal` | `schedule_call` is never offered; `/webhooks/cal` answers 404 |
-| `imessage` | searches drop restricted entries before caching, so nothing restricted is offered and `request_disclosure` refuses without contacting anyone; `/webhooks/sendblue` answers 404 |
+| `imessage` | searches drop restricted entries before caching, so nothing restricted is offered and `request_disclosure` refuses without contacting anyone; `/webhooks/photon` deliveries fail (with iMessage off the channel's adapter can't initialise, so the route answers an error) |
 | `exa` | `web_search` is never offered |
 
 The web BFF reads `webTwinEnvSchema`, from the same file:
@@ -536,7 +535,7 @@ Cost rows carry `model_id = 'openrouter'`, and token rows carry the requested mo
    - It only opens for a `sourceId` that one of this session's cached searches listed as restricted. Anything else is `notOffered`, denied without notifying anyone. The row's topic is the CMS stub's topic, never the model's words.
    - It draws a 4-character **reply code** from `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (no 0/O or 1/I/L), unique among pending approvals; a collision redraws up to 5 times.
    - It stores the workflow's webhook URL. The newest webhook wins, so a re-dispatched run is still the one that gets woken.
-2. **Notify.** `notifyOwner` texts the owner once through Sendblue, then sets `notified_at`, so a retry never texts twice. If notification fails for good, the approval expires. The text holds the CMS topic, the item id and the code only: the model's `reason` is visitor-steerable, so it is kept on the row for audit and never shown next to the question.
+2. **Notify.** `notifyOwner` texts the owner once through Photon, then sets `notified_at`, so a retry never texts twice. If notification fails for good, the approval expires. The text holds the CMS topic, the item id and the code only: the model's `reason` is visitor-steerable, so it is kept on the row for audit and never shown next to the question.
 
    ```
    Twin approval request
@@ -545,12 +544,12 @@ Cost rows carry `model_id = 'openrouter'`, and token rows carry the requested mo
    Reply YES K7Q2 to share or NO K7Q2 to decline. Auto-denies after 15m.
    ```
 3. **Wait.** The body races the webhook against `sleep(TWIN_APPROVAL_TIMEOUT)`.
-4. **The owner replies.** Sendblue posts to `https://<web>/api/twin/hooks/sendblue`, the BFF forwards it, and the agent:
-   - checks `sb-signing-secret` in constant time;
-   - accepts texts from `OWNER_PHONE_NUMBER` only (after E.164 normalisation);
+4. **The owner replies.** Photon posts to `https://<web>/api/twin/hooks/photon`, the BFF forwards it, and eve's Photon channel verifies `X-Spectrum-Signature`. Its `onMessage` (`agent/lib/photon-inbound.ts`):
+   - accepts messages from `OWNER_PHONE_NUMBER` only, in a direct chat (after E.164 normalisation);
    - parses the text with a fixed grammar, no model involved;
    - **commits the decision to the database first**, then wakes the workflow;
-   - texts a short confirmation, best effort.
+   - answers on the same thread with a short confirmation, best effort;
+   - returns `null`, so no agent turn ever starts on this channel.
 5. **Settle.** `finalizeApproval` trusts only the database. Anything without a recorded owner decision becomes `expired`. That covers the deadline, a stray POST and a failed notification, so **the flow fails closed**. Only `approved` releases the item, through `twinDisclose`; a failed release reads as denied.
 
 **Replies.** The text is trimmed, upper-cased and stripped of trailing `.`, `!` and `?`.
@@ -561,35 +560,32 @@ Cost rows carry `model_id = 'openrouter'`, and token rows carry the requested mo
 | `NO K7Q2`, `N K7Q2`, `DENY K7Q2` | Denies K7Q2: "Denied K7Q2: Notice period. Nothing was shared." |
 | a code that settled in the last 24 hours | "K7Q2 already expired; nothing was shared." or "K7Q2 was already approved." |
 | a code that matches nothing | "No approval ZZZZ is waiting." |
-| a bare `YES` or `NO` | Decides only under the rule below; otherwise the help text |
-| anything else | "Reply YES <code> or NO <code>. Waiting: K7Q2 (Notice period)." (up to 3 codes) |
+| a bare `YES` or `NO`, or anything else | "Reply YES <code> or NO <code>. Waiting: K7Q2 (Notice period)." (up to 3 codes), or "Nothing is waiting for approval." |
 
-**A bare `YES`/`NO` fails closed.** It decides only when exactly one approval is pending in total, that approval has been texted (`notified_at` is set), and Sendblue's `date_sent` on the reply is not earlier than `notified_at`. Otherwise the owner gets the help text, listing only the codes already texted. Two things are guarded:
+**Only coded replies decide.** A bare `YES` or `NO` never approves or denies, even with a single approval pending: the owner gets the help text, which lists only the codes already texted. Photon's webhook payload has no service field and no send time, so a bare reply can't be told from an SMS spoof or from an old answer a retry delivers late. The code reached nobody but the owner.
 
-- Sendblue redelivers on 5xx, so an old bare "yes" arriving late must not decide a newer approval.
-- The prompt is texted before it is marked notified, so a reply in that window may be about it. A row not yet marked counts as pending and blocks a bare reply, which cannot then decide a different approval by mistake.
-
-**Who counts.** Only `OWNER_PHONE_NUMBER`. A text from any other number, a group message, an outbound echo or a status other than `RECEIVED` is acknowledged with 200 and ignored: strangers are never answered, because a reply costs money and confirms the line is live, and the number is not logged. An unexpected payload shape is acknowledged and logged by field path. A database failure answers 500, so Sendblue retries; a redelivered coded decision is delivered to the workflow and confirmed again.
-
-**Only iMessage may answer without a code.** SMS and RCS sender ids can be spoofed, while Apple authenticates iMessage handles, and a spoofed bare `YES` would meet exactly the conditions a visitor's own request creates. So a bare `YES`/`NO`, or anything the grammar does not recognise (which would otherwise get the help text), counts only when Sendblue reports `service: "iMessage"`. Over SMS or RCS (or with no `service`), only a coded reply (`YES K7Q2`) decides, since the code reached nobody but the owner; everything else is ignored silently, with no reply and no number or content logged.
+**Who counts.** Only `OWNER_PHONE_NUMBER`. A message from any other number, a group chat, a bot or an echo of our own text is ignored: strangers are never answered, because a reply confirms the line is live, and the number is not logged. Photon is answered 200 before any of this runs, so nothing is redelivered.
 
 **Late replies.** After the deadline the approval is `expired` and stays closed: a reply cannot revive it, and a coded reply gets "already expired; nothing was shared." The prompt states the deadline, and no "expired" text is sent.
 
+**When recording fails.** If the database write fails, the owner is asked "That reply could not be recorded. Send it again." (best effort), and the owner resends the code. A resent coded decision is delivered to the workflow and confirmed again.
+
 Setup:
 
-1. **Get a Sendblue line and API keys** (Sendblue dashboard > API Keys). Put the key id in `SENDBLUE_API_KEY`, the secret in `SENDBLUE_API_SECRET`, and the line, in E.164, in `SENDBLUE_FROM_NUMBER`.
-2. **Set your own number** in E.164 as `OWNER_PHONE_NUMBER`.
-3. **Pick a secret** of 16–256 characters from `A-Z a-z 0-9 _ -`, for example `openssl rand -hex 32`, and put it in `SENDBLUE_WEBHOOK_SECRET`. All five variables are required together.
-4. **Add a receive webhook** in Sendblue against the **web** domain (the agent is not public): URL `https://<web>/api/twin/hooks/sendblue`, secret `SENDBLUE_WEBHOOK_SECRET`. The BFF forwards the raw body plus `content-type` and `sb-signing-secret`. Update it whenever the domain or the secret changes.
-5. **Text the Sendblue line once from your phone,** so the conversation exists before the first approval.
+1. **Create a Photon project** at app.photon.codes (the free tier works) and copy the project id and secret into `IMESSAGE_PROJECT_ID` and `IMESSAGE_PROJECT_SECRET`.
+2. **Create a webhook** for `https://<web>/api/twin/hooks/photon` (event `messages`) against the **web** domain, since the agent is not public. Copy the signing secret Photon shows once into `IMESSAGE_WEBHOOK_SECRET`. The BFF forwards the raw body plus `content-type`, `x-spectrum-signature`, `x-spectrum-timestamp`, `x-spectrum-event` and `x-spectrum-webhook-id`. Update the webhook whenever the domain changes.
+3. **Set your own number** in E.164 as `OWNER_PHONE_NUMBER`. All four variables are required together.
+4. **Text the Photon line once from your iPhone.** The free tier is a shared line (up to 10 users), and a shared line can only message a number after that number has texted the line first.
+5. **On the iPhone, set Settings > Messages > Send & Receive > "Start New Conversations From"** to your phone number. An Apple ID email address can't match `OWNER_PHONE_NUMBER`, so those replies would be ignored.
 
-**Why there is no eve Chat SDK channel.** eve documents Sendblue as a Chat SDK integration (`chat-adapter-sendblue`), and there is a Photon channel for iMessage, but neither fits an approval:
+**Why it is built this way.**
 
-- Both are conversational channels: every inbound message dispatches an agent session. The owner is answering about *another* session (the visitor's), and eve's human-in-the-loop resumes the *requesting* session through *its* channel, which is the visitor's Messenger window.
-- `chat-adapter-sendblue` 0.2.0 compares the secret with `!==` (not constant-time), skips verification when no secret is set, throws at module evaluation when its env is absent (which breaks optional integrations and eve's build-time evaluation), and ignores tapbacks.
-- It needs a Chat SDK state store (Redis in production), which this stack does not run.
+- **Inbound is eve's Photon channel**, as in the personal-agent-template reference and eve's "Other hosts" example (lazy credentials, `route: '/webhooks/photon'`). The one difference is `onMessage`: the owner is answering about *another* session (the visitor's), and eve's human-in-the-loop resumes the *requesting* session through *its* channel, which is the visitor's Messenger window. So `onMessage` decides the approval itself and returns `null` instead of dispatching a turn.
+- **Outbound is the provider API**, per eve's durable cross-channel notifications pattern: `agent/lib/imessage.ts` calls `openDM(owner)` and `postMessage` on `@photon-ai/chat-adapter-imessage` 3.2.0, the adapter eve bundles, so the owner needn't have a live session. An unconfigured integration is a `FatalError` (no retry). The adapter exposes no permanent-error classification, so its failures stay retryable (`Photon send failed`) and the workflow step retries them.
+- **Bare replies don't decide** because Photon gives the agent nothing to tell a real answer from a spoofed or replayed one (see above); the code is the proof.
+- **The decision is in** [the iMessage spec](../../docs/superpowers/specs/2026-10-05-imessage-owner-approvals-design.md).
 
-So `agent/lib/imessage.ts` calls Sendblue's REST API with the official `sendblue` SDK (3.19.0, no SDK retries, 10 s timeout), and `agent/lib/sendblue-webhook.ts` handles the replies. A 400, 401, 403, 404 or 422, or a body status of `ERROR`, is a permanent failure (`FatalError`, no retry); 429, 5xx, timeouts and network errors are retried by the workflow step. Error messages carry the status and Sendblue's message, never credentials. The decision is in [the iMessage spec](../../docs/superpowers/specs/2026-10-05-imessage-owner-approvals-design.md).
+**Restart after a failed first initialisation.** The channel's adapter initialises on the first webhook after boot, issuing Photon tokens, *before* the signature is verified. If that first initialisation fails (a Photon or network outage), Chat SDK caches the failure and `/webhooks/photon` keeps answering 500 until the agents service restarts. After an outage, restart `agents`.
 
 ### Cal.com
 
@@ -666,13 +662,13 @@ Put the key in `PAYLOAD_MCP_API_KEY`.
 | Offline evals | see below | Real channels, tools and Postgres world, scripted model, local stubs |
 | Live evals | see below | Real model, CMS and integrations, deterministic assertions |
 
-**Unit tests (zero network).** Vitest runs against **pglite**, an in-process Postgres migrated with the real migrations (`@repo/twin/testing`). Every HTTP call is mocked (OpenRouter, MCP, Sendblue, Google, Exa). A setup file (`@repo/twin/testing/network-guard`, in both `packages/twin` and `apps/agents`) replaces global `fetch` with a guard: an un-mocked call rejects and fails the test in `afterEach`, even if the code under test swallowed the error. `vi.stubGlobal('fetch', ...)` replaces the guard and unstubbing restores it. `vitest.config.ts` aliases `workflow` to eve's vendored Workflow SDK, as eve does at build time.
+**Unit tests (zero network).** Vitest runs against **pglite**, an in-process Postgres migrated with the real migrations (`@repo/twin/testing`). Every HTTP call is mocked (OpenRouter, MCP, Google, Exa), and Photon's adapter is mocked. A setup file (`@repo/twin/testing/network-guard`, in both `packages/twin` and `apps/agents`) replaces global `fetch` with a guard: an un-mocked call rejects and fails the test in `afterEach`, even if the code under test swallowed the error. `vi.stubGlobal('fetch', ...)` replaces the guard and unstubbing restores it. `vitest.config.ts` aliases `workflow` to eve's vendored Workflow SDK, as eve does at build time.
 
 **Offline evals** (`fixtures/offline/`). This is a separate eve app:
 
 - **The model** is a scripted `mockModel` with keyword-driven paths: `BOOK`, `PUSH`, `NO`, `FACT`.
 - **The channels and tools** re-export the real ones from `agent/`.
-- **Stubs** for Payload MCP (`:4310`) and Sendblue (`:4312`, it records the `/api/send-message` bodies) start in the eval setup.
+- **A stub** for Payload MCP (`:4310`) starts in the eval setup. Photon has none (it is gRPC, with no HTTP stub), so the fixture leaves iMessage unconfigured: restricted entries are never offered there.
 - **The database** is the real Postgres world on `twin_eval`.
 
 The evals cover widget guards, decline, portfolio search and the Cal.com booking webhook. **`request_disclosure` is not in the fixture**, because eve compiles workflow directives only under the app root. Its body is proven by `tests/request-disclosure-body.test.ts` instead, which runs it uncompiled with `workflow` mocked: approved, denied, deadline to expired, notification failure, failed release and an item the session was never offered.
@@ -731,7 +727,7 @@ The `checks` job runs on every push to `main`/`develop` and on every PR:
 
 ## Where the code differs from the spec
 
-- **The owner-approval transport** is iMessage via Sendblue, not Telegram. [The 2026-10-05 spec](../../docs/superpowers/specs/2026-10-05-imessage-owner-approvals-design.md) supersedes the Telegram transport of the 2026-10-04 spec (`request_disclosure`, §6); the rest of the approval design is unchanged.
+- **The owner-approval transport** is iMessage via Photon, not Telegram. [The 2026-10-05 spec](../../docs/superpowers/specs/2026-10-05-imessage-owner-approvals-design.md) supersedes the Telegram transport of the 2026-10-04 spec (`request_disclosure`, §6); the rest of the approval design is unchanged.
 - **The BFF route** is `apps/web/app/api/twin/eve/v1/[...path]/route.ts`, not `apps/web/app/api/twin/[...path]/route.ts`.
 - **Payload MCP** is called with the official `@modelcontextprotocol/sdk` client (`agent/lib/payload-mcp.ts`), not `@ai-sdk/mcp`'s `createMCPClient`.
 - **Skill activation:**
