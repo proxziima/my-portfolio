@@ -1,3 +1,4 @@
+import { addUnique } from '@repo/twin/contract'
 import { setEvaluationOutcome, updateConversation } from '@repo/twin/db'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
@@ -9,7 +10,11 @@ const tool = defineTool({
   inputSchema: z.object({}),
   outputSchema: z.object({ recorded: z.literal(true) }),
   async execute(_input, ctx) {
-    const state = await updateConversation(db(), ctx.session.id, (s) => ({ ...s, callOfferDeclined: true }))
+    const state = await updateConversation(db(), ctx.session.id, (s) => ({
+      ...s,
+      callOfferDeclined: true,
+      toolsUsed: addUnique(s.toolsUsed, 'record_call_decline'),
+    }))
     if (state.intent.lastEvaluationId) await setEvaluationOutcome(db(), state.intent.lastEvaluationId, 'declined')
     return { recorded: true as const }
   },
