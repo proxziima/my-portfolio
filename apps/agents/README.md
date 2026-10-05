@@ -571,6 +571,8 @@ Cost rows carry `model_id = 'openrouter'`, and token rows carry the requested mo
 
 **Who counts.** Only `OWNER_PHONE_NUMBER`. A text from any other number, a group message, an outbound echo or a status other than `RECEIVED` is acknowledged with 200 and ignored: strangers are never answered, because a reply costs money and confirms the line is live, and the number is not logged. An unexpected payload shape is acknowledged and logged by field path. A database failure answers 500, so Sendblue retries; a redelivered coded decision is delivered to the workflow and confirmed again.
 
+**Only iMessage may answer without a code.** SMS and RCS sender ids can be spoofed, while Apple authenticates iMessage handles, and a spoofed bare `YES` would meet exactly the conditions a visitor's own request creates. So a bare `YES`/`NO`, or anything the grammar does not recognise (which would otherwise get the help text), counts only when Sendblue reports `service: "iMessage"`. Over SMS or RCS (or with no `service`), only a coded reply (`YES K7Q2`) decides, since the code reached nobody but the owner; everything else is ignored silently, with no reply and no number or content logged.
+
 **Late replies.** After the deadline the approval is `expired` and stays closed: a reply cannot revive it, and a coded reply gets "already expired; nothing was shared." The prompt states the deadline, and no "expired" text is sent.
 
 Setup:
@@ -724,7 +726,7 @@ The `checks` job runs on every push to `main`/`develop` and on every PR:
    - It creates a CI user and an MCP API key with only `twinIdentity`, `twinSearch` and `twinDisclose` enabled. The key uses Payload's `useAPIKey` auth: the Local API sets `enableAPIKey` and `apiKey`, and Payload's field hooks store the key encrypted plus an HMAC index that the MCP endpoint looks up.
    - The key is masked and written to `$GITHUB_ENV` as `PAYLOAD_MCP_API_KEY`.
    - Then `next start` serves the CMS on `:3001`.
-3. **The agent** is built and runs `world:setup` and `db:migrate` against a `postgres:17` service (`twin_eval` on 5433), then starts on `:4100`. `CMS_URL` and `PAYLOAD_MCP_URL` point at the local CMS. Google and Sendblue get harmless placeholders: the live suite has no approval or free/busy eval. If the model calls `check_availability` during the booking acceptance, that call fails, and the model has to go on without it.
+3. **The agent** is built and runs `world:setup` and `db:migrate` against a `postgres:17` service (`twin_eval` on 5433), then starts on `:4100`. `CMS_URL` and `PAYLOAD_MCP_URL` point at the local CMS. Google gets harmless placeholders; iMessage is left unconfigured, so nothing restricted is offered and no approval runs. The live suite has no free/busy eval either. If the model calls `check_availability` during the booking acceptance, that call fails, and the model has to go on without it.
 4. **The evals.** Once `/eve/v1/health` answers, the job mints the eval token and runs `bunx eve eval --url http://127.0.0.1:4100 --strict --junit .eve/junit.xml` from `apps/agents`.
 
 ## Where the code differs from the spec

@@ -57,10 +57,10 @@ The portfolio twin adds the variables below. Each one is described in [`.env.dep
 | `TWIN_REDACT_SECRET` | cms, web, agents | Random. Authenticates `GET /api/twin/redact-terms` on the CMS. |
 | `TWIN_DAILY_SPEND_USD` | web | Daily model spend cap in USD (default 5). Past it, the twin answers "offline" until 00:00 UTC. |
 | `PAYLOAD_MCP_API_KEY` | agents | The twin's Payload MCP key ([step 6](#6-set-up-the-portfolio-twin)). |
-| `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_CALENDAR_ID`, `OWNER_TIMEZONE` | agents | Free/busy access ([step 6](#6-set-up-the-portfolio-twin)) and the owner's IANA zone. |
-| `CAL_LINK`, `CAL_WEBHOOK_SECRET`, `TWIN_BOOKING_REF_SECRET` | agents | Cal.com event (`<user>/<event-slug>`), the webhook secret you set in Cal.com, and a random key for booking references. `CAL_ORIGIN` and `CAL_EMBED_SCRIPT_URL` are only for self-hosted Cal. |
-| `SENDBLUE_API_KEY`, `SENDBLUE_API_SECRET`, `SENDBLUE_FROM_NUMBER`, `SENDBLUE_WEBHOOK_SECRET`, `OWNER_PHONE_NUMBER` | agents | Optional, all five or none: owner approvals over iMessage ([step 6](#6-set-up-the-portfolio-twin)). Numbers are E.164 (`+15550000001`), and the webhook secret is 16–256 of `A-Z a-z 0-9 _ -`. `SENDBLUE_API_BASE` stays empty. |
-| `EXA_API_KEY` | agents | Exa key for the twin's narrow web search. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_CALENDAR_ID`, `OWNER_TIMEZONE` | agents | Optional (all of the group or none; `OWNER_TIMEZONE` stands apart): free/busy access ([step 6](#6-set-up-the-portfolio-twin)) and the owner's IANA zone. |
+| `CAL_LINK`, `CAL_WEBHOOK_SECRET`, `TWIN_BOOKING_REF_SECRET` | agents | Optional (all of the group or none): Cal.com event (`<user>/<event-slug>`), the webhook secret you set in Cal.com, and a random key for booking references. `CAL_ORIGIN` and `CAL_EMBED_SCRIPT_URL` are only for self-hosted Cal. |
+| `SENDBLUE_API_KEY`, `SENDBLUE_API_SECRET`, `SENDBLUE_FROM_NUMBER`, `SENDBLUE_WEBHOOK_SECRET`, `OWNER_PHONE_NUMBER` | agents | Optional (all of the group or none): owner approvals over iMessage ([step 6](#6-set-up-the-portfolio-twin)). Numbers are E.164 (`+15550000001`), and the webhook secret is 16–256 of `A-Z a-z 0-9 _ -`. `SENDBLUE_API_BASE` stays empty. |
+| `EXA_API_KEY` | agents | Optional (a group of one): Exa key for the twin's narrow web search. |
 
 Generate each secret with `openssl rand -hex 32`. Don't reuse the development values. Origins are `https://`, with no trailing slash and no path.
 
@@ -244,6 +244,8 @@ Possible causes:
 - Check that the Sendblue **receive** webhook points at `https://<web>/api/twin/hooks/sendblue` and that its secret equals `SENDBLUE_WEBHOOK_SECRET`. A mismatch answers 401.
 - Look in the `agents` logs for `Sendblue send failed: HTTP …`: the approval text never reached you. A 401 or 403 means bad credentials; a 400, 404 or 422 means Sendblue refused the number or the content. Check the keys and `SENDBLUE_FROM_NUMBER`.
 - If a bare `YES` gets a "Reply YES <code>…" help text, more than one approval is waiting or the reply predates the prompt. Reply with the code, e.g. `YES K7Q2`.
+- If your iPhone starts conversations from an Apple ID email address, Sendblue reports that email as the sender and the replies are ignored. Set iPhone **Settings > Messages > Send & Receive > Start New Conversations From** to your phone number.
+- Replies sent as SMS (green bubbles) count only with the code, e.g. `YES K7Q2`. A bare `YES` or `NO` over SMS is ignored without an answer, because SMS sender ids can be spoofed and only iMessage is authenticated.
 
 ### `cms` stays unhealthy, so `web` never starts
 

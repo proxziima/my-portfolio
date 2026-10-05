@@ -59,7 +59,7 @@ Outside the group, `SENDBLUE_API_BASE` defaults to `https://api.sendblue.co`. Th
   - assigned in `createApproval`, which retries with a fresh code on a collision on that index (5 attempts, then it throws).
 - **Add the query `findApprovalByCode(code)`.** It returns the pending row with that code, or the most recent settled row with that code from the last 24 hours, so a late reply gets the right message.
 - **Add the query `listPendingApprovals()`** (all pending rows, oldest first) for bare replies and for the help text.
-- **The migration is generated with drizzle-kit,** like 0000 and 0001. Existing local rows get a backfilled random hex code:
+- **The migration is generated with drizzle-kit,** like 0000 and 0001. Existing local rows get a backfilled code: 4 hex characters derived from `md5(id)`, which may contain 0 or 1 (the grammar accepts them):
   - the `NOT NULL` is added after the backfill;
   - `notified_at` is backfilled only for settled rows that had a Telegram message. A Telegram-era pending row was never texted its iMessage code, so it stays un-notified and can't be answered by a bare reply;
   - drizzle's generated SQL is edited for the backfill;
@@ -79,20 +79,21 @@ The text is trimmed, upper-cased and stripped of trailing punctuation. Then:
   - **Redelivery.** Sendblue retries on 5xx, so an old bare "yes" can arrive late. It predates the newer prompt's `notified_at` and can't decide it.
   - **Send before mark.** The prompt is texted before `notified_at` is set. A reply in that window may be about it, so a row not yet marked counts as pending and blocks a bare reply instead of letting it decide something else.
 - Anything else from the owner gets the same help text. No AI is involved, so no prompt injection is possible.
+- **Only iMessage may answer without a code.** Sendblue reports the transport as `service` (`'iMessage' | 'SMS' | 'RCS'`). SMS and RCS sender ids can be spoofed, whereas Apple authenticates iMessage handles, and a spoofed bare `YES` would meet exactly the conditions a visitor's own request creates. So over any service other than `iMessage` (including a missing one), a coded reply is processed as usual (the code reached nobody but the owner), and anything else, bare or unrecognised, is ignored: 200, no reply, one log line without number or content.
 
 ### Inbound route `POST /webhooks/sendblue` (agent: routed in `agent/channels/webhooks.ts`, handled in `agent/lib/sendblue-webhook.ts`)
 
 1. The `imessage` integration is off → 404.
 2. `sb-signing-secret` fails `secretsEqual` → 401.
-3. The body fails the zod `SendblueInbound` schema (`content`, `from_number`, `is_outbound`, `status`, `message_handle`, optional `group_id` and `date_sent`) → acknowledged with 200 and logged by issue paths only.
+3. The body fails the zod `SendblueInbound` schema (`content`, `from_number`, `is_outbound`, `status`, `message_handle`, optional `group_id`, `date_sent` and `service`) → acknowledged with 200 and logged by issue paths only.
 4. `is_outbound`, a status other than `RECEIVED`, a group message, or a sender other than `OWNER_PHONE_NUMBER` after normalisation → 200, logged without the number. Strangers are never answered: the reply would cost money and confirm the line is live.
-5. Parse the text and pick the approval (by code, or under the bare-reply rule above), then `decideApproval(id, { actor: 'imessage:owner', ... })`, then `planDecision`, which is reused unchanged except for the actor, then `deliver(webhook)`. Then send the confirmation text. Sends are best effort: they are logged, never rethrown.
+5. Parse the text. Over a service other than iMessage, a bare or unrecognised reply is ignored here (see the trust rule above). Then pick the approval (by code, or under the bare-reply rule above), then `decideApproval(id, { actor: 'imessage:owner', ... })`, then `planDecision`, then `deliver(webhook)`. `planDecision` is ported from the Telegram version: it takes a status instead of a button tap, returns a `reply` text instead of answer/markText, and has a still-pending branch that answers "Nothing changed. Try again." Then send the confirmation text. Sends are best effort: they are logged, never rethrown.
 6. A transient database failure throws, so the route returns 500 and Sendblue's documented retry on 5xx redelivers. A redelivery of the same decision by the same actor is re-delivered (the existing `planDecision` rule) and gets the same confirmation.
 
 ### Outbound (`agent/lib/imessage.ts`, replaces `telegram.ts`)
 
 - **Client.** `new SendblueAPI({ apiKey, apiSecret, baseURL: SENDBLUE_API_BASE, maxRetries: 0, timeout: 10_000 })`. Retries belong to the workflow step, not the SDK.
-- **Function.** `sendToOwner(text)` returns the message handle. The notify step builds the text with `requestText(row, timeout)` (`agent/lib/imessage-reply.ts`) and passes it in.
+- **Function.** `sendToOwner(text)` returns the message handle. The notify step builds the text with `requestText(row, timeout)` (`agent/lib/imessage-reply.ts`) and passes it in. It throws `FatalError` when the integration is not configured, since no retry would make the configuration appear before the approval expires.
 - **Error classes.** `APIError` 400, 401, 403, 404 and 422, and a response body with status `ERROR`, throw `FatalError`, which is permanent: bad credentials, a number Sendblue refuses, or content it rejects. 429, 5xx, timeouts and network errors stay retryable. A network error keeps its `cause`.
 - **Messages never contain the secrets.** Errors are built from the status and Sendblue's `error_message` only.
 - **Prompt text.** It is built from the row only (CMS topic, source id, reply code, timeout), never from the model's reason. This is unchanged from the original spec:
@@ -116,7 +117,7 @@ The tool contract, the caps (3 per session, one per item), the offered-stub chec
 - **pglite:**
   - the migration (backfill plus `NOT NULL`);
   - reply-code uniqueness and retry on a forced collision;
-  - `findPendingByCode` for pending, recently settled and unknown codes.
+  - `findApprovalByCode` for pending, recently settled and unknown codes.
 - **Route handler with mocks:**
   - 404 off, 401 bad secret;
   - stranger ignored, outbound ignored;
@@ -128,5 +129,5 @@ The tool contract, the caps (3 per session, one per item), the offered-stub chec
 ## Out of scope
 
 - Talking to the twin over iMessage (a conversational channel).
-- SMS or RCS fallback: replies from any service count, but the integration targets iMessage.
+- SMS or RCS fallback: replies over SMS or RCS count only with a code. Bare replies and the help text need iMessage, whose sender is authenticated by Apple.
 - Tapback approvals: the Sendblue webhook docs and the adapter don't document inbound reactions. They can be added later if confirmed.

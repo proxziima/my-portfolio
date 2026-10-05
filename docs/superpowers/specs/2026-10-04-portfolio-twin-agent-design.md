@@ -1,5 +1,7 @@
 # Portfolio Twin Agent — Design
 
+> Owner-approval transport superseded on 2026-10-05: Telegram mentions below are historical; see [2026-10-05-imessage-owner-approvals-design.md](2026-10-05-imessage-owner-approvals-design.md).
+
 Date: 2026-10-04 · Branch: `feat/portfolio-twin-agent` · Status: decided (owner asked for no question gates)
 
 ## 0. Summary
