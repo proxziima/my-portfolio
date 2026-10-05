@@ -32,7 +32,7 @@ export async function loadCorpus(payload: Payload): Promise<CorpusEntry[]> {
   ])
   const entry = (item: TwinItem, disclosure: DisclosureTier, category: KnowledgeCategory | null = null): CorpusEntry => ({ item, disclosure, category })
   const companyOf = (ref: unknown) => companies.get(refId(ref) ?? -1)
-  const publicProjects = new Map(projects.docs.filter((p) => p.disclosure === 'public').map((p) => [p.id, p.name]))
+  const projectNames = new Map(projects.docs.filter((p) => p.disclosure === 'public').map((p) => [p.id, p.name]))
   // Bios are public prose: a record link is named only while its record is public.
   const recordName: RecordName = (ref) => {
     const { relationTo, value } = (ref ?? {}) as { relationTo?: unknown; value?: unknown }
@@ -41,26 +41,32 @@ export async function loadCorpus(payload: Payload): Promise<CorpusEntry[]> {
       const c = companies.get(id)
       return c?.disclosure === 'public' ? c.name : undefined
     }
-    return relationTo === 'projects' ? publicProjects.get(id) : undefined
+    return relationTo === 'projects' ? projectNames.get(id) : undefined
   }
   return [
     entry({ sourceId: 'profile:global', kind: 'profile', title: `Profile: ${profile.name}`, text: [profile.name, profile.headlineTail, profile.location].filter(Boolean).join(' · ') }, 'public'),
     entry({ sourceId: 'contact:global', kind: 'contact', title: 'Contact links', text: (contact.links ?? []).map((l) => `${l.label}: ${l.url}`).join('\n') }, 'public'),
     ...experiences.docs.flatMap((d) => {
       const company = companyOf(d.company)
+      // An unresolved company fails closed: the row is dropped rather than shown without its company.
       if (!company) return []
-      const item = { sourceId: `experiences:${d.id}`, kind: 'experience' as const, title: `${d.title} at ${company.name}`, text: `${d.title} at ${company.name}, ${d.startYear}–${d.endYear ?? 'present'}`, url: company.url ?? undefined }
+      // A restricted entry's title is exposed as its topic stub, so it must not name a non-public company;
+      // the full text, with the name, only leaves through an approved twinDisclose.
+      const title = company.disclosure === 'public' ? `${d.title} at ${company.name}` : `${d.title} (company undisclosed)`
+      const item = { sourceId: `experiences:${d.id}`, kind: 'experience' as const, title, text: `${d.title} at ${company.name}, ${d.startYear}–${d.endYear ?? 'present'}`, url: company.url ?? undefined }
       return [entry(item, stricterTier(d.disclosure, company.disclosure))]
     }),
+    // A project's name is public on the site whatever its company is, so it keeps its own tier;
+    // only a public company may be named alongside it.
     ...projects.docs.map((d) => {
       const company = companyOf(d.company)
-      const text = company ? `${d.summary} (at ${company.name})` : d.summary
-      return entry({ sourceId: `projects:${d.id}`, kind: 'project', title: `Project: ${d.name}`, text, url: d.url ?? undefined }, company ? stricterTier(d.disclosure, company.disclosure) : d.disclosure)
+      const text = company?.disclosure === 'public' ? `${d.summary} (at ${company.name})` : d.summary
+      return entry({ sourceId: `projects:${d.id}`, kind: 'project', title: `Project: ${d.name}`, text, url: d.url ?? undefined }, d.disclosure)
     }),
     ...content.docs.map((d) => entry({ sourceId: `content:${d.id}`, kind: 'content', title: `${d.kind}: ${d.title}`, text: [d.title, d.venue, d.date?.slice(0, 10)].filter(Boolean).join(' · '), url: d.url ?? undefined }, d.disclosure)),
     ...disciplines.docs.map((d) => entry({ sourceId: `disciplines:${d.id}`, kind: 'discipline', title: `Role: ${d.title}`, text: lexicalText(d.bio, recordName) }, d.disclosure)),
     ...knowledge.docs.map((d) => entry({ sourceId: `knowledge:${d.id}`, kind: 'knowledge', title: d.topic, text: d.answer }, d.disclosure, d.category)),
-  ]
+  ].filter((e) => e.disclosure !== 'never') // Defence in depth: an effective never tier (e.g. via its company) stays out of memory.
 }
 
 /** MCP text content carrying JSON; the agent validates it against `@repo/twin/contract`. */

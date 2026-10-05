@@ -73,7 +73,10 @@ describe('twin corpus', () => {
       { type: 'text', text: ' and ' },
       { type: 'inlineBlock', fields: { blockType: 'recordLink', record: { relationTo: 'projects', value: 9 } } },
     ] }] } }
-    const names = (ref: unknown) => ((ref as { relationTo: string; value: number }).value === 3 ? 'Autodoc' : undefined)
+    const names = (ref: unknown) => {
+      const { relationTo, value } = ref as { relationTo: string; value: number }
+      return relationTo === 'companies' && value === 3 ? 'Autodoc' : undefined
+    }
     expect(lexicalText(bio, names)).toBe('At Autodoc and')
   })
 
