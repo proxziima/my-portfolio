@@ -22,14 +22,16 @@ A first-person "twin" of the portfolio owner that answers recruiters and clients
 
 What has been checked:
 
-- **Unit tests pass locally:** `apps/agents` has 31 files and 186 tests, and `packages/twin` has 10 files and 72 tests, at the commit that added this README.
+- **Unit tests pass locally:** `apps/agents` has 33 files and 197 tests, `packages/twin` has 11 files and 77 tests, and `apps/web` has 65 files and 416 tests, at the commit that last updated these counts.
 - **The offline evals pass against local Postgres (`twin_eval`):** 4 evals and 18 gates, with the scripted model and local stubs, at the same commit.
+- **The approval timeout has no offline eval.** It is proven by `tests/request-disclosure-body.test.ts` (the real workflow body, `workflow` mocked) plus the step tests in `tests/approval-steps.test.ts`; `eve build` proves the body compiles. See [Where the code differs from the spec](#where-the-code-differs-from-the-spec).
 - **CI has the jobs listed under [Testing](#testing).** No CI run result has been reviewed for this README.
 
 What has **not** been verified:
 
 - **No Docker image has been built on the development machine**, which has no Docker. That covers `apps/agents/Dockerfile` and the compose stack (`docker-compose.yml`) with `postgres` and `agents`. CI builds the agent with `eve build` but not the image, so the first real image build happens in Easypanel or on a machine with Docker.
 - **The live evals (`evals/`) have not been run against a real model yet.** CI's `live-evals` job runs them against a real model with a throwaway CMS and agent inside the runner (see [Testing](#testing)), but no run of it has been reviewed. It has never run against the production CMS content.
+- **Grounding (acceptance criterion 1) is only partly checked:** it is live-eval checked for search-before-text and URL provenance; claim-level grounding relies on the `portfolio-recall` skill. There is no judge check (see [Where the code differs from the spec](#where-the-code-differs-from-the-spec)).
 - **None of the external integrations has run end to end against the real service:** Telegram approvals, Cal.com webhooks, Google free/busy, OpenRouter fallback routing, and the spend ledger with real OpenRouter cost metadata. Each one is covered by unit tests with mocked HTTP. Telegram and Payload MCP are also covered by local stubs in the offline evals.
 - **`experimental.workflow.retention: 0` has not been verified at runtime on the Postgres world.** eve's docs warn that "Custom Worlds used with eve might not support this feature". The installed `@workflow/world-postgres` implements it (`dist/retention.js` clears the payload columns and stamps `expired_at` for runs started with `$retention: 0`), but no run has been inspected to confirm that the data is gone. See [Retention and deletion](#retention-and-deletion).
 
@@ -62,7 +64,7 @@ Telegram ─ webhook ──► web /api/twin/hooks/telegram ─────(raw 
   A refused message gets one of four refusals: `throttled`, `too_long`, `ended` or `offline`. A failure past validation also becomes `offline`, so failure details never reach the browser.
 - **The output boundary** (`lib/twin/filter.ts`, `packages/twin/src/redact/*`):
   - **Redaction:** never-tier terms (from the CMS's `GET /api/twin/redact-terms`) and PII are redacted from assistant text. The stream redactor holds back a growing tail so that a term split across deltas can't leak.
-  - **Canary:** a reply containing `TWIN_PROMPT_CANARY` is replaced with `LEAK_DEFLECTION`.
+  - **Canary:** once `TWIN_PROMPT_CANARY` (the system prompt's first line) appears in a text block, every later delta of that block is blanked and its `message.completed` is replaced with `LEAK_DEFLECTION`. The canary is the only marker it blocks.
   - **Resumed streams:** the deltas of a block that started before the cut are blanked, and its `message.completed` carries the redacted text.
   - **Blanking:** reasoning, every tool payload except `schedule_call`'s successful output, every error message, failure details (only `code` survives), usage, `providerMetadata` and `session-limit` prompts are blanked.
   - **Fail closed:** without redaction rules, nothing streams.
@@ -520,8 +522,9 @@ Cost rows carry `model_id = 'openrouter'`, and token rows carry the requested mo
 1. **Open.** `openApproval` creates or reuses the approval:
    - It is idempotent per tool call (`call_id`), and the same item is never asked about twice in a session.
    - It is capped at 3 per session; past the cap, the request is denied silently.
+   - It only opens for a `sourceId` that one of this session's cached searches listed as restricted. Anything else is `notOffered`, denied without notifying anyone. The row's topic is the CMS stub's topic, never the model's words.
    - It stores the workflow's webhook URL. The newest webhook wins, so a re-dispatched run is still the one that gets woken.
-2. **Notify.** `notifyOwner` sends the Approve/Deny message once; the stored message id prevents a resend. If notification fails, the approval expires.
+2. **Notify.** `notifyOwner` sends the Approve/Deny message once; the stored message id prevents a resend. If notification fails, the approval expires. The message holds the CMS topic and the item id only: the model's `reason` is visitor-steerable, so it is kept on the row for audit and never shown next to the Approve button.
 3. **Wait.** The body races the webhook against `sleep(TWIN_APPROVAL_TIMEOUT)`.
 4. **The owner taps a button.** Telegram posts to `https://<web>/api/twin/hooks/telegram`, the BFF forwards it, and the agent:
    - checks the secret header;
@@ -623,7 +626,7 @@ Put the key in `PAYLOAD_MCP_API_KEY`.
 | Offline evals | see below | Real channels, tools and Postgres world, scripted model, local stubs |
 | Live evals | see below | Real model, CMS and integrations, deterministic assertions |
 
-**Unit tests (zero network).** Vitest runs against **pglite**, an in-process Postgres migrated with the real migrations (`@repo/twin/testing`). Every HTTP call is mocked (OpenRouter, MCP, Telegram, Google, Exa). `vitest.config.ts` aliases `workflow` to eve's vendored Workflow SDK, as eve does at build time.
+**Unit tests (zero network).** Vitest runs against **pglite**, an in-process Postgres migrated with the real migrations (`@repo/twin/testing`). Every HTTP call is mocked (OpenRouter, MCP, Telegram, Google, Exa). A setup file (`@repo/twin/testing/network-guard`, in both `packages/twin` and `apps/agents`) replaces global `fetch` with a guard: an un-mocked call rejects and fails the test in `afterEach`, even if the code under test swallowed the error. `vi.stubGlobal('fetch', ...)` replaces the guard and unstubbing restores it. `vitest.config.ts` aliases `workflow` to eve's vendored Workflow SDK, as eve does at build time.
 
 **Offline evals** (`fixtures/offline/`). This is a separate eve app:
 
@@ -632,7 +635,7 @@ Put the key in `PAYLOAD_MCP_API_KEY`.
 - **Stubs** for Payload MCP (`:4310`) and Telegram (`:4312`) start in the eval setup.
 - **The database** is the real Postgres world on `twin_eval`.
 
-The evals cover widget guards, decline, portfolio search and the Cal.com booking webhook. **`request_disclosure` is not in the fixture**, because eve compiles workflow directives only under the app root. Its body is proven by `tests/request-disclosure-body.test.ts` instead, which runs it uncompiled with `workflow` mocked: approved, denied, deadline to expired, notification failure and failed release.
+The evals cover widget guards, decline, portfolio search and the Cal.com booking webhook. **`request_disclosure` is not in the fixture**, because eve compiles workflow directives only under the app root. Its body is proven by `tests/request-disclosure-body.test.ts` instead, which runs it uncompiled with `workflow` mocked: approved, denied, deadline to expired, notification failure, failed release and an item the session was never offered.
 
 ```bash
 export TWIN_DATABASE_URL=postgres://twin:twin@127.0.0.1:5433/twin_eval WORKFLOW_POSTGRES_URL=postgres://twin:twin@127.0.0.1:5433/twin_eval
@@ -697,3 +700,13 @@ The `checks` job runs on every push to `main`/`develop` and on every PR:
 - **The skill version** comes from `SKILL.md` (`metadata.version`), not from `defineTwinSkill`.
 - **`request_disclosure` is always offered** (workflow tools can't be dynamic). It is not gated by `toolGranted`.
 - **There are no eve connections.** "Adding one later is a single file in `agent/connections/`" holds, but see [path B](#b-an-eve-connection-agentconnectionsnamets) for what that file then exposes.
+- **No offline approval-timeout eval.** The spec lists one, but eve compiles workflow directives only under the app root, so `request_disclosure` can't live in `fixtures/offline/`. The timeout path is proven by `tests/request-disclosure-body.test.ts` (the uncompiled body with `workflow` mocked: the deadline resolves, the outcome is `expired`) plus the step tests in `tests/approval-steps.test.ts`; `eve build` proves the body compiles.
+- **No judge check for grounding.** eve's judge needs an AI SDK `EvaluationModel`, and the OpenRouter provider has none. The grounding eval (`evals/skills/portfolio-recall/`) checks that `search_portfolio` is requested before any text and that every URL in the reply came from the search output. Acceptance criterion 1 is therefore live-eval checked for search-before-text and URL provenance; claim-level grounding relies on the `portfolio-recall` skill.
+- **The BFF blocks the canary only.** There are no other "banned leakage markers": the output filter matches `TWIN_PROMPT_CANARY` (case-insensitive) and silences the rest of that block.
+- **Three MCP tools, not two:** `twinIdentity` (owner identity and voice samples for the `identity` skill) joins `twinSearch` and `twinDisclose`.
+- **`check_availability({ startDate, days })`**, not `check_availability({ from, to })`: `startDate` is `YYYY-MM-DD` (default today in the owner's time zone, up to 90 days ahead) and `days` is 1 to 14 (default 7).
+- **Hook and instrumentation files.** The spec's `hooks/intent.ts`, `hooks/transcript.ts` and `hooks/usage.ts` are `agent/hooks/conversation.ts` (turn bookkeeping, transcript and the post-reply intent evaluation) and `agent/instrumentation/spend.ts` (the spend ledger).
+- **No CI migration-drift check.** CI applies the committed twin migrations (`db:migrate`), and the `live-evals` job's throwaway CMS applies Payload's committed ones, but nothing fails when the Drizzle schema or the Payload config has changes without a generated migration.
+- **Classifier calls are not in the spend ledger.** The abuse gate and the intent label call `generateText` directly, outside eve's instrumentation, so their cost never reaches `twin.spend_ledger` and the daily cap undercounts by that much. The OpenRouter key's credit limit still covers them.
+- **The abuse gate adds latency.** It runs before dispatch, so every message waits up to `TWIN_ABUSE_TIMEOUT_MS` (1.5 s by default) before the model call starts: time-to-first-token grows by the classifier's latency.
+- **`request_disclosure` takes `{ sourceId, reason }`.** The spec's model-supplied topic is gone: the topic shown to the owner and stored on the approval comes from the CMS stub this session's search listed, and a `sourceId` the session was never offered as restricted is denied.
