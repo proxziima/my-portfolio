@@ -60,8 +60,10 @@ recorded here with its reason.
       the old favicon is removed. If an unchanged URL is being refreshed, the old favicon is kept.
       One exception: when replacing the file in place fails, the old favicon is removed too,
       because Payload deletes the old file before it writes the new one.
-   6. Only raster icons (ICO, PNG, JPEG, GIF, WebP, AVIF) are accepted. SVG is excluded because a
-      third-party SVG served from the CMS origin could run script if opened directly.
+   6. Only raster files are stored (ICO, PNG, JPEG, GIF, WebP, AVIF). A third-party SVG served
+      from the CMS origin could run script if opened directly. Many sites only declare an SVG icon
+      (autodoc.com.br does), so SVG candidates are rasterized with sharp to a 64×64 PNG before
+      storing. The stored file is then plain pixels, and an SVG is never served.
 
    `context.skipFavicon` turns the hook off (tests, migrations), and `context.refreshFavicon`
    forces a re-fetch.

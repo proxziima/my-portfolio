@@ -1,9 +1,12 @@
+// @vitest-environment node
+import sharp from 'sharp'
 import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_LIMITS, discoverFavicon, iconLinks } from '@/favicons/discover'
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
 const PNG_BIG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9, 9, 9, 9])
 const ICO = Uint8Array.from([0, 0, 1, 0, 1, 0, 16, 16])
+const SVG = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="blue"/></svg>')
 
 const html = (head: string) => new Response(`<html><head>${head}</head></html>`, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 const image = (bytes: Uint8Array, type: string) => new Response(bytes, { headers: { 'content-type': type } })
@@ -28,12 +31,18 @@ describe('iconLinks', () => {
       'https://a.dev/legacy.ico',
     ])
   })
-  it('skips SVG icons, by type or by extension', () => {
+  it('ranks SVG icons, by type or by extension, with sizes="any" as largest', () => {
     const page = `
-      <link rel="icon" href="/vector.svg" type="image/svg+xml">
-      <link rel="icon" href="/other.SVG">
-      <link rel="icon" href="/ok.png">`
-    expect(iconLinks(page, 'https://a.dev/')).toEqual(['https://a.dev/ok.png'])
+      <link rel="icon" href="/big.png" sizes="512x512">
+      <link rel="icon" href="/vector" type="image/svg+xml" sizes="32x32">
+      <link rel="icon" href="/any.png" sizes="any">
+      <link rel="icon" href="/other.SVG">`
+    expect(iconLinks(page, 'https://a.dev/')).toEqual([
+      'https://a.dev/vector',
+      'https://a.dev/any.png',
+      'https://a.dev/other.SVG',
+      'https://a.dev/big.png',
+    ])
   })
   it('ignores non-http hrefs', () => {
     expect(iconLinks('<link rel="icon" href="data:image/png;base64,AAAA">', 'https://a.dev/')).toEqual([])
@@ -119,10 +128,34 @@ describe('discoverFavicon', () => {
     const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(PNG, 'image/gif') })
     expect(await discoverFavicon('https://a.dev/', fetchImpl)).toMatchObject({ mimetype: 'image/png', ext: 'png' })
   })
-  it('never accepts SVG, even from /favicon.ico', async () => {
-    const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>')
-    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(svg, 'image/svg+xml') })
-    expect(await discoverFavicon('https://a.dev/', fetchImpl)).toBeNull()
+  it('rasterizes a declared SVG icon to a 64×64 PNG', async () => {
+    const fetchImpl = stub({
+      'https://a.dev/': () => html('<link rel="icon" href="/fav.svg">'),
+      'https://a.dev/fav.svg': () => image(SVG, 'image/svg+xml'),
+    })
+    const found = await discoverFavicon('https://a.dev/', fetchImpl)
+    expect(found).toMatchObject({ mimetype: 'image/png', ext: 'png' })
+    expect(found!.data.subarray(0, 8).equals(Buffer.from(PNG.subarray(0, 8)))).toBe(true)
+    expect(await sharp(found!.data).metadata()).toMatchObject({ format: 'png', width: 64, height: 64 })
+  })
+  it('accepts an SVG served from /favicon.ico (e.g. after a redirect)', async () => {
+    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(SVG, 'image/svg+xml') })
+    expect(await discoverFavicon('https://a.dev/', fetchImpl)).toMatchObject({ mimetype: 'image/png', ext: 'png' })
+  })
+  it('sniffs an SVG served without an SVG content type', async () => {
+    const xml = new TextEncoder().encode(`  <?xml version="1.0"?>\n${new TextDecoder().decode(SVG)}`)
+    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(xml, 'application/octet-stream') })
+    expect(await discoverFavicon('https://a.dev/', fetchImpl)).toMatchObject({ mimetype: 'image/png', ext: 'png' })
+  })
+  it('skips a malformed SVG and tries the next candidate', async () => {
+    const broken = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><rect')
+    const fetchImpl = stub({
+      'https://a.dev/': () => html('<link rel="icon" href="/fav.svg">'),
+      'https://a.dev/fav.svg': () => image(broken, 'image/svg+xml'),
+      'https://a.dev/favicon.ico': () => image(ICO, 'image/x-icon'),
+    })
+    expect(await discoverFavicon('https://a.dev/', fetchImpl)).toMatchObject({ mimetype: 'image/x-icon', ext: 'ico' })
+    expect(fetchImpl.mock.calls.map(([url]) => String(url))).toEqual(['https://a.dev/', 'https://a.dev/fav.svg', 'https://a.dev/favicon.ico'])
   })
   it('skips candidates that are not images', async () => {
     const fetchImpl = stub({

@@ -1,3 +1,5 @@
+import { rasterizeSvg } from './rasterize'
+
 /** A favicon ready to store: its bytes, MIME type and file extension. */
 export interface FoundFavicon {
   data: Buffer
@@ -22,8 +24,8 @@ const MAX_DECLARED = 4
 const USER_AGENT = 'Mozilla/5.0 (compatible; portfolio-favicon/1.0)'
 
 /**
- * Raster types only. SVG is left out on purpose: a third-party SVG stored on the CMS origin could
- * run script when opened directly.
+ * The types stored as they are: raster only. An SVG stored on the CMS origin could run script when
+ * opened directly, so SVG icons are rasterized to PNG instead (see rasterize.ts).
  */
 const EXTENSIONS: Record<string, string> = {
   'image/x-icon': 'ico',
@@ -70,6 +72,16 @@ function sniff(data: Buffer): string | undefined {
   return undefined
 }
 
+/**
+ * The body as SVG markup, whatever the server declared: `<svg …`, or an XML prolog followed by an
+ * `<svg` root, after leading whitespace (which an XML prolog may not follow, so it is dropped).
+ */
+function svgMarkup(data: Buffer): Buffer | null {
+  const text = data.toString('utf8').trimStart()
+  const lower = text.toLowerCase()
+  return (lower.startsWith('<svg') || lower.startsWith('<?xml')) && lower.includes('<svg') ? Buffer.from(text, 'utf8') : null
+}
+
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&#38;': '&', '&quot;': '"', '&#34;': '"' }
 const decodeEntities = (value: string) => value.replace(/&amp;|&#38;|&quot;|&#34;/g, (e) => ENTITIES[e]!)
 
@@ -80,8 +92,9 @@ const attr = (tag: string, name: string): string | undefined => {
 }
 
 /**
- * Icon URLs a page declares (`rel` icon, shortcut icon, apple-touch-icon), best first: `sizes="any"`
- * counts as largest, then the largest declared size, then document order. SVG icons are skipped.
+ * Icon URLs a page declares (`rel` icon, shortcut icon, apple-touch-icon), best first: SVG icons (by
+ * type or extension) and `sizes="any"` count as largest since they scale, then the largest declared
+ * size, then document order.
  */
 export function iconLinks(html: string, base: string): string[] {
   const found: { href: string; size: number; index: number }[] = []
@@ -99,10 +112,9 @@ export function iconLinks(html: string, base: string): string[] {
     }
     if (!isHttp(url)) continue
     const svg = (attr(tag, 'type') ?? '').toLowerCase() === 'image/svg+xml' || url.pathname.toLowerCase().endsWith('.svg')
-    if (svg) continue
     const sizes = (attr(tag, 'sizes') ?? '').toLowerCase()
     const declared = sizes.split(/\s+/).map((s) => Number.parseInt(s, 10)).filter(Number.isFinite)
-    const size = sizes === 'any' ? Number.POSITIVE_INFINITY : Math.max(0, ...declared)
+    const size = svg || sizes === 'any' ? Number.POSITIVE_INFINITY : Math.max(0, ...declared)
     found.push({ href: url.toString(), size, index })
   }
   return found
@@ -112,8 +124,9 @@ export function iconLinks(html: string, base: string): string[] {
 
 /**
  * Finds a site's icon: up to four icons its page declares, best first, then `/favicon.ico` at the
- * origin the page ended up on. The first candidate that answers 200 with a raster image under
- * 512 KB wins; its type comes from the ICO/PNG magic bytes, else from the declared type. Each
+ * origin the page ended up on. The first candidate that answers 200 with an image under 512 KB
+ * wins: a raster one as it is, its type from the ICO/PNG magic bytes, else from the declared type;
+ * an SVG one (declared or sniffed) rasterized to a 64×64 PNG, skipped if it will not render. Each
  * request times out after 5 s and the whole search after 15 s. Returns null for non-http(s) URLs
  * or when nothing qualifies; never throws.
  */
@@ -165,7 +178,14 @@ export async function discoverFavicon(
       }
       const data = await readCapped(res, ICON_LIMIT)
       if (!data || data.length === 0) continue
-      const mimetype = sniff(data) ?? declared
+      const sniffed = sniff(data)
+      const svg = sniffed ? null : (svgMarkup(data) ?? (declared === 'image/svg+xml' ? data : null))
+      if (svg) {
+        const png = await rasterizeSvg(svg)
+        if (png) return { data: png, mimetype: 'image/png', ext: 'png' }
+        continue
+      }
+      const mimetype = sniffed ?? declared
       const ext = EXTENSIONS[mimetype]
       if (ext) return { data, mimetype, ext }
     } catch {

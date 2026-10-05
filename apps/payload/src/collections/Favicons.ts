@@ -10,8 +10,8 @@ export const Favicons: CollectionConfig = {
   fields: [],
   upload: {
     staticDir: uploadStaticDir('FAVICONS_DIR', 'favicons'),
-    // Raster icons only, matching what discoverFavicon accepts. No SVG: it can carry script and is
-    // served from the CMS origin.
+    // Raster files only, matching what discoverFavicon returns. No SVG: it can carry script and is
+    // served from the CMS origin, so discoverFavicon rasterizes SVG icons to PNG before they get here.
     mimeTypes: ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'],
     // ICO cannot go through sharp; icons are never cropped or resized.
     focalPoint: false,
