@@ -78,14 +78,22 @@ export function rankCorpus(corpus: readonly CorpusEntry[], query: string, limit:
   }
 }
 
-/** Plain text of a Lexical rich-text value (discipline bios), paragraphs separated by newlines. */
-export function lexicalText(value: unknown): string {
+/** A record link's name, or undefined when the record may not be named (not public, or gone). */
+export type RecordName = (ref: unknown) => string | undefined
+
+/**
+ * Plain text of a Lexical rich-text value (discipline bios), paragraphs separated by newlines. Record
+ * links read their name through `recordName`; without one, or when it returns nothing, they read as
+ * nothing.
+ */
+export function lexicalText(value: unknown, recordName: RecordName = () => undefined): string {
   const walk = (node: unknown): string => {
     if (!node || typeof node !== 'object') return ''
-    const n = node as { text?: unknown; children?: unknown[]; type?: unknown; fields?: { label?: unknown; word?: unknown } }
+    const n = node as { text?: unknown; children?: unknown[]; type?: unknown; fields?: { blockType?: unknown; record?: unknown; label?: unknown; word?: unknown } }
     if (typeof n.text === 'string') return n.text
-    // Inline blocks (chipLink, curiousToggle) carry company and project names in their fields.
     if (n.type === 'inlineBlock') {
+      if (n.fields?.blockType === 'recordLink') return recordName(n.fields.record) ?? ''
+      // Free-text chip links and the curious toggle carry their words in their fields.
       const name = n.fields?.label ?? n.fields?.word
       return typeof name === 'string' ? name : ''
     }
