@@ -15,6 +15,7 @@ import { Posts } from './collections/Posts'
 import { Projects } from './collections/Projects'
 import { Scenes } from './collections/Scenes'
 import { Users } from './collections/Users'
+import { redactTermsEndpoint } from './endpoints/redact-terms'
 import { Contact } from './globals/Contact'
 import { Messenger } from './globals/Messenger'
 import { Navigation } from './globals/Navigation'
@@ -35,6 +36,7 @@ export default buildConfig({
     livePreview: { breakpoints: livePreviewBreakpoints },
   },
   collections: [Disciplines, Experiences, Projects, Content, Knowledge, Posts, Categories, Media, Scenes, Users],
+  endpoints: [redactTermsEndpoint],
   globals: [Profile, Contact, Navigation, SiteSettings, Messenger],
   // The web origin loads uploads (the Spline scene) from the browser, so file responses need CORS.
   cors: process.env.WEB_URL ? [process.env.WEB_URL] : [],

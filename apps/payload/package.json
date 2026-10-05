@@ -29,6 +29,7 @@
     "@payloadcms/richtext-lexical": "3.90.2",
     "@payloadcms/ui": "3.90.2",
     "@repo/cms-types": "*",
+    "@repo/twin": "*",
     "cross-env": "^7.0.3",
     "dotenv": "16.4.7",
     "graphql": "^16.8.2",
@@ -36,7 +37,8 @@
     "payload": "3.90.2",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "sharp": "0.35.4"
+    "sharp": "0.35.4",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

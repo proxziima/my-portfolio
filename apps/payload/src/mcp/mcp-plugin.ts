@@ -1,9 +1,11 @@
 import { mcpPlugin } from '@payloadcms/plugin-mcp'
+import { twinTools } from './twin-tools'
 
 const crud = { find: true, create: true, update: true, delete: true }
 const readWrite = { find: true, update: true }
 
 export const portfolioMcp = mcpPlugin({
+  mcp: { tools: twinTools },
   collections: {
     disciplines: {
       enabled: crud,
@@ -16,6 +18,7 @@ export const portfolioMcp = mcpPlugin({
     },
     projects: { enabled: crud, description: 'Portfolio projects: name, favicon chip, url, one-line summary, disciplines.' },
     content: { enabled: crud, description: 'Content & community: articles, talks, podcasts, open-source and community work.' },
+    knowledge: { enabled: crud, description: 'Twin knowledge: facts and writing samples, each with a disclosure tier.' },
     media: { enabled: { find: true }, description: 'Uploaded images (avatar, Open Graph image).' },
   },
   globals: {
