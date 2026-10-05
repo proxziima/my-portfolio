@@ -1,3 +1,5 @@
+import { scan } from './scan'
+
 /** What replaces redacted spans; visible so readers know something was withheld. */
 export const REDACTED = '[redacted]'
 
@@ -13,34 +15,9 @@ export interface Span {
   end: number
 }
 
-const EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}/gu
-// Ten or more digits joined only by phone punctuation: phone numbers, never years or ranges.
-const PHONE = /\+?\(?\d(?:[\s().-]{0,2}\d){9,14}/g
-
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-/** All spans to redact in `text`, merged and sorted. */
+/** All spans to redact in `text`, merged and sorted. Allow-listed matches are left out. */
 export function findSpans(text: string, rules: RedactionRules): Span[] {
-  const allow = new Set(rules.allow.map((a) => a.toLowerCase()))
-  const spans: Span[] = []
-  const collect = (re: RegExp) => {
-    for (const m of text.matchAll(re)) {
-      if (allow.has(m[0].toLowerCase())) continue
-      spans.push({ start: m.index, end: m.index + m[0].length })
-    }
-  }
-  const terms = rules.terms.filter((t) => t.trim().length > 0)
-  if (terms.length > 0) collect(new RegExp(terms.map(escape).join('|'), 'giu'))
-  collect(EMAIL)
-  collect(PHONE)
-  spans.sort((a, b) => a.start - b.start)
-  const merged: Span[] = []
-  for (const s of spans) {
-    const last = merged.at(-1)
-    if (last && s.start <= last.end) last.end = Math.max(last.end, s.end)
-    else merged.push({ ...s })
-  }
-  return merged
+  return scan(text, rules).redact
 }
 
 /** Replaces every span with REDACTED. */
