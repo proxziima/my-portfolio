@@ -103,10 +103,10 @@ describe('toMessenger', () => {
       personalMessage: ' building things ',
       listeningTo: ' Daft Punk - Digital Love ',
       avatar: { url: '/api/media/file/v.png' },
-      replies: [{ id: 'a', text: 'hey' }, { id: 'b', text: 'brb' }],
     },
     labels: {
       search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', conversation: '{name} - Conversation', send: 'Send', listeningTo: 'Listening to:',
+      throttled: 't', tooLong: 'tl', ended: 'e', offline: 'o', privacy: 'p', deleteData: 'd', bookingTitle: 'b', yourTime: 'y', myTime: 'my', bookingNotice: 'Booked for {time}',
       menu: [{ id: 'm1', label: 'Photos' }, { id: 'm2', label: 'Files' }],
     },
     spotlight: { title: ' Doom ', text: 'Boots in js-dos.', url: 'javascript:alert(1)', source: 'My Desktop', image: { url: '/api/media/file/d.png' } },
@@ -126,10 +126,11 @@ describe('toMessenger', () => {
       personalMessage: 'building things',
       listeningTo: 'Daft Punk - Digital Love',
       avatar: 'http://cms.test/api/media/file/v.png',
-      replies: ['hey', 'brb'],
     })
     expect(m.labels.typing).toBe('{name} is typing')
     expect(m.labels.conversation).toBe('{name} - Conversation')
+    expect(m.labels.bookingNotice).toBe('Booked for {time}')
+    expect(m.labels.deleteData).toBe('d')
     expect(m.labels.menu).toEqual(['Photos', 'Files'])
     expect(toMessenger({ ...doc, labels: { ...doc.labels, menu: null } } as unknown as CmsMessenger, BASE).labels.menu).toEqual([])
     expect(m.title).toBe('Windows Live Messenger')

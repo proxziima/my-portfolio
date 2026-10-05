@@ -7,8 +7,8 @@ import { BandCaret, Brush, Caret, Collapse, FontStyle, Layout, Nudge, Pen, Smile
 import { History } from './History'
 import { withName } from './labels'
 import { PersonLine } from './PersonLine'
-import { scriptedResponder, type Sender } from './responder'
-import { useConversation } from './use-conversation'
+import type { Sender, TextLine } from './parts'
+import { useTwin } from './use-twin'
 import styles from './messenger.module.css'
 
 /** A picture in the left column, with the small hide and webcam buttons beside it (decorative). */
@@ -27,8 +27,9 @@ function Portrait({ person }: { person: MessengerPerson }) {
 /** The Conversation window with the owner: pictures on the left, the chat on the right. */
 export function Conversation({ data }: OsAppProps) {
   const { viewer, contact, labels } = data.messenger
-  const respond = useMemo(() => scriptedResponder(contact.replies), [contact.replies])
-  const { messages, typing, send } = useConversation(respond)
+  const { lines, typing, send } = useTwin()
+  // Text only for now; the booking dialog and notice lines arrive with the History rewrite.
+  const messages = useMemo(() => lines.filter((line): line is TextLine => line.kind === 'text'), [lines])
   const [draft, setDraft] = useState('')
   const box = useRef<HTMLTextAreaElement>(null)
 

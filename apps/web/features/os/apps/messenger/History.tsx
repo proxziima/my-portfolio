@@ -1,15 +1,15 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import type { Message, Sender } from './responder'
+import type { Sender, TextLine } from './parts'
 import styles from './messenger.module.css'
 
 interface Group {
   from: Sender
-  messages: Message[]
+  messages: TextLine[]
 }
 
 /** Consecutive messages from one sender, shown under a single name as Messenger does. */
-export function groupBySender(messages: readonly Message[]): Group[] {
+export function groupBySender(messages: readonly TextLine[]): Group[] {
   const groups: Group[] = []
   for (const message of messages) {
     const last = groups.at(-1)
@@ -20,7 +20,7 @@ export function groupBySender(messages: readonly Message[]): Group[] {
 }
 
 /** The conversation so far, kept scrolled to the newest message. */
-export function History({ messages, nameOf }: { messages: readonly Message[]; nameOf: (from: Sender) => string }) {
+export function History({ messages, nameOf }: { messages: readonly TextLine[]; nameOf: (from: Sender) => string }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = ref.current
