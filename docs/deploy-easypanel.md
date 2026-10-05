@@ -244,7 +244,7 @@ Possible causes:
 - Check that the Photon webhook points at `https://<web>/api/twin/hooks/photon` and that its signing secret equals `IMESSAGE_WEBHOOK_SECRET`. A mismatch is rejected and the reply never reaches the approval.
 - Look in the `agents` logs for `Photon send failed`: the approval text never reached you. Check `IMESSAGE_PROJECT_ID` and `IMESSAGE_PROJECT_SECRET`, and that you texted the Photon line once from your phone (a shared line can only message numbers that texted it first).
 - If your iPhone starts conversations from an Apple ID email address, the reply doesn't match `OWNER_PHONE_NUMBER` and is ignored. Set iPhone **Settings > Messages > Send & Receive > Start New Conversations From** to your phone number.
-- Reply with the code, e.g. `YES K7Q2`. A bare `YES` or `NO` only returns the help text, because Photon's webhook carries nothing that tells a real answer from a spoofed or replayed one. SMS replies count only if Photon delivers them, and they need the code too.
+- Reply with the code, e.g. `YES K7Q2`. A bare `YES` or `NO` only returns the help text, because Photon's webhook has no service field (iMessage vs SMS), so a real answer can't be told from a spoofed SMS. SMS replies count only if Photon delivers them, and they need the code too.
 - If `/webhooks/photon` returns 500 after a Photon or network outage, restart the `agents` service: the channel's adapter initialises on the first webhook after boot, and a failed first initialisation stays cached until restart.
 
 ### `cms` stays unhealthy, so `web` never starts

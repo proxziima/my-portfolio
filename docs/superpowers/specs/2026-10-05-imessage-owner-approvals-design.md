@@ -68,9 +68,8 @@ Like every integration, the variables are all or nothing (`INTEGRATIONS` in `pac
 The text is trimmed, upper-cased and stripped of trailing punctuation. Then:
 
 - `^(YES|Y|APPROVE|OK) ([A-Z0-9]{4})$` approves the code, and `^(NO|N|DENY) ([A-Z0-9]{4})$` denies it.
-- **Only a coded reply decides.** A bare `YES`/`NO`, or anything else, gets the help text: "Reply YES <code> or NO <code>. Waiting: K7Q2 (Notice period).", listing up to 3 notified codes with topics. The Sendblue revision let a bare reply decide when it was unambiguous. Its two guards came from Sendblue's `service` and `date_sent` fields, and Photon's payload has neither. Without them, a bare reply can't be told apart from:
-  - **a spoof.** SMS sender ids can be forged, and a forged bare `YES` would meet exactly the conditions a visitor's own request creates;
-  - **a retried old answer** landing on a newer approval.
+- **Only a coded reply decides.** A bare `YES`/`NO`, or anything else, gets the help text: "Reply YES <code> or NO <code>. Waiting: K7Q2 (Notice period).", listing up to 3 notified codes with topics. The Sendblue revision let a bare reply decide when it was unambiguous. Its two guards relied on Sendblue's `service` and `date_sent` fields. Photon's payload gives a timestamp (the adapter exposes it as `message.metadata.dateSent`, falling back to now when missing) but no service field, and without a service the spoof case can't be excluded:
+  - **a spoof.** SMS sender ids can be forged, and a forged bare `YES` would meet exactly the conditions a visitor's own request creates. With no service field, an SMS can't be told from an iMessage, so sender authenticity can't be established.
   The code is a secret that only reached the owner, so a coded reply is safe on every path.
 - No AI reads owner texts, so no prompt injection is possible.
 
@@ -156,5 +155,5 @@ The tool contract, the caps (3 per session, one per item), the offered-stub chec
 ## Out of scope
 
 - Talking to the twin over iMessage (an agent turn on this channel).
-- Bare YES/NO decisions. They need a sender-authenticity signal and a send time that Photon's webhook doesn't carry. They can return if Photon adds them.
+- Bare YES/NO decisions. They need a sender-authenticity signal (a service field, iMessage vs SMS) that Photon's webhook doesn't carry. They can return if Photon adds them.
 - Tapback approvals. Reactions reach the adapter, but not `onMessage`.

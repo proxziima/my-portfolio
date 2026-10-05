@@ -45,8 +45,8 @@ export async function handleOwnerMessage(ctx: PhotonInboundMessageContext, messa
 /** Decides one coded reply, or answers with help. Database failures throw to the caller. */
 async function answerOwner(text: string, reply: (text: string) => Promise<void>): Promise<void> {
   const answer = parseOwnerReply(text)
-  // Only a coded reply decides. Photon's payload carries no service or send time, so a bare reply
-  // can't be told from an SMS spoof or a retried old answer; the code reached nobody but the owner.
+  // Only a coded reply decides. Photon's payload has no service field (iMessage vs SMS), so a bare
+  // reply can't be told from an SMS spoof; the code reached nobody but the owner.
   if (answer.kind === 'unrecognised' || !answer.code) {
     await reply(helpText(notified(await listPendingApprovals(db()))))
     return

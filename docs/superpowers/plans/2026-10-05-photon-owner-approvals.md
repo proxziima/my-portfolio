@@ -470,8 +470,8 @@ T1 to T3 land as **one** commit at the end of T3, because apps/agents doesn't ty
   /** Decides one coded reply, or answers with help. Database failures throw to the caller. */
   async function answerOwner(text: string, reply: (text: string) => Promise<void>): Promise<void> {
     const answer = parseOwnerReply(text)
-    // Only a coded reply decides. Photon's payload carries no service or send time, so a bare reply
-    // can't be told from an SMS spoof or a retried old answer; the code reached nobody but the owner.
+    // Only a coded reply decides. Photon's payload has no service field (iMessage vs SMS), so a bare
+    // reply can't be told from an SMS spoof; the code reached nobody but the owner.
     if (answer.kind === 'unrecognised' || !answer.code) {
       await reply(helpText(notified(await listPendingApprovals(db()))))
       return
@@ -648,7 +648,7 @@ T1 to T3 land as **one** commit at the end of T3, because apps/agents doesn't ty
   - **Env table:** the four `imessage` rows, and no `SENDBLUE_API_BASE`.
   - **"iMessage approvals" section:**
     - the prompt;
-    - **only coded replies decide**, and a bare YES/NO gets the help text, with the reason: Photon's payload has no service or send time;
+    - **only coded replies decide**, and a bare YES/NO gets the help text, with the reason: Photon's payload has no service field (iMessage vs SMS), so an SMS spoof can't be excluded;
     - owner-only, strangers ignored, late replies;
     - the 5 setup steps from the spec's "Setup (owner)";
     - why it's built this way: inbound is eve's Photon channel as in the personal-agent-template reference, with `onMessage` returning `null`, so no agent turn starts; outbound is the provider API, per eve's durable cross-channel notifications page.

@@ -562,7 +562,7 @@ Cost rows carry `model_id = 'openrouter'`, and token rows carry the requested mo
 | a code that matches nothing | "No approval ZZZZ is waiting." |
 | a bare `YES` or `NO`, or anything else | "Reply YES <code> or NO <code>. Waiting: K7Q2 (Notice period)." (up to 3 codes), or "Nothing is waiting for approval." |
 
-**Only coded replies decide.** A bare `YES` or `NO` never approves or denies, even with a single approval pending: the owner gets the help text, which lists only the codes already texted. Photon's webhook payload has no service field and no send time, so a bare reply can't be told from an SMS spoof or from an old answer a retry delivers late. The code reached nobody but the owner.
+**Only coded replies decide.** A bare `YES` or `NO` never approves or denies, even with a single approval pending: the owner gets the help text, which lists only the codes already texted. Photon's webhook payload has no service field (iMessage vs SMS or RCS), so sender authenticity can't be established and a bare reply can't be told from an SMS spoof. The code reached nobody but the owner.
 
 **Who counts.** Only `OWNER_PHONE_NUMBER`. A message from any other number, a group chat, a bot or an echo of our own text is ignored: strangers are never answered, because a reply confirms the line is live, and the number is not logged. Photon is answered 200 before any of this runs, so nothing is redelivered.
 
@@ -582,7 +582,7 @@ Setup:
 
 - **Inbound is eve's Photon channel**, as in the personal-agent-template reference and eve's "Other hosts" example (lazy credentials, `route: '/webhooks/photon'`). The one difference is `onMessage`: the owner is answering about *another* session (the visitor's), and eve's human-in-the-loop resumes the *requesting* session through *its* channel, which is the visitor's Messenger window. So `onMessage` decides the approval itself and returns `null` instead of dispatching a turn.
 - **Outbound is the provider API**, per eve's durable cross-channel notifications pattern: `agent/lib/imessage.ts` calls `openDM(owner)` and `postMessage` on `@photon-ai/chat-adapter-imessage` 3.2.0, the adapter eve bundles, so the owner needn't have a live session. An unconfigured integration is a `FatalError` (no retry). The adapter exposes no permanent-error classification, so its failures stay retryable (`Photon send failed`) and the workflow step retries them.
-- **Bare replies don't decide** because Photon gives the agent nothing to tell a real answer from a spoofed or replayed one (see above); the code is the proof.
+- **Bare replies don't decide** because Photon's payload has no service field, so the agent can't tell a real iMessage from a spoofed SMS (see above); the code is the proof.
 - **The decision is in** [the iMessage spec](../../docs/superpowers/specs/2026-10-05-imessage-owner-approvals-design.md).
 
 **Restart after a failed first initialisation.** The channel's adapter initialises on the first webhook after boot, issuing Photon tokens, *before* the signature is verified. If that first initialisation fails (a Photon or network outage), Chat SDK caches the failure and `/webhooks/photon` keeps answering 500 until the agents service restarts. After an outage, restart `agents`.
