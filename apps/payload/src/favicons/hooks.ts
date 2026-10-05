@@ -43,7 +43,7 @@ const writeOwnerFavicon = (req: PayloadRequest, collection: string, id: unknown,
     req.payload.update({
       collection: collection as CollectionSlug,
       id: id as number,
-      data: { favicon } as never,
+      data: { favicon },
       req,
       context: { skipFavicon: true, disableRevalidate: true },
       depth: 0,
@@ -66,7 +66,7 @@ async function storedFields(
       id: doc.id as number,
       depth: 0,
       req,
-      select: { name: true, url: true, favicon: true } as never,
+      select: { name: true, url: true, favicon: true },
       overrideAccess: true,
     }),
   )) as { name: unknown; url: unknown; favicon: unknown }

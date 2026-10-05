@@ -1,9 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { disclosureRead } from '../access/disclosure-read'
 import { publicContentAccess } from '../access/public-read'
-import { chipField } from '../fields/chip'
 import { disciplinesField } from '../fields/disciplines-relation'
-import { urlField } from '../fields/link-url'
 import { disclosureField } from '../fields/disclosure'
 import { orderField } from '../fields/order'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
@@ -11,14 +9,12 @@ import { revalidateCollectionHooks } from '../hooks/revalidate-web'
 export const Experiences: CollectionConfig = {
   slug: 'experiences',
   labels: { singular: 'Experience', plural: 'Professional background' },
-  admin: { useAsTitle: 'company', defaultColumns: ['company', 'title', 'startYear', 'endYear'] },
+  admin: { useAsTitle: 'title', defaultColumns: ['title', 'company', 'startYear', 'endYear'] },
   defaultSort: 'order',
   access: { ...publicContentAccess, read: disclosureRead },
   hooks: revalidateCollectionHooks,
   fields: [
-    { name: 'company', type: 'text', required: true },
-    chipField(),
-    urlField(),
+    { name: 'company', type: 'relationship', relationTo: 'companies', required: true },
     { name: 'title', type: 'text', required: true },
     {
       type: 'row',

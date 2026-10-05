@@ -6,9 +6,11 @@ import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 import { canRunJobs } from './access/run-jobs'
 import { Categories } from './collections/Categories'
+import { Companies } from './collections/Companies'
 import { Content } from './collections/Content'
 import { Disciplines } from './collections/Disciplines'
 import { Experiences } from './collections/Experiences'
+import { Favicons } from './collections/Favicons'
 import { Knowledge } from './collections/Knowledge'
 import { Media } from './collections/Media'
 import { Posts } from './collections/Posts'
@@ -35,7 +37,7 @@ export default buildConfig({
     // Shared by every collection that sets `admin.livePreview.url` (today: posts).
     livePreview: { breakpoints: livePreviewBreakpoints },
   },
-  collections: [Disciplines, Experiences, Projects, Content, Knowledge, Posts, Categories, Media, Scenes, Users],
+  collections: [Disciplines, Companies, Experiences, Projects, Content, Knowledge, Posts, Categories, Media, Favicons, Scenes, Users],
   endpoints: [redactTermsEndpoint],
   globals: [Profile, Contact, Navigation, SiteSettings, Messenger],
   // The web origin loads uploads (the Spline scene) from the browser, so file responses need CORS.

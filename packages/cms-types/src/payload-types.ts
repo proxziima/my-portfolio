@@ -69,6 +69,7 @@ export interface Config {
   blocks: {};
   collections: {
     disciplines: Discipline;
+    companies: Company;
     experiences: Experience;
     projects: Project;
     content: Content;
@@ -76,6 +77,7 @@ export interface Config {
     posts: Post;
     categories: Category;
     media: Media;
+    favicons: Favicon;
     scenes: Scene;
     users: User;
     search: Search;
@@ -90,6 +92,7 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     disciplines: DisciplinesSelect<false> | DisciplinesSelect<true>;
+    companies: CompaniesSelect<false> | CompaniesSelect<true>;
     experiences: ExperiencesSelect<false> | ExperiencesSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     content: ContentSelect<false> | ContentSelect<true>;
@@ -97,6 +100,7 @@ export interface Config {
     posts: PostsSelect<false> | PostsSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    favicons: FaviconsSelect<false> | FaviconsSelect<true>;
     scenes: ScenesSelect<false> | ScenesSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     search: SearchSelect<false> | SearchSelect<true>;
@@ -236,16 +240,70 @@ export interface Discipline {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "experiences".
+ * via the `definition` "companies".
  */
-export interface Experience {
+export interface Company {
   id: number;
-  company: string;
+  name: string;
   /**
    * Up to 3 characters shown in the 16px favicon chip (e.g. "A", "TL", "gh").
    */
   chip: string;
   url?: string | null;
+  /**
+   * Shown instead of the favicon and the chip.
+   */
+  logo?: (number | null) | Media;
+  /**
+   * Fetched from the URL on save. Used when there is no logo; the chip is the last fallback.
+   */
+  favicon?: (number | null) | Favicon;
+  disclosure: 'public' | 'restricted' | 'never';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media".
+ */
+export interface Media {
+  id: number;
+  alt: string;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "favicons".
+ */
+export interface Favicon {
+  id: number;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "experiences".
+ */
+export interface Experience {
+  id: number;
+  company: number | Company;
   title: string;
   startYear: number;
   /**
@@ -276,7 +334,19 @@ export interface Project {
    */
   chip: string;
   url?: string | null;
+  /**
+   * Shown instead of the favicon and the chip.
+   */
+  logo?: (number | null) | Media;
+  /**
+   * Fetched from the URL on save. Used when there is no logo; the chip is the last fallback.
+   */
+  favicon?: (number | null) | Favicon;
   summary: string;
+  /**
+   * Where or for whom it was built (optional).
+   */
+  company?: (number | null) | Company;
   /**
    * Disciplines this project appears under. Empty = all.
    */
@@ -404,25 +474,6 @@ export interface Post {
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media".
- */
-export interface Media {
-  id: number;
-  alt: string;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -574,6 +625,24 @@ export interface PayloadMcpApiKey {
     update?: boolean | null;
     /**
      * Allow clients to delete disciplines.
+     */
+    delete?: boolean | null;
+  };
+  companies?: {
+    /**
+     * Allow clients to find companies.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create companies.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update companies.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete companies.
      */
     delete?: boolean | null;
   };
@@ -838,6 +907,10 @@ export interface PayloadLockedDocument {
         value: number | Discipline;
       } | null)
     | ({
+        relationTo: 'companies';
+        value: number | Company;
+      } | null)
+    | ({
         relationTo: 'experiences';
         value: number | Experience;
       } | null)
@@ -864,6 +937,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'favicons';
+        value: number | Favicon;
       } | null)
     | ({
         relationTo: 'scenes';
@@ -962,12 +1039,24 @@ export interface DisciplinesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "companies_select".
+ */
+export interface CompaniesSelect<T extends boolean = true> {
+  name?: T;
+  chip?: T;
+  url?: T;
+  logo?: T;
+  favicon?: T;
+  disclosure?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "experiences_select".
  */
 export interface ExperiencesSelect<T extends boolean = true> {
   company?: T;
-  chip?: T;
-  url?: T;
   title?: T;
   startYear?: T;
   endYear?: T;
@@ -985,7 +1074,10 @@ export interface ProjectsSelect<T extends boolean = true> {
   name?: T;
   chip?: T;
   url?: T;
+  logo?: T;
+  favicon?: T;
   summary?: T;
+  company?: T;
   disciplines?: T;
   order?: T;
   disclosure?: T;
@@ -1100,6 +1192,21 @@ export interface MediaSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "favicons_select".
+ */
+export interface FaviconsSelect<T extends boolean = true> {
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "scenes_select".
  */
 export interface ScenesSelect<T extends boolean = true> {
@@ -1183,6 +1290,14 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
   label?: T;
   description?: T;
   disciplines?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  companies?:
     | T
     | {
         find?: T;
