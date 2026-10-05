@@ -67,7 +67,9 @@ export interface EventFilterHooks {
 /**
  * The output boundary (spec §10). Redacts never-tier terms, PII and the prompt canary from
  * assistant text, independent of what the model produced, and blanks reasoning, tool payloads,
- * failure details and token usage. Never drops or adds events: clients resume by absolute event index.
+ * failure details and token usage. Also blanks the model id on `step.started`: the boundaries forbid
+ * revealing models or providers, and with routing it would reveal the tier. Never drops or adds events:
+ * clients resume by absolute event index.
  */
 export function createEventFilter(rules: RedactionRules, canary: string, hooks: EventFilterHooks = {}): (e: StreamEvent) => StreamEvent {
   const withCanary: RedactionRules = { terms: [...rules.terms, canary], allow: rules.allow }
@@ -100,7 +102,7 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
     switch (e.type) {
       case 'step.started':
         started.add(keyOf(d))
-        return e
+        return 'modelId' in d || 'model' in d ? rewrite(e, { ...d, ...('modelId' in d ? { modelId: undefined } : {}), ...('model' in d ? { model: undefined } : {}) }) : e
       case 'message.appended': {
         if (typeof d.messageDelta !== 'string') return e
         const key = keyOf(d)
