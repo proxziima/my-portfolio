@@ -14,6 +14,7 @@ export function modelIds(env: Record<string, string | undefined>): {
   primary: string
   chain: string[]
   classifier: string
+  intent: string
   contextTokens: number
   tiers: Record<ModelTier, TierModel>
 } {
@@ -30,6 +31,7 @@ export function modelIds(env: Record<string, string | undefined>): {
     primary,
     chain: chainOf(primary),
     classifier: read('TWIN_CLASSIFIER_MODEL') ?? MODEL_DEFAULTS.classifier,
+    intent: read('TWIN_INTENT_MODEL') ?? MODEL_DEFAULTS.intent,
     contextTokens,
     tiers: {
       light: { id: light, chain: chainOf(light), contextTokens: tokens('TWIN_MODEL_LIGHT_CONTEXT_TOKENS', MODEL_DEFAULTS.lightContextTokens), reasoning: 'low' },
@@ -57,11 +59,21 @@ export function twinModel() {
 }
 
 /**
- * The fast classifier used for the pre-turn gate and the intent label. Its one fallback covers a
- * provider outage; callers still time out, so a slow answer never delays a reply for long.
+ * The fast classifier used for the pre-turn gate. Its one fallback covers a provider outage; the
+ * caller still times out, so a slow answer never delays a reply for long.
  */
 export function classifierModel() {
   const { classifier } = modelIds(process.env)
   const models = [...new Set([classifier, MODEL_DEFAULTS.classifierFallback])]
   return openrouter.chat(classifier, { models, provider: { data_collection: 'deny' } })
+}
+
+/**
+ * The post-reply intent label's model, chosen by its own benchmark (it is a different task from the
+ * gate). Same shape as the gate's: one fallback on another provider, and the caller's timeout.
+ */
+export function intentClassifierModel() {
+  const { intent } = modelIds(process.env)
+  const models = [...new Set([intent, MODEL_DEFAULTS.intentFallback])]
+  return openrouter.chat(intent, { models, provider: { data_collection: 'deny' } })
 }

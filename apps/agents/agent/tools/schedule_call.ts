@@ -11,7 +11,8 @@ import { decideScheduleCall, type ScheduleDecision } from '../lib/scheduling'
 import { toolGranted } from '../lib/tool-gate'
 
 const tool = defineTool({
-  description: 'Show the booking dialog in the chat. Use only on an explicit request to talk, or when the state says the call tier is hot.',
+  description:
+    'Show the booking dialog in the chat. Use only on an explicit request for a live call, or when the state says the call tier is hot. Call it as the last action of the reply, after the answer.',
   inputSchema: z.object({ trigger: ScheduleTrigger }),
   outputSchema: ScheduleCallResult,
   async execute({ trigger }, ctx): Promise<ScheduleCallResult> {

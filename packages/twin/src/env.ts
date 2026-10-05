@@ -38,9 +38,17 @@ export const MODEL_DEFAULTS = {
   // Cost-driven (2026-10-05): input tokens dominate the bill, and DeepSeek is ~7x cheaper than Sonnet.
   model: 'deepseek/deepseek-v4.1-flash',
   fallbacks: ['anthropic/claude-haiku-4.5'],
-  // Benchmarked 2026-10-05 on the gate's prompts: 12/12 correct, p90 under 0.9 s.
-  classifier: 'google/gemini-2.5-flash-lite',
-  classifierFallback: 'mistralai/ministral-8b-2512',
+  // Classifiers use Anthropic, DeepSeek or OpenAI models only (owner policy, 2026-10-05), and each
+  // falls back to another provider for an outage. Both were chosen by benchmark (README, classifiers).
+  // Gate, on the critical path before every reply: 15 single messages x 3 runs, twice. 90/90 correct,
+  // p90 1.5-1.6 s, well inside the 2.5 s timeout. gpt-4o-mini was also 90/90 but slower (p90 1.8-2.0 s)
+  // for a negligible saving, and the gate's latency is time-to-first-token.
+  classifier: 'openai/gpt-4.1-mini',
+  classifierFallback: 'anthropic/claude-haiku-4.5',
+  // Intent label, after the reply: 25 multi-turn PT/EN cases x 3 runs, twice. The only model with no
+  // miss (150/150, p90 1.5 s); the OpenAI models read the twin's own call offer as the visitor asking.
+  intent: 'anthropic/claude-haiku-4.5',
+  intentFallback: 'deepseek/deepseek-v4.1-flash',
   contextTokens: 1_000_000,
   light: 'deepseek/deepseek-v4.1-flash',
   lightContextTokens: 1_000_000,
@@ -75,6 +83,7 @@ const agentsEnvObject = z.object({
   TWIN_MODEL_DEEP: z.string().min(1).default(MODEL_DEFAULTS.deep),
   TWIN_MODEL_DEEP_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.deepContextTokens),
   TWIN_CLASSIFIER_MODEL: z.string().min(1).default(MODEL_DEFAULTS.classifier),
+  TWIN_INTENT_MODEL: z.string().min(1).default(MODEL_DEFAULTS.intent),
   TWIN_JWT_SECRET: secret,
   TWIN_PROMPT_CANARY: z.string().min(16),
   TWIN_STABLE_KEY_SECRET: secret,

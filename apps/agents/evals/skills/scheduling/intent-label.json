@@ -1,0 +1,205 @@
+[
+  {
+    "id": "bug-tell-more-nexo-labs",
+    "turns": [
+      { "role": "visitor", "text": "me conta sobre as sua última experiencia profissional, o que você fazia lá e o que mais gostou" },
+      { "role": "twin", "text": "Hoje eu tô na Autodoc, cuidando da parte de agentes de IA e das integrações com os sistemas legados. Antes disso passei pela Nexo Labs, uma consultoria pequena onde eu montava produtos do zero pra clientes, de MVP a produção. Na Autodoc o que eu mais curto é ver agente rodando em cima de sistema velho sem quebrar nada. Quer que eu detalhe alguma das duas?" },
+      { "role": "visitor", "text": "Sim, fala mais da Nexo Labs." },
+      { "role": "twin", "text": "Na Nexo Labs eu era um dos três devs. Fazia de tudo: levantava requisito com o cliente, desenhava a arquitetura e entregava. O projeto que mais marcou foi um sistema de agendamento pra clínicas que saiu do papel em seis semanas." }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "bug-tell-more-after-warm-offer",
+    "turns": [
+      { "role": "visitor", "text": "me conta sobre as sua última experiencia profissional, o que você fazia lá e o que mais gostou" },
+      { "role": "twin", "text": "Hoje eu tô na Autodoc, cuidando da parte de agentes de IA e das integrações com os sistemas legados. Antes disso passei pela Nexo Labs, uma consultoria pequena onde eu montava produtos do zero pra clientes. Quer que eu detalhe alguma das duas?" },
+      { "role": "visitor", "text": "Sim, fala mais da Nexo Labs." },
+      { "role": "twin", "text": "Na Nexo Labs eu era um dos três devs e fazia de tudo, do requisito com o cliente até o deploy. O projeto que mais marcou foi um sistema de agendamento pra clínicas que saiu do papel em seis semanas. Se ficar mais fácil, a gente pode marcar uns 20 minutos e eu te mostro como ele funciona." }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "declines-offer-wants-info-pt",
+    "turns": [
+      { "role": "visitor", "text": "Você já trabalhou com sistemas legados?" },
+      { "role": "twin", "text": "Bastante! Na Autodoc boa parte do trabalho é colocar agente em cima de sistema antigo. Se quiser, a gente marca uma call rápida e eu te mostro." },
+      { "role": "visitor", "text": "Não precisa de call, só me conta mais como vocês fizeram." }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "can-we-talk-about-topic-en",
+    "turns": [
+      { "role": "visitor", "text": "I read your post on agent evals." },
+      { "role": "twin", "text": "Thanks for reading! It's the part of the job I think about the most." },
+      { "role": "visitor", "text": "Can we talk about how you'd apply that to RAG pipelines?" }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "pode-falar-mais-pt",
+    "turns": [
+      { "role": "visitor", "text": "Vi que você usa um gate de classificação antes de cada mensagem." },
+      { "role": "twin", "text": "Isso, um modelo barato decide o escopo e a profundidade antes do modelo principal responder." },
+      { "role": "visitor", "text": "Pode falar mais sobre isso?" }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "whatsapp-pt",
+    "turns": [
+      { "role": "visitor", "text": "Curti demais seu trabalho. Tem um WhatsApp ou dá pra gente fazer uma chamada de vídeo rapidinho?" }
+    ],
+    "expected": ["requesting_call"]
+  },
+  {
+    "id": "tell-more-without-reply-yet",
+    "turns": [
+      { "role": "visitor", "text": "Qual foi o projeto mais difícil que você já fez?" },
+      { "role": "twin", "text": "Provavelmente a migração do motor de preços da Autodoc: um monólito de quinze anos que não podia parar. Quer que eu conte como a gente fez?" },
+      { "role": "visitor", "text": "Quero sim, me conta como foi." }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "tell-me-more-en",
+    "turns": [
+      { "role": "visitor", "text": "What did you build at your last job?" },
+      { "role": "twin", "text": "Mostly agent infrastructure at Autodoc: tool routing, evals and the glue to the legacy systems. Want me to go deeper on any of that?" },
+      { "role": "visitor", "text": "Yes, tell me more about the evals part." }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "talk-about-topic-en",
+    "turns": [
+      { "role": "visitor", "text": "Can you talk about how you handle hallucinations in production agents?" }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "fala-sobre-tema-pt",
+    "turns": [
+      { "role": "visitor", "text": "Fala um pouco sobre como você testa agentes antes de subir pra produção." }
+    ],
+    "expected": ["evaluating", "browsing"]
+  },
+  {
+    "id": "explicit-call-pt",
+    "turns": [
+      { "role": "visitor", "text": "Gostei bastante do seu trabalho com agentes." },
+      { "role": "twin", "text": "Valeu! É a parte que mais me diverte hoje." },
+      { "role": "visitor", "text": "Bora marcar uma call essa semana pra gente conversar melhor?" }
+    ],
+    "expected": ["requesting_call"]
+  },
+  {
+    "id": "explicit-papo-pt",
+    "turns": [
+      { "role": "visitor", "text": "Achei muito legal o projeto das clínicas. Dá pra gente bater um papo ao vivo sobre isso?" }
+    ],
+    "expected": ["requesting_call"]
+  },
+  {
+    "id": "explicit-reuniao-pt",
+    "turns": [
+      { "role": "visitor", "text": "Sou da Contoso e queria entender melhor seu trabalho." },
+      { "role": "twin", "text": "Prazer! Posso te contar dos projetos de agentes que fiz na Autodoc, por exemplo." },
+      { "role": "visitor", "text": "Consegue agendar uma reunião com a gente na quinta?" }
+    ],
+    "expected": ["requesting_call"]
+  },
+  {
+    "id": "explicit-call-en",
+    "turns": [
+      { "role": "visitor", "text": "Your RAG eval approach is exactly what we need. Could we hop on a quick call this week?" }
+    ],
+    "expected": ["requesting_call"]
+  },
+  {
+    "id": "explicit-book-en",
+    "turns": [
+      { "role": "visitor", "text": "How do you usually structure tool routing?" },
+      { "role": "twin", "text": "A cheap gate picks the tier first, then each tier has a small allowlist of tools. Happy to go deeper." },
+      { "role": "visitor", "text": "This is great. How do I book some time with you to go over our setup?" }
+    ],
+    "expected": ["requesting_call"]
+  },
+  {
+    "id": "accepts-call-offer-pt",
+    "turns": [
+      { "role": "visitor", "text": "A gente tá montando um time de IA e tô avaliando perfis." },
+      { "role": "twin", "text": "Legal! Se ficar mais fácil, a gente pode marcar uns 20 minutos e eu te mostro como trabalho. Quer?" },
+      { "role": "visitor", "text": "Sim, pode ser!" }
+    ],
+    "expected": ["requesting_call", "hiring_signal"]
+  },
+  {
+    "id": "hiring-role-pt",
+    "turns": [
+      { "role": "visitor", "text": "Oi! Sou recrutadora e estamos contratando um engenheiro de IA sênior, remoto. Você teria interesse?" }
+    ],
+    "expected": ["hiring_signal"]
+  },
+  {
+    "id": "hiring-project-en",
+    "turns": [
+      { "role": "visitor", "text": "We need someone to build a support agent for our e-commerce store, probably a 3-month contract. Is that something you'd take on?" }
+    ],
+    "expected": ["hiring_signal"]
+  },
+  {
+    "id": "hiring-rate-pt",
+    "turns": [
+      { "role": "visitor", "text": "Tenho um projeto de automação pra minha empresa." },
+      { "role": "twin", "text": "Conta mais! Que tipo de automação?" },
+      { "role": "visitor", "text": "Integração do ERP com WhatsApp. Quanto você cobraria e qual seria o prazo?" }
+    ],
+    "expected": ["hiring_signal"]
+  },
+  {
+    "id": "evaluating-depth-en",
+    "turns": [
+      { "role": "visitor", "text": "How many years have you worked with TypeScript in production, and how does that compare to your Python experience?" }
+    ],
+    "expected": ["evaluating"]
+  },
+  {
+    "id": "evaluating-way-of-working-pt",
+    "turns": [
+      { "role": "visitor", "text": "Como você costuma trabalhar com times de produto? Você prefere escrever spec antes ou prototipar direto?" }
+    ],
+    "expected": ["evaluating"]
+  },
+  {
+    "id": "browsing-hobby-pt",
+    "turns": [
+      { "role": "visitor", "text": "Que site maneiro! Você que fez esse visual de MSN?" }
+    ],
+    "expected": ["browsing"]
+  },
+  {
+    "id": "browsing-curious-en",
+    "turns": [
+      { "role": "visitor", "text": "What are you learning these days?" },
+      { "role": "twin", "text": "Mostly durable workflows and a bit of Rust on the side." },
+      { "role": "visitor", "text": "Nice, any book you'd recommend?" }
+    ],
+    "expected": ["browsing", "evaluating"]
+  },
+  {
+    "id": "unrelated-weather-pt",
+    "turns": [
+      { "role": "visitor", "text": "Vai chover amanhã em São Paulo?" }
+    ],
+    "expected": ["unrelated"]
+  },
+  {
+    "id": "unrelated-recipe-en",
+    "turns": [
+      { "role": "visitor", "text": "Give me a good recipe for banana bread." }
+    ],
+    "expected": ["unrelated"]
+  }
+]

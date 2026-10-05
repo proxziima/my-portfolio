@@ -23,10 +23,15 @@ export interface MessageLike {
  * Flattens eve messages into the window's lines: visitor text, twin text split into one line per
  * paragraph (as the owner texts in bursts), the booking dialog (the only tool with a visible
  * result), and booking notices rendered as system lines.
+ *
+ * A message's booking dialog always follows that message's text, whatever order the model produced
+ * the parts in: the answer reads first and the widget closes the reply. Ids stay part-based, so a
+ * reordered dialog keeps its key and text streaming in before it never re-keys it.
  */
 export function toLines(messages: readonly MessageLike[]): Line[] {
   const lines: Line[] = []
   for (const m of messages) {
+    const bookings: Line[] = []
     m.parts.forEach((p, i) => {
       const id = `${m.id}:${i}`
       if (p.type === 'text' && p.text) {
@@ -45,9 +50,10 @@ export function toLines(messages: readonly MessageLike[]): Line[] {
       if (p.type === 'dynamic-tool' && p.toolName === 'schedule_call' && p.state === 'output-available') {
         // A refused or absent descriptor renders nothing, as the spec defines.
         const booking = ScheduleCallRendered.safeParse(p.output)
-        if (booking.success) lines.push({ kind: 'booking', id, booking: booking.data })
+        if (booking.success) bookings.push({ kind: 'booking', id, booking: booking.data })
       }
     })
+    lines.push(...bookings)
   }
   return lines
 }
