@@ -662,3 +662,63 @@
 .composeEnd > button:not(:disabled):hover {
   background: #e3effa;
 }
+
+/* The booking dialog: a Windows-era dialog inside the chat (title bar, bevel edges, system font). */
+.lines > li.bookingLine {
+  padding-left: 0;
+  white-space: normal;
+}
+.lines > li.bookingLine::before {
+  content: none;
+}
+.dialog {
+  margin: 6px 0;
+  padding: 2px;
+  font: 11px/14px var(--os-font);
+  color: var(--os-text);
+}
+.dialogTitle {
+  padding: 2px 4px;
+  font-weight: 700;
+  color: var(--os-text-inverse);
+  background: var(--os-title);
+}
+.dialogZones {
+  margin: 4px;
+}
+.dialogBody {
+  min-height: 420px;
+  margin: 0 4px 4px;
+  overflow: auto;
+  background: var(--os-light);
+}
+/* Booking notices and refusals: the grey italic system lines Messenger writes into a chat. */
+.notice,
+.refusal {
+  font-style: italic;
+  color: var(--msn-muted);
+}
+.notice {
+  padding: 2px 0 2px 14px;
+}
+.refusal {
+  margin: 0 0 4px;
+  font-size: 11px;
+}
+.privacy {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0 0 6px;
+  font-size: 11px;
+  color: var(--msn-muted);
+}
+.privacy button {
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--msn-link);
+  text-decoration: underline;
+  background: none;
+  cursor: pointer;
+}

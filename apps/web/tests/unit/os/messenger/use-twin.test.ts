@@ -131,9 +131,34 @@ describe('useTwin', () => {
     expect(api.refusal).toBeNull()
   })
 
-  it('exposes reset', () => {
+  it('exposes reset, which also clears the refusal', () => {
     mount()
-    api.reset()
+    update({ status: 'error', error: new ClientError(429, '') })
+    expect(api.refusal).toBe('throttled')
+    act(() => api.reset())
     expect(agent.reset).toHaveBeenCalled()
+    expect(api.refusal).toBeNull()
+  })
+
+  it('starts a fresh session once when the saved one is gone (404), instead of staying offline', () => {
+    window.localStorage.setItem('twin-session', JSON.stringify({ sessionId: 'gone', streamIndex: 3 }))
+    mount()
+    update({ status: 'error', error: new ClientError(404, '') })
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(api.refusal).toBeNull()
+    // A second 404 is not a stale save any more: it is explained, and never loops.
+    update({ status: 'ready', error: undefined })
+    update({ status: 'error', error: new ClientError(404, '') })
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(api.refusal).toBe('offline')
+  })
+
+  it('resends once on a fresh session when a follow-up hits a session that is gone', async () => {
+    mount()
+    agent.send.mockRejectedValueOnce(new ClientError(404, ''))
+    await act(() => api.send('hello'))
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(agent.send).toHaveBeenCalledTimes(2)
+    expect(api.refusal).toBeNull()
   })
 })
