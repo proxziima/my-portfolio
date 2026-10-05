@@ -4,20 +4,20 @@ import { confirmationText, lateReplyText } from './imessage-reply'
 /** The audit actor for a decision the owner texted (only the owner's number is accepted). */
 export const OWNER_ACTOR = 'imessage:owner'
 
-/** What the Sendblue route does once it has tried to commit the owner's reply. */
+/** What the Photon inbound handler does once it has tried to commit the owner's reply. */
 export interface DecisionPlan {
   /** The workflow webhook to wake, or null when there is nothing (left) to deliver. */
   deliverTo: string | null
   /** The text sent back to the owner. */
   reply: string
-  /** Set when the decision is recorded but cannot be delivered; the route logs it. */
+  /** Set when the decision is recorded but cannot be delivered; the handler logs it. */
   error: string | null
 }
 
 const noHook = (id: string) => `Approval ${id} was decided but has no delivery webhook`
 
 /**
- * Plans the route's side effects from the commit result. `decided` is what `decideApproval`
+ * Plans the handler's side effects from the commit result. `decided` is what `decideApproval`
  * returned; `stored` is the row read back when it returned null (already settled or unknown).
  *
  * A settled row carrying this very decision by the owner is a redelivery (or a repeated reply)

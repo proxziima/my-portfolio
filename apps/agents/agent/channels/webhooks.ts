@@ -12,7 +12,6 @@ import { verifyBookingRef } from '../lib/booking-ref'
 import { bookingStatusOf, parseCalWebhook, verifyCalSignature } from '../lib/cal-webhook'
 import { db } from '../lib/db'
 import { getEnv } from '../lib/env'
-import { handleSendblueWebhook } from '../lib/sendblue-webhook'
 import { json, lostCause, reason } from '../lib/webhook-utils'
 
 /** Webhooks never act as a visitor: a dedicated service principal, so they queue behind turns. */
@@ -27,13 +26,12 @@ const CAL_PRINCIPAL = {
 const notConfigured = () => new Response('not found', { status: 404 })
 
 /**
- * Inbound webhooks (Cal.com bookings, Sendblue owner replies), reached only through the web
- * app's allow-listed forwarders. Each verifies its own signature here, next to the secret
- * (spec §2).
+ * Inbound Cal.com booking webhooks, reached only through the web app's allow-listed forwarder.
+ * The webhook verifies its own signature here, next to the secret (spec §2). Photon owner replies
+ * have their own channel (`photon.ts`).
  */
 export default defineChannel({
   routes: [
-    POST('/webhooks/sendblue', (request) => handleSendblueWebhook(request)),
     POST('/webhooks/cal', async (request, { attachSession, waitUntil }) => {
       const cal = integrationConfig(getEnv(), 'cal')
       if (!cal) return notConfigured()

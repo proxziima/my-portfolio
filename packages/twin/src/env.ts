@@ -49,7 +49,7 @@ export const MODEL_DEFAULTS = {
 export const INTEGRATIONS = {
   google: ['GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_CALENDAR_ID'],
   cal: ['CAL_LINK', 'CAL_WEBHOOK_SECRET', 'TWIN_BOOKING_REF_SECRET'],
-  imessage: ['SENDBLUE_API_KEY', 'SENDBLUE_API_SECRET', 'SENDBLUE_FROM_NUMBER', 'SENDBLUE_WEBHOOK_SECRET', 'OWNER_PHONE_NUMBER'],
+  imessage: ['IMESSAGE_PROJECT_ID', 'IMESSAGE_PROJECT_SECRET', 'IMESSAGE_WEBHOOK_SECRET', 'OWNER_PHONE_NUMBER'],
   exa: ['EXA_API_KEY'],
 } as const
 export type Integration = keyof typeof INTEGRATIONS
@@ -80,15 +80,12 @@ const agentsEnvObject = z.object({
   CAL_LINK: z.string().regex(/^[\w-]+\/[\w-]+$/, 'must be "<user>/<event-slug>"').optional(),
   CAL_WEBHOOK_SECRET: secret.optional(),
   TWIN_BOOKING_REF_SECRET: secret.optional(),
-  // Sendblue REST base; the offline evals point it at a local stub.
-  SENDBLUE_API_BASE: z.url().default('https://api.sendblue.co'),
-  SENDBLUE_API_KEY: z.string().min(1).optional(),
-  SENDBLUE_API_SECRET: z.string().min(1).optional(),
-  // The Sendblue line that texts the owner.
-  SENDBLUE_FROM_NUMBER: e164.optional(),
-  // Set on the Sendblue receive webhook; Sendblue sends it back in `sb-signing-secret`.
-  SENDBLUE_WEBHOOK_SECRET: z.string().regex(/^[\w-]{16,256}$/).optional(),
-  // The only number whose replies decide approvals.
+  // Photon (Spectrum Cloud) project credentials, as eve's Photon channel and the adapter name them.
+  IMESSAGE_PROJECT_ID: z.string().min(1).optional(),
+  IMESSAGE_PROJECT_SECRET: z.string().min(1).optional(),
+  // The signing secret Photon returns once, when the webhook is created.
+  IMESSAGE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  // The only number whose replies decide approvals, and where the prompt is sent.
   OWNER_PHONE_NUMBER: e164.optional(),
   EXA_API_KEY: z.string().min(1).optional(),
   TWIN_APPROVAL_TIMEOUT: z.string().regex(/^\d+(s|m|h)$/).default('15m'),

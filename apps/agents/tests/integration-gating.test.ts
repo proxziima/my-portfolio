@@ -19,10 +19,9 @@ const { toolGranted } = await import('../agent/lib/tool-gate')
 const { searchPortfolio } = await import('../agent/lib/search')
 
 const imessage = {
-  SENDBLUE_API_KEY: 'sb-key',
-  SENDBLUE_API_SECRET: 'sb-secret',
-  SENDBLUE_FROM_NUMBER: '+15550000001',
-  SENDBLUE_WEBHOOK_SECRET: 'sb_secret_value_1234',
+  IMESSAGE_PROJECT_ID: 'photon-project-1',
+  IMESSAGE_PROJECT_SECRET: 'photon-secret-VALUE',
+  IMESSAGE_WEBHOOK_SECRET: 'photon-webhook-VALUE',
   OWNER_PHONE_NUMBER: '+5511999998888',
 }
 

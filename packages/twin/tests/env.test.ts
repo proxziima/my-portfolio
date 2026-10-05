@@ -29,10 +29,9 @@ const agents = {
   CAL_LINK: 'vinicius/intro',
   CAL_WEBHOOK_SECRET: secret,
   TWIN_BOOKING_REF_SECRET: secret,
-  SENDBLUE_API_KEY: 'sb-key',
-  SENDBLUE_API_SECRET: 'sb-secret',
-  SENDBLUE_FROM_NUMBER: '+15550000001',
-  SENDBLUE_WEBHOOK_SECRET: 'sb_secret_value_1234',
+  IMESSAGE_PROJECT_ID: 'photon-project-1',
+  IMESSAGE_PROJECT_SECRET: 'photon-project-secret',
+  IMESSAGE_WEBHOOK_SECRET: 'photon-webhook-secret',
   OWNER_PHONE_NUMBER: '+5511999998888',
   EXA_API_KEY: 'exa',
 }
@@ -90,16 +89,12 @@ describe('env', () => {
 
   it('rejects a half-configured integration, naming what is missing', () => {
     expect(() => parseEnv(agentsEnvSchema, { ...agents, OWNER_PHONE_NUMBER: '' })).toThrow(
-      /OWNER_PHONE_NUMBER: required by the imessage integration because SENDBLUE_API_KEY, SENDBLUE_API_SECRET, SENDBLUE_FROM_NUMBER, SENDBLUE_WEBHOOK_SECRET is set/,
+      /OWNER_PHONE_NUMBER: required by the imessage integration because IMESSAGE_PROJECT_ID, IMESSAGE_PROJECT_SECRET, IMESSAGE_WEBHOOK_SECRET is set/,
     )
   })
 
   it('requires E.164 phone numbers', () => {
     expect(() => parseEnv(agentsEnvSchema, { ...agents, OWNER_PHONE_NUMBER: '11 99999-8888' })).toThrow(/OWNER_PHONE_NUMBER: must be E.164/)
-  })
-
-  it('defaults the Sendblue API base', () => {
-    expect(parseEnv(agentsEnvSchema, agents).SENDBLUE_API_BASE).toBe('https://api.sendblue.co')
   })
 
   it('parses the web BFF env', () => {

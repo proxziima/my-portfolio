@@ -126,8 +126,8 @@ describe('notifyOwner', () => {
 
   it('leaves notified_at unset when the send fails, so a retry texts again', async () => {
     const id = await opened('call-1')
-    m.sendToOwner.mockRejectedValueOnce(new Error('sendblue down'))
-    await expect(notifyOwner(id)).rejects.toThrow('sendblue down')
+    m.sendToOwner.mockRejectedValueOnce(new Error('photon down'))
+    await expect(notifyOwner(id)).rejects.toThrow('photon down')
     expect(await getApproval(t.db, id)).toMatchObject({ notifiedAt: null })
     await notifyOwner(id)
     expect(m.sendToOwner).toHaveBeenCalledTimes(2)

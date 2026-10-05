@@ -33,7 +33,7 @@ export function lostCause(message: string): Response {
 /**
  * Runs a provider API call after the decision is committed. A failure is logged, never
  * rethrown: a non-2xx would make the provider redeliver the same event over and over. `what`
- * names the provider and the call, e.g. `sendblue reply`.
+ * names the provider and the call, e.g. `photon reply`.
  */
 export async function bestEffort(what: string, call: () => Promise<void>): Promise<void> {
   try {

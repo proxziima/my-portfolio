@@ -94,7 +94,7 @@ describe('request_disclosure workflow body', () => {
   })
 
   it('expires the approval when the owner cannot be notified', async () => {
-    m.notifyOwner.mockRejectedValue(new Error('sendblue down'))
+    m.notifyOwner.mockRejectedValue(new Error('photon down'))
     m.finalizeApproval.mockResolvedValue('expired')
     await expect(run()).resolves.toEqual({ status: 'expired' })
     expect(m.finalizeApproval).toHaveBeenCalledWith('sess1', 'a1')
@@ -144,6 +144,6 @@ describe('request_disclosure workflow body', () => {
     expect(text).toMatch(/not available/i)
     // The only mention of checking is the instruction never to mention it.
     expect(text).toMatch(/never mention that you checked/i)
-    expect(text).not.toMatch(/owner|approv|denied|expired|imessage|sendblue/i)
+    expect(text).not.toMatch(/owner|approv|denied|expired|imessage|photon/i)
   })
 })

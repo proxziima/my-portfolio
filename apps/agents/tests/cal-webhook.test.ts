@@ -2,7 +2,6 @@ import { createHmac } from 'node:crypto'
 import { ConversationState } from '@repo/twin/contract'
 import { describe, expect, it } from 'vitest'
 import { bookingStatusOf, parseCalWebhook, verifyCalSignature } from '../agent/lib/cal-webhook'
-import { secretsEqual } from '../agent/lib/secrets'
 
 const secret = 'w'.repeat(32)
 const envelope = {
@@ -129,13 +128,5 @@ describe('cal webhook', () => {
     expect(parseCalWebhook({ triggerEvent: 'MEETING_ENDED' })).toEqual({ kind: 'other' })
     expect(parseCalWebhook({ triggerEvent: 'PING' })).toEqual({ kind: 'other' })
     expect(parseCalWebhook(null)).toEqual({ kind: 'other' })
-  })
-
-  it('compares secrets in constant time', () => {
-    expect(secretsEqual('abc', 'abc')).toBe(true)
-    expect(secretsEqual('abd', 'abc')).toBe(false)
-    expect(secretsEqual('abcd', 'abc')).toBe(false)
-    expect(secretsEqual(null, 'abc')).toBe(false)
-    expect(secretsEqual('', 'abc')).toBe(false)
   })
 })
