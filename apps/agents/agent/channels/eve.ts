@@ -68,6 +68,7 @@ export default eveChannel({
       await storeTier(sessionId, 'light', startedAt)
       return { auth, context: [closingContext()] }
     }
+    const gateStart = Date.now()
     const { verdict, depth } = await classifyMessage(
       textOf(message),
       await previousExchange(sessionId),
@@ -75,6 +76,8 @@ export default eveChannel({
     )
     // Deflections are one short line in character, so anything that isn't ok runs on the light tier.
     const modelTier: ModelTier = verdict === 'ok' ? depth : 'light'
+    // One line per turn for tuning routing and the gate; labels only, never the visitor's text.
+    console.info('[twin] gate', { sessionId, verdict, depth, modelTier, ms: Date.now() - gateStart })
     if (verdict === 'ok') {
       await storeTier(sessionId, modelTier, startedAt)
       return { auth }
