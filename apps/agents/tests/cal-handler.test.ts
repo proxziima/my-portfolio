@@ -25,20 +25,10 @@ vi.mock('../agent/lib/env', () => ({
     CAL_LINK: 'vinicius/intro',
     CAL_WEBHOOK_SECRET: secret,
     TWIN_BOOKING_REF_SECRET: 'r',
-    TELEGRAM_WEBHOOK_SECRET: 't',
-    TELEGRAM_OWNER_USER_ID: 1,
   }),
 }))
 vi.mock('../agent/lib/booking-ref', () => ({ verifyBookingRef: () => 'sess1' }))
-vi.mock('../agent/lib/telegram', () => ({
-  answerCallback: vi.fn(),
-  markDecided: vi.fn(),
-  parseCallback: vi.fn(),
-  TelegramUpdate: { safeParse: vi.fn() },
-}))
 vi.mock('@repo/twin/db', () => ({
-  decideApproval: vi.fn(),
-  getApproval: vi.fn(),
   getConversation: async () => ({ visitorId: 'v', state: mocks.state }),
   upsertBooking: mocks.upsert,
   setEvaluationOutcome: mocks.setOutcome,

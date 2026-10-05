@@ -29,9 +29,11 @@ const agents = {
   CAL_LINK: 'vinicius/intro',
   CAL_WEBHOOK_SECRET: secret,
   TWIN_BOOKING_REF_SECRET: secret,
-  TELEGRAM_BOT_TOKEN: '123:abc',
-  TELEGRAM_WEBHOOK_SECRET: 'tg_secret_value_1234',
-  TELEGRAM_OWNER_USER_ID: '42',
+  SENDBLUE_API_KEY: 'sb-key',
+  SENDBLUE_API_SECRET: 'sb-secret',
+  SENDBLUE_FROM_NUMBER: '+15550000001',
+  SENDBLUE_WEBHOOK_SECRET: 'sb_secret_value_1234',
+  OWNER_PHONE_NUMBER: '+5511999998888',
   EXA_API_KEY: 'exa',
 }
 
@@ -74,7 +76,7 @@ describe('env', () => {
       Object.entries(agents).filter(([k]) => !Object.values(INTEGRATIONS).flat().some((i) => i === k)),
     )
     const env = parseEnv(agentsEnvSchema, core)
-    for (const name of ['google', 'cal', 'telegram', 'exa'] as const) {
+    for (const name of ['google', 'cal', 'imessage', 'exa'] as const) {
       expect(integrationConfig(env, name)).toBeNull()
       expect(() => requireIntegration(env, name)).toThrow(`The ${name} integration is not configured`)
     }
@@ -87,9 +89,17 @@ describe('env', () => {
   })
 
   it('rejects a half-configured integration, naming what is missing', () => {
-    expect(() => parseEnv(agentsEnvSchema, { ...agents, TELEGRAM_OWNER_USER_ID: '' })).toThrow(
-      /TELEGRAM_OWNER_USER_ID: required by the telegram integration because TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET is set/,
+    expect(() => parseEnv(agentsEnvSchema, { ...agents, OWNER_PHONE_NUMBER: '' })).toThrow(
+      /OWNER_PHONE_NUMBER: required by the imessage integration because SENDBLUE_API_KEY, SENDBLUE_API_SECRET, SENDBLUE_FROM_NUMBER, SENDBLUE_WEBHOOK_SECRET is set/,
     )
+  })
+
+  it('requires E.164 phone numbers', () => {
+    expect(() => parseEnv(agentsEnvSchema, { ...agents, OWNER_PHONE_NUMBER: '11 99999-8888' })).toThrow(/OWNER_PHONE_NUMBER: must be E.164/)
+  })
+
+  it('defaults the Sendblue API base', () => {
+    expect(parseEnv(agentsEnvSchema, agents).SENDBLUE_API_BASE).toBe('https://api.sendblue.co')
   })
 
   it('parses the web BFF env', () => {

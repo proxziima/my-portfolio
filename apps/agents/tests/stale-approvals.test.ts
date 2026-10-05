@@ -40,7 +40,7 @@ describe('pruneSettledApprovals', () => {
     const dead = await approval('call-1')
     const live = await approval('call-2')
     await updateConversation(t.db, SESSION, (s) => ({ ...s, pendingApprovals: [entry(dead), entry(live)] }))
-    await decideApproval(t.db, dead, { status: 'approved', actor: 'telegram:42', reasoning: 'yes' })
+    await decideApproval(t.db, dead, { status: 'approved', actor: 'imessage:owner', reasoning: 'yes' })
     await pruneSettledApprovals(SESSION)
     expect((await getConversation(t.db, SESSION))?.state.pendingApprovals).toEqual([entry(live)])
   })

@@ -23,10 +23,41 @@ describe('webhook forwarder', () => {
     expect(new Headers(seen[0]?.init.headers).get('x-cal-signature-256')).toBe('abc')
   })
 
-  it('404s unknown providers without calling the agent', async () => {
-    vi.stubGlobal('fetch', vi.fn())
+  it('forwards the Sendblue body and signing secret, and nothing else', async () => {
+    vi.stubEnv('TWIN_AGENT_URL', 'http://agent')
+    const seen: Array<{ url: string; init: RequestInit }> = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      seen.push({ url, init })
+      return new Response('ok')
+    }))
     const { POST } = await import('@/app/api/twin/hooks/[provider]/route')
-    const res = await POST(new Request('http://web/x', { method: 'POST', body: '' }), { params: Promise.resolve({ provider: 'github' }) })
+    const body = '{"content":"yes","from_number":"+5511999998888"}'
+    const res = await POST(new Request('http://web/api/twin/hooks/sendblue', { method: 'POST', body, headers: { 'content-type': 'application/json', 'sb-signing-secret': 'shh', cookie: 'x=y', authorization: 'Bearer t' } }), { params: Promise.resolve({ provider: 'sendblue' }) })
+    expect(res.status).toBe(200)
+    expect(seen[0]?.url).toBe('http://agent/webhooks/sendblue')
+    expect(seen[0]?.init.body).toBe(body)
+    const forwarded = new Headers(seen[0]?.init.headers)
+    expect(forwarded.get('sb-signing-secret')).toBe('shh')
+    expect(forwarded.get('content-type')).toBe('application/json')
+    expect(forwarded.get('cookie')).toBeNull()
+    expect(forwarded.get('authorization')).toBeNull()
+  })
+
+  it('relays the agent status and body for Sendblue', async () => {
+    vi.stubEnv('TWIN_AGENT_URL', 'http://agent')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized', { status: 401 })))
+    const { POST } = await import('@/app/api/twin/hooks/[provider]/route')
+    const res = await POST(new Request('http://web/api/twin/hooks/sendblue', { method: 'POST', body: '{}' }), { params: Promise.resolve({ provider: 'sendblue' }) })
+    expect(res.status).toBe(401)
+    expect(await res.text()).toBe('unauthorized')
+  })
+
+  it.each(['github', 'telegram', 'constructor', '__proto__', 'toString'])('404s %s without calling the agent', async provider => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { POST } = await import('@/app/api/twin/hooks/[provider]/route')
+    const res = await POST(new Request('http://web/x', { method: 'POST', body: '' }), { params: Promise.resolve({ provider }) })
     expect(res.status).toBe(404)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

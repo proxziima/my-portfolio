@@ -49,10 +49,12 @@ export const MODEL_DEFAULTS = {
 export const INTEGRATIONS = {
   google: ['GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_CALENDAR_ID'],
   cal: ['CAL_LINK', 'CAL_WEBHOOK_SECRET', 'TWIN_BOOKING_REF_SECRET'],
-  telegram: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET', 'TELEGRAM_OWNER_USER_ID'],
+  imessage: ['SENDBLUE_API_KEY', 'SENDBLUE_API_SECRET', 'SENDBLUE_FROM_NUMBER', 'SENDBLUE_WEBHOOK_SECRET', 'OWNER_PHONE_NUMBER'],
   exa: ['EXA_API_KEY'],
 } as const
 export type Integration = keyof typeof INTEGRATIONS
+
+const e164 = z.string().regex(/^\+[1-9]\d{7,14}$/, 'must be E.164, e.g. +5511999998888')
 
 const agentsEnvObject = z.object({
   TWIN_DATABASE_URL: z.url(),
@@ -78,13 +80,16 @@ const agentsEnvObject = z.object({
   CAL_LINK: z.string().regex(/^[\w-]+\/[\w-]+$/, 'must be "<user>/<event-slug>"').optional(),
   CAL_WEBHOOK_SECRET: secret.optional(),
   TWIN_BOOKING_REF_SECRET: secret.optional(),
-  // Bot API base URL; Telegram documents running a local Bot API server, and offline evals use a stub.
-  TELEGRAM_API_BASE: z.url().default('https://api.telegram.org'),
-  TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]+$/).optional(),
-  TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[\w-]{16,256}$/).optional(),
-  // The owner's numeric user id, used as the private chat id. The owner must /start the bot once
-  // first: Telegram refuses messages to users who never did (403), so every approval would expire.
-  TELEGRAM_OWNER_USER_ID: z.string().regex(/^\d+$/).optional(),
+  // Sendblue REST base; the offline evals point it at a local stub.
+  SENDBLUE_API_BASE: z.url().default('https://api.sendblue.co'),
+  SENDBLUE_API_KEY: z.string().min(1).optional(),
+  SENDBLUE_API_SECRET: z.string().min(1).optional(),
+  // The Sendblue line that texts the owner.
+  SENDBLUE_FROM_NUMBER: e164.optional(),
+  // Set on the Sendblue receive webhook; Sendblue sends it back in `sb-signing-secret`.
+  SENDBLUE_WEBHOOK_SECRET: z.string().regex(/^[\w-]{16,256}$/).optional(),
+  // The only number whose replies decide approvals.
+  OWNER_PHONE_NUMBER: e164.optional(),
   EXA_API_KEY: z.string().min(1).optional(),
   TWIN_APPROVAL_TIMEOUT: z.string().regex(/^\d+(s|m|h)$/).default('15m'),
   TWIN_CLASSIFIER_TIMEOUT_MS: z.coerce.number().int().positive().default(4_000),

@@ -9,7 +9,10 @@ import {
   findSessionApproval,
   getApproval,
   listCachedSearches,
-  setApprovalTelegramMessage,
+  setApprovalNotified,
+  findApprovalByCode,
+  listPendingApprovals,
+  newReplyCode,
   setApprovalWebhook,
   deleteVisitor,
   getConversation,
@@ -90,7 +93,7 @@ describe('approvals', () => {
 
   it('decides a pending approval exactly once', async () => {
     const id = await createApproval(t.db, pending)
-    const first = await decideApproval(t.db, id, { status: 'approved', actor: 'telegram:42', reasoning: 'Approved via Telegram' })
+    const first = await decideApproval(t.db, id, { status: 'approved', actor: 'imessage:owner', reasoning: 'Approved via iMessage' })
     const second = await decideApproval(t.db, id, { status: 'expired', actor: 'system', reasoning: 'timeout' })
     expect(first?.status).toBe('approved')
     expect(second).toBeNull()
@@ -99,8 +102,8 @@ describe('approvals', () => {
   it('reads an approval back, pending or settled, and null for an unknown id', async () => {
     const id = await createApproval(t.db, pending)
     expect(await getApproval(t.db, id)).toMatchObject({ id, sessionId: 'sess-1', sourceId: 'knowledge:7', status: 'pending', decidedAt: null, actor: null })
-    await decideApproval(t.db, id, { status: 'denied', actor: 'telegram:42', reasoning: 'no' }, new Date('2026-10-05T10:00:00Z'))
-    expect(await getApproval(t.db, id)).toMatchObject({ status: 'denied', actor: 'telegram:42', decidedAt: new Date('2026-10-05T10:00:00Z') })
+    await decideApproval(t.db, id, { status: 'denied', actor: 'imessage:owner', reasoning: 'no' }, new Date('2026-10-05T10:00:00Z'))
+    expect(await getApproval(t.db, id)).toMatchObject({ status: 'denied', actor: 'imessage:owner', decidedAt: new Date('2026-10-05T10:00:00Z') })
     expect(await getApproval(t.db, '3f1c2b9e-8a7d-4c6b-9e5f-1a2b3c4d5e6f')).toBeNull()
   })
 
@@ -121,19 +124,26 @@ describe('approvals', () => {
     expect(await findSessionApproval(t.db, 'sess-2', { callId: 'call-1' })).toBeNull()
   })
 
-  it('keeps the newest delivery webhook while pending and stores the telegram message on its own', async () => {
+  it('keeps the newest delivery webhook while pending and records the notification on its own', async () => {
     const id = await createApproval(t.db, pending)
     await setApprovalWebhook(t.db, id, 'https://agents.test/hook/first')
     await setApprovalWebhook(t.db, id, 'https://agents.test/hook/second')
-    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/second', telegramMessageId: null })
-    await setApprovalTelegramMessage(t.db, id, 77)
-    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/second', telegramMessageId: 77 })
+    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/second', notifiedAt: null })
+    await setApprovalNotified(t.db, id)
+    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/second', notifiedAt: expect.any(Date) })
+  })
+
+  it('keeps the first notification time when notified again', async () => {
+    const id = await createApproval(t.db, pending)
+    await setApprovalNotified(t.db, id, new Date('2026-10-05T10:00:00Z'))
+    await setApprovalNotified(t.db, id, new Date('2026-10-05T11:00:00Z'))
+    expect((await getApproval(t.db, id))!.notifiedAt).toEqual(new Date('2026-10-05T10:00:00Z'))
   })
 
   it('never moves the delivery webhook once the approval is decided', async () => {
     const id = await createApproval(t.db, pending)
     await setApprovalWebhook(t.db, id, 'https://agents.test/hook/first')
-    await decideApproval(t.db, id, { status: 'approved', actor: 'telegram:42', reasoning: 'yes' })
+    await decideApproval(t.db, id, { status: 'approved', actor: 'imessage:owner', reasoning: 'yes' })
     await setApprovalWebhook(t.db, id, 'https://agents.test/hook/late')
     expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/first' })
   })
@@ -142,12 +152,64 @@ describe('approvals', () => {
     const open = await createApproval(t.db, pending)
     const denied = await createApproval(t.db, { ...pending, callId: 'call-2', sourceId: 'knowledge:8' })
     const expired = await createApproval(t.db, { ...pending, callId: 'call-3', sourceId: 'knowledge:9' })
-    await decideApproval(t.db, denied, { status: 'denied', actor: 'telegram:42', reasoning: 'no' })
+    await decideApproval(t.db, denied, { status: 'denied', actor: 'imessage:owner', reasoning: 'no' })
     await decideApproval(t.db, expired, { status: 'expired', actor: 'system', reasoning: 'timeout' })
     const settled = await listSettledApprovalIds(t.db, 'sess-1')
     expect(settled.sort()).toEqual([denied, expired].sort())
     expect(settled).not.toContain(open)
     expect(await listSettledApprovalIds(t.db, 'sess-2')).toEqual([])
+  })
+
+  it('assigns a reply code from the alphabet and redraws on a pending collision', async () => {
+    const codes = ['AAAA', 'AAAA', 'BBBB']
+    const first = await createApproval(t.db, pending, () => codes.shift()!)
+    const second = await createApproval(t.db, { ...pending, callId: 'call-2', sourceId: 'knowledge:9' }, () => codes.shift()!)
+    expect((await getApproval(t.db, first))!.replyCode).toBe('AAAA')
+    expect((await getApproval(t.db, second))!.replyCode).toBe('BBBB')
+    expect(newReplyCode()).toMatch(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{4}$/)
+  })
+
+  it('gives up after five draws when the code keeps colliding', async () => {
+    await createApproval(t.db, pending, () => 'AAAA')
+    let draws = 0
+    await expect(
+      createApproval(t.db, { ...pending, callId: 'call-2', sourceId: 'knowledge:9' }, () => {
+        draws++
+        return 'AAAA'
+      }),
+    ).rejects.toThrow()
+    expect(draws).toBe(5)
+  })
+
+  it('returns the existing approval for a repeated call even when the drawn code collides', async () => {
+    const first = await createApproval(t.db, pending, () => 'AAAA')
+    await createApproval(t.db, { ...pending, callId: 'call-2', sourceId: 'knowledge:9' }, () => 'BBBB')
+    expect(await createApproval(t.db, pending, () => 'BBBB')).toBe(first)
+  })
+
+  it('reuses a code once its approval is settled', async () => {
+    const first = await createApproval(t.db, pending, () => 'CCCC')
+    await decideApproval(t.db, first, { status: 'denied', actor: 'imessage:owner', reasoning: 'no' })
+    const second = await createApproval(t.db, { ...pending, callId: 'call-2', sourceId: 'knowledge:9' }, () => 'CCCC')
+    expect((await findApprovalByCode(t.db, 'CCCC'))!.id).toBe(second)
+  })
+
+  it('finds a recently settled approval by code for late replies, but not an old one', async () => {
+    const id = await createApproval(t.db, pending, () => 'DDDD')
+    await decideApproval(t.db, id, { status: 'expired', actor: 'system', reasoning: 'x' }, new Date('2026-10-05T10:00:00Z'))
+    expect((await findApprovalByCode(t.db, 'DDDD', new Date('2026-10-05T12:00:00Z')))!.status).toBe('expired')
+    expect(await findApprovalByCode(t.db, 'DDDD', new Date('2026-10-07T12:00:00Z'))).toBeNull()
+    expect(await findApprovalByCode(t.db, 'ZZZZ')).toBeNull()
+  })
+
+  it('lists every pending approval, notified or not, oldest first', async () => {
+    const a = await createApproval(t.db, pending)
+    const b = await createApproval(t.db, { ...pending, callId: 'call-2', sourceId: 'knowledge:9' })
+    const c = await createApproval(t.db, { ...pending, callId: 'call-3', sourceId: 'knowledge:10' })
+    const settled = await createApproval(t.db, { ...pending, callId: 'call-4', sourceId: 'knowledge:11' })
+    await decideApproval(t.db, settled, { status: 'denied', actor: 'imessage:owner', reasoning: 'no' })
+    await setApprovalNotified(t.db, b)
+    expect((await listPendingApprovals(t.db)).map((r) => r.id)).toEqual([a, b, c])
   })
 })
 

@@ -8,7 +8,7 @@ import { untrusted } from './untrusted'
 
 /**
  * Searches the knowledge base through Payload MCP, cached per session and normalised query.
- * Without Telegram there is no owner to approve a restricted item, so restricted entries are left
+ * Without iMessage there is no owner to approve a restricted item, so restricted entries are left
  * out before caching: the model never learns of them, and `request_disclosure`'s offered-stub
  * check refuses any request without contacting anyone.
  */
@@ -17,7 +17,7 @@ export async function searchPortfolio(sessionId: string, query: string): Promise
   const cached = await getCachedSearch(db(), sessionId, key)
   if (cached !== null) return TwinSearchResult.parse(cached)
   const found = await callPayloadTool('twinSearch', { query, limit: 6 }, TwinSearchResult)
-  const result = integrationConfig(getEnv(), 'telegram') ? found : { ...found, restricted: [] }
+  const result = integrationConfig(getEnv(), 'imessage') ? found : { ...found, restricted: [] }
   await putCachedSearch(db(), sessionId, key, result)
   return result
 }
