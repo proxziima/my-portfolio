@@ -10,7 +10,10 @@ function routed(question: string, tier: ModelTier) {
     async test(t) {
       // The ids come from the same env resolution the agent uses, so a TWIN_MODEL* override does not break the eval.
       const expected = modelIds(process.env).tiers[tier].id
-      const turn = await t.send(question)
+      // The channel only classifies a message that arrives on an existing session, and `t.send` would create the session
+      // and send in one request (no session id yet, so the gate is skipped and every case would run on standard).
+      const session = await t.session()
+      const turn = await session.send(question)
       turn.eventsSatisfy(`every step starts on ${expected}`, (events) => {
         const started = events.filter((e) => e.type === 'step.started')
         return started.length > 0 && started.every((e) => e.data.modelId === expected)
