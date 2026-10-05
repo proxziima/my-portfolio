@@ -1,4 +1,4 @@
-import { and, asc, count, eq, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, ne } from 'drizzle-orm'
 import type { TwinDb } from '../client'
 import { ApprovalStatus } from '../../contract/state'
 import { approvals } from '../schema'
@@ -22,12 +22,17 @@ export async function createApproval(
   return existing.id
 }
 
-/** Stores where the decision must be delivered. The first webhook wins, so a rerun can't divert it. */
+/**
+ * Stores where the decision must be delivered. While the approval is pending the newest waiting
+ * run's webhook wins, so a reused approval or a re-dispatched run gets the fast wake; an earlier
+ * run still wakes at its deadline and reads the decision from the database. Once decided, the
+ * webhook never moves.
+ */
 export async function setApprovalWebhook(db: TwinDb, id: string, webhookUrl: string): Promise<void> {
   await db
     .update(approvals)
     .set({ webhookUrl })
-    .where(and(eq(approvals.id, id), isNull(approvals.webhookUrl)))
+    .where(and(eq(approvals.id, id), eq(approvals.status, 'pending')))
 }
 
 /** Records the Telegram message that carries the buttons, which also marks the owner as notified. */
@@ -120,6 +125,18 @@ export async function findSessionApproval(
     .orderBy(asc(approvals.requestedAt))
     .limit(1)
   return row ? toRecord(row) : null
+}
+
+/**
+ * Ids of the session's approvals that are no longer pending. A settled approval never goes back
+ * to pending, so pruning these from conversation state can't race a newly opened one.
+ */
+export async function listSettledApprovalIds(db: TwinDb, sessionId: string): Promise<string[]> {
+  const rows = await db
+    .select({ id: approvals.id })
+    .from(approvals)
+    .where(and(eq(approvals.sessionId, sessionId), ne(approvals.status, 'pending')))
+  return rows.map((r) => r.id)
 }
 
 /** How many approvals a session has opened, whatever their outcome. */

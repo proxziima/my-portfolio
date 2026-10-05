@@ -27,6 +27,9 @@ import {
   recentTranscript,
   setEvaluationOutcome,
   setStableKeyHash,
+  listSettledApprovalIds,
+  upsertBooking,
+  schema,
 } from '../../src/db'
 
 let t: TestDb
@@ -118,13 +121,64 @@ describe('approvals', () => {
     expect(await findSessionApproval(t.db, 'sess-2', { callId: 'call-1' })).toBeNull()
   })
 
-  it('keeps the first delivery webhook and stores the telegram message on its own', async () => {
+  it('keeps the newest delivery webhook while pending and stores the telegram message on its own', async () => {
     const id = await createApproval(t.db, pending)
     await setApprovalWebhook(t.db, id, 'https://agents.test/hook/first')
     await setApprovalWebhook(t.db, id, 'https://agents.test/hook/second')
-    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/first', telegramMessageId: null })
+    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/second', telegramMessageId: null })
     await setApprovalTelegramMessage(t.db, id, 77)
-    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/first', telegramMessageId: 77 })
+    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/second', telegramMessageId: 77 })
+  })
+
+  it('never moves the delivery webhook once the approval is decided', async () => {
+    const id = await createApproval(t.db, pending)
+    await setApprovalWebhook(t.db, id, 'https://agents.test/hook/first')
+    await decideApproval(t.db, id, { status: 'approved', actor: 'telegram:42', reasoning: 'yes' })
+    await setApprovalWebhook(t.db, id, 'https://agents.test/hook/late')
+    expect(await getApproval(t.db, id)).toMatchObject({ webhookUrl: 'https://agents.test/hook/first' })
+  })
+
+  it('lists the ids of a session’s settled approvals, never pending ones or another session’s', async () => {
+    const open = await createApproval(t.db, pending)
+    const denied = await createApproval(t.db, { ...pending, callId: 'call-2', sourceId: 'knowledge:8' })
+    const expired = await createApproval(t.db, { ...pending, callId: 'call-3', sourceId: 'knowledge:9' })
+    await decideApproval(t.db, denied, { status: 'denied', actor: 'telegram:42', reasoning: 'no' })
+    await decideApproval(t.db, expired, { status: 'expired', actor: 'system', reasoning: 'timeout' })
+    const settled = await listSettledApprovalIds(t.db, 'sess-1')
+    expect(settled.sort()).toEqual([denied, expired].sort())
+    expect(settled).not.toContain(open)
+    expect(await listSettledApprovalIds(t.db, 'sess-2')).toEqual([])
+  })
+})
+
+describe('bookings', () => {
+  const at = { startTime: new Date('2026-10-08T14:00:00Z'), endTime: new Date('2026-10-08T14:30:00Z') }
+  const booking = (status: string) => ({ uid: 'bk_1', sessionId: 'sess-1', status, ...at })
+
+  it('reports a new booking as a change from nothing', async () => {
+    expect(await upsertBooking(t.db, booking('confirmed'))).toEqual({ previous: null, current: 'confirmed', changed: true })
+  })
+
+  it('reports a redelivered event as unchanged', async () => {
+    await upsertBooking(t.db, booking('confirmed'))
+    expect(await upsertBooking(t.db, booking('confirmed'))).toEqual({ previous: 'confirmed', current: 'confirmed', changed: false })
+  })
+
+  it('reports a status transition with the previous status', async () => {
+    await upsertBooking(t.db, booking('confirmed'))
+    expect(await upsertBooking(t.db, booking('cancelled'))).toEqual({ previous: 'confirmed', current: 'cancelled', changed: true })
+  })
+
+  it('keeps a cancelled booking cancelled when a late create or reschedule arrives', async () => {
+    await upsertBooking(t.db, booking('cancelled'))
+    expect(await upsertBooking(t.db, booking('confirmed'))).toEqual({ previous: 'cancelled', current: 'cancelled', changed: false })
+    expect(await upsertBooking(t.db, { ...booking('rescheduled'), startTime: new Date('2026-10-09T14:00:00Z') })).toEqual({
+      previous: 'cancelled',
+      current: 'cancelled',
+      changed: false,
+    })
+    const [row] = await t.db.select().from(schema.bookings)
+    expect(row).toMatchObject({ status: 'cancelled', startTime: at.startTime })
   })
 })
 

@@ -27,6 +27,8 @@ const { finalizeApproval, notifyOwner, openApproval } = await import('../agent/l
 
 const SESSION = 'sess-1'
 const HOOK = 'https://agents.test/.well-known/workflow/v1/webhook/tok-1'
+const HOOK_2 = 'https://agents.test/.well-known/workflow/v1/webhook/tok-2'
+const HOOK_3 = 'https://agents.test/.well-known/workflow/v1/webhook/tok-3'
 const input = { sourceId: 'knowledge:5', topic: 'Notice period', reason: 'Recruiter asked when I can start' }
 
 let t: TestDb
@@ -65,10 +67,20 @@ describe('openApproval', () => {
     expect((await state()).pendingApprovals).toHaveLength(1)
   })
 
+  it('hands the fast wake to the newest waiting run: a reused or re-dispatched approval stores its webhook', async () => {
+    const first = await opened('call-1')
+    await openApproval(SESSION, 'call-2', HOOK_2, input)
+    expect(await getApproval(t.db, first)).toMatchObject({ webhookUrl: HOOK_2 })
+    await openApproval(SESSION, 'call-1', HOOK_3, input)
+    expect(await getApproval(t.db, first)).toMatchObject({ webhookUrl: HOOK_3 })
+  })
+
   it('returns the outcome of an already decided approval for the same source', async () => {
     const first = await opened('call-1')
     await decideApproval(t.db, first, { status: 'denied', actor: 'telegram:42', reasoning: 'no' })
-    expect(await openApproval(SESSION, 'call-2', HOOK, input)).toEqual({ kind: 'alreadyDecided', approvalId: first, status: 'denied' })
+    expect(await openApproval(SESSION, 'call-2', HOOK_2, input)).toEqual({ kind: 'alreadyDecided', approvalId: first, status: 'denied' })
+    // A decided approval keeps the webhook its decision was delivered to.
+    expect(await getApproval(t.db, first)).toMatchObject({ webhookUrl: HOOK })
   })
 
   it('caps approvals per session and auto-denies beyond it without a new row', async () => {
