@@ -70,6 +70,8 @@ export const agentsEnvSchema = z.object({
   TELEGRAM_API_BASE: z.url().default('https://api.telegram.org'),
   TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]+$/),
   TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[\w-]{16,256}$/),
+  // The owner's numeric user id, used as the private chat id. The owner must /start the bot once
+  // first: Telegram refuses messages to users who never did (403), so every approval would expire.
   TELEGRAM_OWNER_USER_ID: z.string().regex(/^\d+$/),
   EXA_API_KEY: z.string().min(1),
   TWIN_APPROVAL_TIMEOUT: z.string().regex(/^\d+(s|m|h)$/).default('15m'),

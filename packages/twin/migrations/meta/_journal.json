@@ -8,6 +8,13 @@
       "when": 1791167356477,
       "tag": "0000_lethal_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791172369661,
+      "tag": "0001_fancy_randall",
+      "breakpoints": true
     }
   ]
 }

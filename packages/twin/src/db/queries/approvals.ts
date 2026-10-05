@@ -1,25 +1,38 @@
-import { and, eq } from 'drizzle-orm'
+import { and, asc, count, eq, isNull } from 'drizzle-orm'
 import type { TwinDb } from '../client'
 import { ApprovalStatus } from '../../contract/state'
 import { approvals } from '../schema'
 
-/** Persists a pending owner approval and returns its id (also the Telegram callback payload). */
+/**
+ * Persists a pending owner approval once per tool call and returns its id (also the Telegram
+ * callback payload). A retried step or a re-dispatched run with the same call gets the same row.
+ */
 export async function createApproval(
   db: TwinDb,
-  a: { sessionId: string; sourceId: string; topic: string; reason: string },
+  a: { sessionId: string; callId: string; sourceId: string; topic: string; reason: string },
 ): Promise<string> {
-  const [row] = await db.insert(approvals).values(a).returning({ id: approvals.id })
-  if (!row) throw new Error('Approval insert returned no row')
-  return row.id
+  const [row] = await db
+    .insert(approvals)
+    .values(a)
+    .onConflictDoNothing({ target: [approvals.sessionId, approvals.callId] })
+    .returning({ id: approvals.id })
+  if (row) return row.id
+  const existing = await findSessionApproval(db, a.sessionId, { callId: a.callId })
+  if (!existing) throw new Error('Approval insert conflicted but no row was found')
+  return existing.id
 }
 
-/** Stores where the decision must be delivered (workflow webhook) and the Telegram message to edit. */
-export async function attachApprovalDelivery(
-  db: TwinDb,
-  id: string,
-  delivery: { webhookUrl: string; telegramMessageId: number },
-): Promise<void> {
-  await db.update(approvals).set(delivery).where(eq(approvals.id, id))
+/** Stores where the decision must be delivered. The first webhook wins, so a rerun can't divert it. */
+export async function setApprovalWebhook(db: TwinDb, id: string, webhookUrl: string): Promise<void> {
+  await db
+    .update(approvals)
+    .set({ webhookUrl })
+    .where(and(eq(approvals.id, id), isNull(approvals.webhookUrl)))
+}
+
+/** Records the Telegram message that carries the buttons, which also marks the owner as notified. */
+export async function setApprovalTelegramMessage(db: TwinDb, id: string, telegramMessageId: number): Promise<void> {
+  await db.update(approvals).set({ telegramMessageId }).where(eq(approvals.id, id))
 }
 
 /** A settled approval as returned to callers. */
@@ -67,21 +80,50 @@ export interface ApprovalRecord {
   sourceId: string
   topic: string
   status: ApprovalStatus
+  webhookUrl: string | null
   telegramMessageId: number | null
   decidedAt: Date | null
+  actor: string | null
 }
 
-/** Reads one approval, or null when the id is unknown. The status is validated, not trusted. */
-export async function getApproval(db: TwinDb, id: string): Promise<ApprovalRecord | null> {
-  const [row] = await db.select().from(approvals).where(eq(approvals.id, id))
-  if (!row) return null
+function toRecord(row: typeof approvals.$inferSelect): ApprovalRecord {
   return {
     id: row.id,
     sessionId: row.sessionId,
     sourceId: row.sourceId,
     topic: row.topic,
     status: ApprovalStatus.parse(row.status),
+    webhookUrl: row.webhookUrl,
     telegramMessageId: row.telegramMessageId,
     decidedAt: row.decidedAt,
+    actor: row.actor,
   }
+}
+
+/** Reads one approval, or null when the id is unknown. The status is validated, not trusted. */
+export async function getApproval(db: TwinDb, id: string): Promise<ApprovalRecord | null> {
+  const [row] = await db.select().from(approvals).where(eq(approvals.id, id))
+  return row ? toRecord(row) : null
+}
+
+/** The session's approval opened by a tool call, or the oldest one for a source; null if none. */
+export async function findSessionApproval(
+  db: TwinDb,
+  sessionId: string,
+  by: { callId: string } | { sourceId: string },
+): Promise<ApprovalRecord | null> {
+  const match = 'callId' in by ? eq(approvals.callId, by.callId) : eq(approvals.sourceId, by.sourceId)
+  const [row] = await db
+    .select()
+    .from(approvals)
+    .where(and(eq(approvals.sessionId, sessionId), match))
+    .orderBy(asc(approvals.requestedAt))
+    .limit(1)
+  return row ? toRecord(row) : null
+}
+
+/** How many approvals a session has opened, whatever their outcome. */
+export async function countSessionApprovals(db: TwinDb, sessionId: string): Promise<number> {
+  const [row] = await db.select({ n: count() }).from(approvals).where(eq(approvals.sessionId, sessionId))
+  return row?.n ?? 0
 }

@@ -13,6 +13,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
 import type { ConversationState } from '../contract/state'
@@ -75,20 +76,29 @@ export const intentEvaluations = twin.table(
   ],
 )
 
-export const approvals = twin.table('approvals', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  sessionId: sessionRef(),
-  sourceId: text('source_id').notNull(),
-  topic: text('topic').notNull(),
-  reason: text('reason').notNull(),
-  status: text('status').notNull().default('pending'),
-  webhookUrl: text('webhook_url'),
-  telegramMessageId: bigint('telegram_message_id', { mode: 'number' }),
-  requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
-  decidedAt: timestamp('decided_at', { withTimezone: true }),
-  actor: text('actor'),
-  reasoning: text('reasoning'),
-})
+export const approvals = twin.table(
+  'approvals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sessionId: sessionRef(),
+    // The tool call that opened it, so a retried step or re-dispatched run reuses the row.
+    callId: text('call_id'),
+    sourceId: text('source_id').notNull(),
+    topic: text('topic').notNull(),
+    reason: text('reason').notNull(),
+    status: text('status').notNull().default('pending'),
+    webhookUrl: text('webhook_url'),
+    telegramMessageId: bigint('telegram_message_id', { mode: 'number' }),
+    requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    actor: text('actor'),
+    reasoning: text('reasoning'),
+  },
+  (t) => [
+    uniqueIndex('approvals_session_call_uq').on(t.sessionId, t.callId),
+    index('approvals_session_source_idx').on(t.sessionId, t.sourceId),
+  ],
+)
 
 export const bookings = twin.table('bookings', {
   uid: text('uid').primaryKey(),

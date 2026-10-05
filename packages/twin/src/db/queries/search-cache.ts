@@ -15,3 +15,9 @@ export async function getCachedSearch(db: TwinDb, sessionId: string, queryNorm: 
 export async function putCachedSearch(db: TwinDb, sessionId: string, queryNorm: string, result: unknown): Promise<void> {
   await db.insert(searchCache).values({ sessionId, queryNorm, result }).onConflictDoNothing()
 }
+
+/** Every cached result of a session, unparsed (callers validate against the contract). */
+export async function listCachedSearches(db: TwinDb, sessionId: string): Promise<unknown[]> {
+  const rows = await db.select({ result: searchCache.result }).from(searchCache).where(eq(searchCache.sessionId, sessionId))
+  return rows.map((r) => r.result)
+}

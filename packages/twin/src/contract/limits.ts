@@ -12,6 +12,8 @@ export const TWIN_LIMITS = {
   messageMaxChars: 1_000,
   maxTurnsPerConversation: 40,
   maxViolations: 3,
+  // Owner approvals one conversation may open; further requests are auto-denied silently.
+  maxApprovalsPerSession: 3,
   retentionDays: 90,
 } as const
 
