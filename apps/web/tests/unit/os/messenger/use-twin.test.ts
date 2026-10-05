@@ -251,4 +251,51 @@ describe('useTwin', () => {
     expect(agent.reset).toHaveBeenCalledTimes(1)
     expect(api.refusal).toBe('offline')
   })
+
+  it('starts a fresh session when a saved one never finishes resuming', () => {
+    vi.useFakeTimers()
+    try {
+      window.localStorage.setItem('twin-session', JSON.stringify({ sessionId: 's1', streamIndex: 4 }))
+      agent = { ...fresh(), status: 'resuming' }
+      eve.agent = agent
+      mount()
+      act(() => vi.advanceTimersByTime(9_000))
+      expect(agent.reset).not.toHaveBeenCalled()
+      act(() => vi.advanceTimersByTime(2_000))
+      expect(agent.reset).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('holds a message sent while resuming and delivers it once the resume settles', async () => {
+    agent = { ...fresh(), status: 'resuming' }
+    eve.agent = agent
+    mount()
+    await act(async () => api.send('oi'))
+    expect(agent.send).not.toHaveBeenCalled()
+    expect(api.refusal).toBeNull()
+    await act(async () => update({ status: 'ready' }))
+    expect(agent.send).toHaveBeenCalledTimes(1)
+    expect(agent.send).toHaveBeenCalledWith('oi')
+  })
+
+  it('delivers a held message to the fresh session when the stuck resume is renewed', async () => {
+    vi.useFakeTimers()
+    try {
+      window.localStorage.setItem('twin-session', JSON.stringify({ sessionId: 's1', streamIndex: 4 }))
+      agent = { ...fresh(), status: 'resuming' }
+      eve.agent = agent
+      mount()
+      await act(async () => api.send('oi'))
+      expect(agent.send).not.toHaveBeenCalled()
+      await act(async () => vi.advanceTimersByTime(10_000))
+      expect(agent.reset).toHaveBeenCalledTimes(1)
+      await act(async () => update({ status: 'ready' }))
+      expect(agent.send).toHaveBeenCalledTimes(1)
+      expect(agent.send).toHaveBeenCalledWith('oi')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

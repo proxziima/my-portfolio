@@ -8,6 +8,13 @@ import { hasFailed, isParked, toLines, type Line } from './parts'
 
 const SESSION_KEY = 'twin-session'
 
+/**
+ * How long a saved session may stay resuming before the window gives up on it. A healthy resume
+ * catches up in about a second; a session whose run died before publishing anything never does,
+ * because its stream serves no events up to the tail index eve waits for.
+ */
+const RESUME_STALL_MS = 10_000
+
 type Refusal = TwinRefusal['kind']
 
 /** Reads the saved session; storage can be unavailable (private mode), which just means no resume. */
@@ -77,6 +84,11 @@ export function useTwin() {
   const typing = agent.status === 'submitted' || (agent.status === 'streaming' && !isParked(agent.events))
 
   const { send: sendTurn, reset: resetAgent } = agent
+  // Read inside callbacks, which must not be recreated on every status change.
+  const status = useRef(agent.status)
+  status.current = agent.status
+  /** A message sent while the saved session was still resuming, delivered once it settles. */
+  const held = useRef<string | null>(null)
   const reset = useCallback(() => {
     setRefusal(null)
     resetAgent()
@@ -127,6 +139,11 @@ export function useTwin() {
       const text = input.trim()
       if (!text) return
       setRefusal(null)
+      // eve rejects a send while it resumes; hold the message until the resume settles or is renewed.
+      if (status.current === 'resuming') {
+        held.current = text
+        return
+      }
       lastSent.current = text
       // A first turn's HTTP failure lands in `agent.error`; a follow-up sent mid-turn rejects instead.
       try {
@@ -168,6 +185,24 @@ export function useTwin() {
       void resend(owed)
     }
   }, [agent.error, failed, fail, resend])
+
+  // A saved session stuck resuming would refuse every message as "offline": start over instead,
+  // under the same at-most-once rule as a 404 or a failed session.
+  useEffect(() => {
+    if (agent.status !== 'resuming') return
+    const timer = setTimeout(() => {
+      if (!renew()) setRefusal('offline')
+    }, RESUME_STALL_MS)
+    return () => clearTimeout(timer)
+  }, [agent.status, renew])
+
+  // Delivers the held message once the session can take it (resumed, or renewed and ready).
+  useEffect(() => {
+    if (agent.status === 'resuming' || held.current === null) return
+    const text = held.current
+    held.current = null
+    void send(text)
+  }, [agent.status, send])
 
   return { lines, typing, refusal, send, reset }
 }
