@@ -33,6 +33,22 @@ function isGone(error: unknown): boolean {
   return error instanceof ClientError && error.status === 404
 }
 
+interface MessageLike {
+  role: string
+  metadata?: unknown
+  parts: readonly { type: string; text?: string }[]
+}
+
+/** The server recorded a visitor message with this text (an optimistic echo doesn't count). */
+function acknowledged(messages: readonly MessageLike[], text: string): boolean {
+  return messages.some(
+    (m) =>
+      m.role === 'user' &&
+      (m.metadata as { optimistic?: boolean } | undefined)?.optimistic !== true &&
+      m.parts.some((p) => p.type === 'text' && p.text === text),
+  )
+}
+
 /**
  * The live conversation with the twin through the BFF (`/api/twin`). Persists the session so a
  * reload or dropped connection resumes the same stream from where it stopped.
@@ -84,30 +100,56 @@ export function useTwin() {
     [reset],
   )
 
+  // The last text submitted through `send`, so a first turn whose session turned out to be gone
+  // (a 404 through `agent.error`) can be resent to the fresh session instead of being dropped.
+  const lastSent = useRef<string | null>(null)
+  const messages = useRef<readonly MessageLike[]>(agent.data.messages)
+  useEffect(() => {
+    messages.current = agent.data.messages
+  }, [agent.data.messages])
+
+  const resend = useCallback(
+    async (text: string) => {
+      try {
+        await sendTurn(text)
+      } catch (retryError) {
+        setRefusal(refusalOf(retryError))
+      }
+    },
+    [sendTurn],
+  )
+
   const send = useCallback(
     async (input: string) => {
       const text = input.trim()
       if (!text) return
       setRefusal(null)
+      lastSent.current = text
       // A first turn's HTTP failure lands in `agent.error`; a follow-up sent mid-turn rejects instead.
       try {
         await sendTurn(text)
       } catch (error) {
+        // Resent right here if the session was gone, so the error path must not resend it too.
+        lastSent.current = null
         if (!fail(error)) return
         // The session was gone: the visitor's message goes to the fresh one.
-        try {
-          await sendTurn(text)
-        } catch (retryError) {
-          setRefusal(refusalOf(retryError))
-        }
+        await resend(text)
       }
     },
-    [sendTurn, fail],
+    [sendTurn, fail, resend],
   )
 
   useEffect(() => {
-    if (agent.error) fail(agent.error)
-  }, [agent.error, fail])
+    if (!agent.error) return
+    // Read before `fail`: a reset clears the messages.
+    const text = lastSent.current
+    const owed = text !== null && !acknowledged(messages.current, text) ? text : null
+    // `fail` renews the session at most once, so this resends at most once.
+    if (fail(agent.error) && owed !== null) {
+      lastSent.current = null
+      void resend(owed)
+    }
+  }, [agent.error, fail, resend])
 
   return { lines, typing, refusal, send, reset }
 }

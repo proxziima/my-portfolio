@@ -161,4 +161,66 @@ describe('useTwin', () => {
     expect(agent.send).toHaveBeenCalledTimes(2)
     expect(api.refusal).toBeNull()
   })
+
+  const userMessage = (text: string, metadata: Record<string, unknown>) => ({
+    id: `m-${text}`,
+    role: 'user',
+    metadata,
+    parts: [{ type: 'text', text }],
+  })
+
+  it('resends the visitor message once on a fresh session when a first turn fails with 404', async () => {
+    mount()
+    await act(() => api.send('  hello  '))
+    expect(agent.send).toHaveBeenCalledTimes(1)
+    // The first turn's failure surfaces through `agent.error`; the optimistic message failed with it.
+    await act(async () =>
+      update({
+        status: 'error',
+        error: new ClientError(404, ''),
+        data: { messages: [userMessage('hello', { optimistic: true, status: 'failed' })] },
+      }),
+    )
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(agent.send).toHaveBeenCalledTimes(2)
+    expect(agent.send).toHaveBeenLastCalledWith('hello')
+    expect(api.refusal).toBeNull()
+    // The resent turn failing with 404 again is explained, never resent nor reset again.
+    await act(async () => update({ status: 'ready', error: undefined, data: { messages: [] } }))
+    await act(async () => update({ status: 'error', error: new ClientError(404, '') }))
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(agent.send).toHaveBeenCalledTimes(2)
+    expect(api.refusal).toBe('offline')
+  })
+
+  it('does not resend a message the server already acknowledged before the 404', async () => {
+    mount()
+    await act(() => api.send('hello'))
+    await act(async () =>
+      update({
+        status: 'error',
+        error: new ClientError(404, ''),
+        data: { messages: [userMessage('hello', { status: 'complete', turnId: 't1' })] },
+      }),
+    )
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(agent.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not resend anything when the 404 comes from a resumed session with nothing sent', async () => {
+    window.localStorage.setItem('twin-session', JSON.stringify({ sessionId: 'gone', streamIndex: 3 }))
+    mount()
+    await act(async () => update({ status: 'error', error: new ClientError(404, '') }))
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(agent.send).not.toHaveBeenCalled()
+  })
+
+  it('a follow-up 404 resends once from send, not again from the error path', async () => {
+    mount()
+    agent.send.mockRejectedValueOnce(new ClientError(404, ''))
+    await act(() => api.send('hello'))
+    expect(agent.send).toHaveBeenCalledTimes(2)
+    await act(async () => update({ status: 'error', error: new ClientError(404, '') }))
+    expect(agent.send).toHaveBeenCalledTimes(2)
+  })
 })

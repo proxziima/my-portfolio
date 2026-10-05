@@ -104,6 +104,40 @@ describe('createEventFilter', () => {
     expect(keep.data.output).toEqual({ a: 1 })
   })
 
+  it('blanks schedule_call error messages too: only its successful output is visible', () => {
+    const f = createEventFilter(rules, canary)
+    const r = f(ev('action.result', { ...step, status: 'failed', error: { code: 'X', message: 'cal.com 500 at 10.0.0.1' }, result: { kind: 'tool-result', toolName: 'schedule_call', callId: 'c', output: { status: 'rendered' } } }))
+    expect(r.data.error).toEqual({ code: 'X', message: '' })
+    expect((r.data.result as { output: unknown }).output).toEqual({ status: 'rendered' })
+    const ok = f(ev('action.result', { ...step, status: 'completed', result: { kind: 'tool-result', toolName: 'schedule_call', callId: 'c', output: { status: 'rendered' } } }))
+    expect('error' in ok.data).toBe(false)
+    const s = f(ev('task.settled', { turnId: 't', callId: 'c', taskId: 'k', name: 'schedule_call', status: 'failed', error: { message: 'token sk_live_x rejected' } }))
+    expect(s.data.error).toEqual({ message: '' })
+    expect('output' in s.data).toBe(false)
+  })
+
+  it('strips token usage and cost from session, turn and step events, only where the key exists', () => {
+    const f = createEventFilter(rules, canary)
+    const usage = { inputTokens: 10, outputTokens: 5, costUsd: 0.01 }
+    for (const [type, data] of [
+      ['session.waiting', { continuationToken: 'k', wait: 'next-user-message', usage }],
+      ['turn.waiting', { on: 'input', sequence: 1, turnId: 't', usage }],
+      ['session.completed', { usage }],
+      ['session.failed', { code: 'C', message: 'm', sessionId: 's', usage }],
+      ['step.completed', { ...step, finishReason: 'stop', usage }],
+    ] as const) {
+      const out = f(ev(type, data))
+      expect(out.type).toBe(type)
+      expect('usage' in out.data).toBe(true)
+      expect(out.data.usage).toBeUndefined()
+      expect(JSON.stringify(out)).not.toContain('costUsd')
+    }
+    const without = f(ev('turn.waiting', { on: 'tasks', sequence: 2, turnId: 't' }))
+    expect('usage' in without.data).toBe(false)
+    const compaction = f(ev('compaction.requested', { ...step, modelId: 'm', sessionId: 's', usageInputTokens: 4096 }))
+    expect(compaction.data.usageInputTokens).toBeNull()
+  })
+
   it('blanks deltas of a block whose step start it did not see, and the completed event carries the redacted text', () => {
     const f = createEventFilter(rules, canary)
     const a = f(ev('message.appended', { ...step, messageDelta: `${'word '.repeat(30)}Acme ` }))

@@ -83,6 +83,21 @@ describe('Conversation', () => {
     expect(status()).toBe('Too long')
   })
 
+  it('keeps the refusal live region mounted and only changes its text', () => {
+    render()
+    const region = host.querySelector('[role="status"]')
+    expect(region).not.toBeNull()
+    expect(region?.textContent).toBe('')
+    twin.state.refusal = 'throttled'
+    render()
+    expect(host.querySelector('[role="status"]')).toBe(region)
+    expect(region?.textContent).not.toBe('')
+    twin.state.refusal = null
+    render()
+    expect(host.querySelector('[role="status"]')).toBe(region)
+    expect(region?.textContent).toBe('')
+  })
+
   it('writes a booking notice as a system line and leaves a cancellation out', () => {
     twin.state.lines = [
       { kind: 'notice', id: 'n1', notice: { twinNotice: 1, kind: 'booking.confirmed' } },
@@ -99,7 +114,7 @@ describe('Conversation', () => {
     await act(async () => deleteButton()?.click())
     expect(fetch).toHaveBeenCalledWith('/api/twin/me', { method: 'DELETE' })
     expect(twin.reset).toHaveBeenCalledTimes(1)
-    expect(status()).toBeUndefined()
+    expect(status()).toBe('')
   })
 
   it('keeps the session and says offline when the erase fails', async () => {

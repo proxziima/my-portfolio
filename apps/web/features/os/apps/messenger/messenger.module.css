@@ -705,6 +705,10 @@
   margin: 0 0 4px;
   font-size: 11px;
 }
+/* mounted while empty so its announcements are reliable; takes no room until it says something */
+.refusal:empty {
+  margin: 0;
+}
 .privacy {
   display: flex;
   justify-content: space-between;

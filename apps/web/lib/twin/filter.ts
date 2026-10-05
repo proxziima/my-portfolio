@@ -23,6 +23,7 @@ const VISIBLE_TOOL = 'schedule_call'
  * - input.requested: data.requests[].action.{toolName,input}
  * - action.partial / action.result: data.result.{toolName (tool-result only), output}, data.error.message
  * - task.settled: data.name, data.output, data.error.message
+ * Error messages are blanked for every tool, schedule_call included: only its successful output shows.
  */
 const isVisibleAction = (a: Data) => (a.kind === 'tool-call' || a.kind === 'workflow-tool-call') && a.toolName === VISIBLE_TOOL
 const isVisibleResult = (r: Data) => r.kind === 'tool-result' && r.toolName === VISIBLE_TOOL
@@ -57,8 +58,8 @@ export interface EventFilterHooks {
 
 /**
  * The output boundary (spec §10). Redacts never-tier terms, PII and the prompt canary from
- * assistant text, independent of what the model produced, and blanks reasoning, tool payloads and
- * failure details. Never drops or adds events: clients resume by absolute event index.
+ * assistant text, independent of what the model produced, and blanks reasoning, tool payloads,
+ * failure details and token usage. Never drops or adds events: clients resume by absolute event index.
  */
 export function createEventFilter(rules: RedactionRules, canary: string, hooks: EventFilterHooks = {}): (e: StreamEvent) => StreamEvent {
   const withCanary: RedactionRules = { terms: [...rules.terms, canary], allow: rules.allow }
@@ -75,8 +76,7 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
   const keyOf = (d: Data) => `${String(d.turnId)}:${String(d.stepIndex)}`
   const rewrite = (e: StreamEvent, data: Data): StreamEvent => ({ ...e, data })
 
-  return (e) => {
-    if (typeof e.data !== 'object' || e.data === null) return e
+  const filterContent = (e: StreamEvent): StreamEvent => {
     const d = e.data
     switch (e.type) {
       case 'step.started':
@@ -116,11 +116,12 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
       }
       case 'action.partial':
       case 'action.result': {
+        // Only schedule_call's successful output is visible; every error message is blanked.
         const result = asData(d.result)
-        return isVisibleResult(result) ? e : rewrite(e, { ...d, result: { ...result, output: null }, ...blankError(d) })
+        return rewrite(e, { ...d, ...(isVisibleResult(result) ? {} : { result: { ...result, output: null } }), ...blankError(d) })
       }
       case 'task.settled':
-        return d.name === VISIBLE_TOOL ? e : rewrite(e, { ...d, ...('output' in d ? { output: null } : {}), ...blankError(d) })
+        return rewrite(e, { ...d, ...(d.name !== VISIBLE_TOOL && 'output' in d ? { output: null } : {}), ...blankError(d) })
       case 'turn.failed':
       case 'step.failed':
       case 'session.failed':
@@ -128,6 +129,25 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
       default:
         return e
     }
+  }
+
+  return (e) => {
+    if (typeof e.data !== 'object' || e.data === null) return e
+    return stripUsage(filterContent(e))
+  }
+}
+
+/**
+ * Token counts and spend (`usage` on `session.waiting`, `turn.waiting`, `session.completed`,
+ * `session.failed`, `step.completed`; `usageInputTokens` on `compaction.requested`) are the
+ * operator's business. Only keys present on the original are touched, so no shape changes.
+ */
+function stripUsage(e: StreamEvent): StreamEvent {
+  const d = e.data
+  if (!('usage' in d) && !('usageInputTokens' in d)) return e
+  return {
+    ...e,
+    data: { ...d, ...('usage' in d ? { usage: undefined } : {}), ...('usageInputTokens' in d ? { usageInputTokens: null } : {}) },
   }
 }
 

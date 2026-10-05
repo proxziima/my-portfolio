@@ -102,11 +102,10 @@ export function Conversation({ data }: OsAppProps) {
           <p className={styles.typing} aria-live="polite">
             {typing ? withName(labels.typing, contact.name) : ''}
           </p>
-          {shownRefusal ? (
-            <p className={styles.refusal} role="status">
-              {labels[refusalLabel[shownRefusal]]}
-            </p>
-          ) : null}
+          {/* always mounted, like the typing line: a live region that appears with text already in it isn't reliably announced */}
+          <p className={styles.refusal} role="status">
+            {shownRefusal ? labels[refusalLabel[shownRefusal]] : ''}
+          </p>
           <form
             className={styles.compose}
             onSubmit={(e) => {
