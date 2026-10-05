@@ -1,27 +1,24 @@
 import type { Field, GlobalConfig } from 'payload'
 import { publicGlobalAccess } from '../access/public-read'
 import { urlField } from '../fields/link-url'
+import { presenceStatusField } from '../fields/presence'
 import { requiredText } from '../fields/required-text'
 import { revalidateGlobalHooks } from '../hooks/revalidate-web'
 
-const STATUSES = [
-  { label: 'Available', value: 'available' },
-  { label: 'Busy', value: 'busy' },
-  { label: 'Away', value: 'away' },
-  { label: 'Offline', value: 'offline' },
-]
+/** A song, shown as "♫ Listening to: …" under the personal message. */
+const listeningTo = (defaultValue?: string): Field => ({
+  name: 'listeningTo',
+  type: 'text',
+  defaultValue,
+  admin: { description: 'A song, shown as "♫ Listening to: …" under the personal message.' },
+})
 
-/** A person as Messenger shows them: the visitor (viewer) or the owner (contact). */
-const person = (name: string, personalMessage?: string, listeningTo?: string): Field[] => [
+/** The visitor as Messenger shows them. The owner comes from the Profile global instead. */
+const viewer = (name: string, personalMessage: string, song: string): Field[] => [
   requiredText('name', name),
-  { name: 'status', type: 'select', required: true, defaultValue: 'available', options: STATUSES },
+  presenceStatusField(),
   { name: 'personalMessage', type: 'text', defaultValue: personalMessage },
-  {
-    name: 'listeningTo',
-    type: 'text',
-    defaultValue: listeningTo,
-    admin: { description: 'A song, shown as "♫ Listening to: …" under the personal message.' },
-  },
+  listeningTo(song),
   { name: 'avatar', type: 'upload', relationTo: 'media' },
 ]
 
@@ -37,13 +34,16 @@ export const Messenger: GlobalConfig = {
       name: 'viewer',
       type: 'group',
       admin: { description: 'The visitor, signed in at the top of the main window.' },
-      fields: person('Visitor', 'Say hi to Vinicius 👋', 'Daft Punk - Digital Love'),
+      fields: viewer('Visitor', 'Say hi to Vinicius 👋', 'Daft Punk - Digital Love'),
     },
     {
       name: 'contact',
       type: 'group',
-      admin: { description: 'The one contact (the owner). Replies come from the twin agent.' },
-      fields: person('Vinicius Queiroz'),
+      admin: {
+        description:
+          'The one contact (the owner). Name, status, status message and avatar come from the Profile global; replies come from the twin agent.',
+      },
+      fields: [listeningTo()],
     },
     {
       name: 'labels',

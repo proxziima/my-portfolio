@@ -96,7 +96,14 @@ export const projects: ProjectSeed[] = [
   { name: 'Carga', chip: 'G', summary: 'A moving-load solver that draws influence lines while you drag.', disciplines: ['civil'], order: 3 },
 ]
 
-export const profile = { name: 'Vinicius Queiroz', headlineTail: 'and builder.', email: 'vqueiroz@autodoc.com.br', location: 'Brazil' }
+export const profile = {
+  name: 'Vinicius Queiroz',
+  headlineTail: 'and builder.',
+  email: 'vqueiroz@autodoc.com.br',
+  location: 'Brazil',
+  status: 'available' as const,
+  statusMessage: 'building things on the web, one pixel at a time',
+}
 export const contactLinks = [
   { label: 'Send me a message', chip: '@', url: 'mailto:vqueiroz@autodoc.com.br' },
   { label: '/in/vqueiroz', chip: 'in', url: 'https://www.linkedin.com/in/vqueiroz' },
@@ -113,10 +120,6 @@ export const content: never[] = []
 
 // Only the content: the window title, the visitor and the labels keep the global's field defaults.
 export const messenger = {
-  contact: {
-    name: 'Vinicius Queiroz',
-    personalMessage: 'building things on the web, one pixel at a time',
-  },
   whatsNew: [
     { text: 'Vinicius added Messenger to his desktop.', linkLabel: 'See the site', url: '/' },
     { text: 'Vinicius rebuilt his desktop as a Windows 98 PC.', linkLabel: 'Open it full screen', url: '/os' },

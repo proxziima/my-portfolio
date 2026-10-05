@@ -97,13 +97,7 @@ describe('toMessenger', () => {
     title: 'Windows Live Messenger',
     shortcut: 'Messenger',
     viewer: { name: 'Visitor', status: 'available', personalMessage: '  ', avatar: null },
-    contact: {
-      name: 'Vinicius Queiroz',
-      status: 'away',
-      personalMessage: ' building things ',
-      listeningTo: ' Daft Punk - Digital Love ',
-      avatar: { url: '/api/media/file/v.png' },
-    },
+    contact: { listeningTo: ' Daft Punk - Digital Love ' },
     labels: {
       search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', conversation: '{name} - Conversation', send: 'Send', listeningTo: 'Listening to:',
       throttled: 't', tooLong: 'tl', ended: 'e', offline: 'o', privacy: 'p', deleteData: 'd', bookingTitle: 'b', yourTime: 'y', myTime: 'my', bookingNotice: 'Booked for {time}',
@@ -117,8 +111,18 @@ describe('toMessenger', () => {
     ],
   } as unknown as CmsMessenger
 
+  const owner = {
+    id: 1,
+    name: 'Vinicius Queiroz',
+    headlineTail: 'and builder.',
+    email: 'v@example.com',
+    status: 'away',
+    statusMessage: ' building things ',
+    avatar: { url: '/api/media/file/v.png' },
+  } as unknown as Profile
+
   it('maps people, trimming empty personal messages away and resolving avatars', () => {
-    const m = toMessenger(doc, BASE)
+    const m = toMessenger(doc, owner, BASE)
     expect(m.viewer).toEqual({ name: 'Visitor', status: 'available', personalMessage: undefined, avatar: undefined })
     expect(m.contact).toEqual({
       name: 'Vinicius Queiroz',
@@ -132,13 +136,13 @@ describe('toMessenger', () => {
     expect(m.labels.bookingNotice).toBe('Booked for {time}')
     expect(m.labels.deleteData).toBe('d')
     expect(m.labels.menu).toEqual(['Photos', 'Files'])
-    expect(toMessenger({ ...doc, labels: { ...doc.labels, menu: null } } as unknown as CmsMessenger, BASE).labels.menu).toEqual([])
+    expect(toMessenger({ ...doc, labels: { ...doc.labels, menu: null } } as unknown as CmsMessenger, owner, BASE).labels.menu).toEqual([])
     expect(m.title).toBe('Windows Live Messenger')
     expect(m.shortcut).toBe('Messenger')
   })
 
   it("keeps What's new items, labels a link by its URL when unlabelled and drops unsafe links", () => {
-    expect(toMessenger(doc, BASE).whatsNew).toEqual([
+    expect(toMessenger(doc, owner, BASE).whatsNew).toEqual([
       { id: 'n1', text: 'New post', link: { label: '/blog', href: '/blog' }, image: 'http://cms.test/api/media/file/t.png' },
       { id: 'n2', text: 'Unsafe', link: undefined, image: undefined },
       // a labelled link keeps its (trimmed) label; an item saved without an id is keyed by its position
@@ -147,11 +151,11 @@ describe('toMessenger', () => {
   })
 
   it("tolerates a global saved without What's new", () => {
-    expect(toMessenger({ ...doc, whatsNew: null } as unknown as CmsMessenger, BASE).whatsNew).toEqual([])
+    expect(toMessenger({ ...doc, whatsNew: null } as unknown as CmsMessenger, owner, BASE).whatsNew).toEqual([])
   })
 
   it('maps the spotlight, dropping an unsafe link', () => {
-    expect(toMessenger(doc, BASE).spotlight).toEqual({
+    expect(toMessenger(doc, owner, BASE).spotlight).toEqual({
       title: 'Doom',
       text: 'Boots in js-dos.',
       href: undefined,
@@ -161,6 +165,6 @@ describe('toMessenger', () => {
   })
 
   it('has no spotlight without a title', () => {
-    expect(toMessenger({ ...doc, spotlight: { title: '  ', text: 'x' } } as unknown as CmsMessenger, BASE).spotlight).toBeUndefined()
+    expect(toMessenger({ ...doc, spotlight: { title: '  ', text: 'x' } } as unknown as CmsMessenger, owner, BASE).spotlight).toBeUndefined()
   })
 })
