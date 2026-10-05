@@ -9,6 +9,10 @@ export type VisitorKind = z.infer<typeof VisitorKind>
 export const KnowledgeCategory = z.enum(['availability', 'compensation', 'logistics', 'background', 'voice', 'other'])
 export type KnowledgeCategory = z.infer<typeof KnowledgeCategory>
 
+/** The model tier a turn runs on: cheap for small talk and deflections, deep for hard technical questions. */
+export const ModelTier = z.enum(['light', 'standard', 'deep'])
+export type ModelTier = z.infer<typeof ModelTier>
+
 export const ApprovalStatus = z.enum(['pending', 'approved', 'denied', 'expired'])
 export type ApprovalStatus = z.infer<typeof ApprovalStatus>
 
@@ -96,6 +100,8 @@ export const ConversationState = z.object({
   approvalDecisions: z.array(ApprovalDecision).default([]),
   violations: z.number().int().nonnegative().default(0),
   ended: z.boolean().default(false),
+  // The tier the current turn runs on; written by the channel before the turn starts.
+  modelTier: ModelTier.default('standard'),
 })
 export type ConversationState = z.infer<typeof ConversationState>
 

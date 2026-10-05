@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ConversationState, initialConversationState } from '../../src/contract/state'
+import { ConversationState, initialConversationState, ModelTier } from '../../src/contract/state'
 
 describe('ConversationState', () => {
   it('builds a complete cold initial state', () => {
@@ -22,6 +22,26 @@ describe('ConversationState', () => {
     const s = ConversationState.parse(legacy)
     expect(s.turnCount).toBe(3)
     expect(s.pendingApprovals).toEqual([])
+  })
+})
+
+describe('ConversationState model tier', () => {
+  it('lists the three tiers', () => {
+    expect(ModelTier.options).toEqual(['light', 'standard', 'deep'])
+  })
+
+  it('starts a fresh state on the standard tier', () => {
+    expect(initialConversationState().modelTier).toBe('standard')
+  })
+
+  it('parses a row stored before the field existed as standard', () => {
+    const { modelTier: _omitted, ...legacy } = initialConversationState()
+    expect(ConversationState.parse(legacy).modelTier).toBe('standard')
+  })
+
+  it('keeps a stored tier and rejects an unknown one', () => {
+    expect(ConversationState.parse({ modelTier: 'deep' }).modelTier).toBe('deep')
+    expect(() => ConversationState.parse({ modelTier: 'huge' })).toThrow()
   })
 })
 

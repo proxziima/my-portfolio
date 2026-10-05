@@ -61,6 +61,28 @@ describe('env', () => {
     expect(env.TWIN_MODEL_CONTEXT_TOKENS).toBe(1_000_000)
   })
 
+  it('defaults the light and deep tiers and lets each be overridden', () => {
+    const env = parseEnv(agentsEnvSchema, agents)
+    expect(env.TWIN_MODEL_LIGHT).toBe('anthropic/claude-haiku-4.5')
+    expect(env.TWIN_MODEL_LIGHT_CONTEXT_TOKENS).toBe(200_000)
+    expect(env.TWIN_MODEL_DEEP).toBe('anthropic/claude-opus-5.5')
+    expect(env.TWIN_MODEL_DEEP_CONTEXT_TOKENS).toBe(1_000_000)
+    const custom = parseEnv(agentsEnvSchema, {
+      ...agents,
+      TWIN_MODEL_LIGHT: 'a/light',
+      TWIN_MODEL_LIGHT_CONTEXT_TOKENS: '64000',
+      TWIN_MODEL_DEEP: 'a/deep',
+      TWIN_MODEL_DEEP_CONTEXT_TOKENS: '500000',
+    })
+    expect([custom.TWIN_MODEL_LIGHT, custom.TWIN_MODEL_LIGHT_CONTEXT_TOKENS, custom.TWIN_MODEL_DEEP, custom.TWIN_MODEL_DEEP_CONTEXT_TOKENS]).toEqual(['a/light', 64_000, 'a/deep', 500_000])
+  })
+
+  it('treats blank tier variables as unset so the tier defaults apply', () => {
+    const env = parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL_LIGHT: '', TWIN_MODEL_DEEP_CONTEXT_TOKENS: ' ' })
+    expect(env.TWIN_MODEL_LIGHT).toBe('anthropic/claude-haiku-4.5')
+    expect(env.TWIN_MODEL_DEEP_CONTEXT_TOKENS).toBe(1_000_000)
+  })
+
   it('blankToUndefined keeps non-blank values untouched', () => {
     expect([undefined, '', ' 	', 'a', ' a '].map(blankToUndefined)).toEqual([undefined, undefined, undefined, 'a', ' a '])
   })

@@ -39,6 +39,10 @@ export const MODEL_DEFAULTS = {
   fallbacks: ['deepseek/deepseek-v4.1-flash'],
   classifier: 'deepseek/deepseek-v4.1-flash',
   contextTokens: 1_000_000,
+  light: 'anthropic/claude-haiku-4.5',
+  lightContextTokens: 200_000,
+  deep: 'anthropic/claude-opus-5.5',
+  deepContextTokens: 1_000_000,
 } as const
 
 /**
@@ -61,6 +65,10 @@ const agentsEnvObject = z.object({
   TWIN_MODEL: z.string().min(1).default(MODEL_DEFAULTS.model),
   TWIN_MODEL_FALLBACKS: csv.default([...MODEL_DEFAULTS.fallbacks]),
   TWIN_MODEL_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.contextTokens),
+  TWIN_MODEL_LIGHT: z.string().min(1).default(MODEL_DEFAULTS.light),
+  TWIN_MODEL_LIGHT_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.lightContextTokens),
+  TWIN_MODEL_DEEP: z.string().min(1).default(MODEL_DEFAULTS.deep),
+  TWIN_MODEL_DEEP_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.deepContextTokens),
   TWIN_CLASSIFIER_MODEL: z.string().min(1).default(MODEL_DEFAULTS.classifier),
   TWIN_JWT_SECRET: secret,
   TWIN_PROMPT_CANARY: z.string().min(16),
