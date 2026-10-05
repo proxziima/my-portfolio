@@ -4,14 +4,14 @@ on:
     branches: [main, develop]
   pull_request:
   workflow_dispatch:
-    inputs:
-      live_url:
-        description: 'Twin agent URL for live evals (blank = skip)'
-        required: false
 
 jobs:
   checks:
     runs-on: ubuntu-latest
+    # Secrets can't be read in a job-level `if`, so this job exports whether live evals can run.
+    # The value is the boolean, never the secret.
+    outputs:
+      live-evals: ${{ secrets.OPENROUTER_API_KEY != '' }}
     services:
       postgres:
         image: postgres:17-alpine
@@ -63,23 +63,103 @@ jobs:
           CMS_URL: http://127.0.0.1:3001
         run: bunx turbo run build --filter=web && bun scripts/scan-client-bundle.ts apps/web/.next/static
 
+  # Live evals against a real model, with a throwaway CMS and agent inside this runner: production
+  # agents are internal-only, so nothing outside the compose network can reach them. Spends model credit.
   live-evals:
-    if: github.event_name == 'workflow_dispatch' && inputs.live_url != ''
     needs: checks
+    if: >-
+      needs.checks.outputs.live-evals == 'true' &&
+      (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: twin, POSTGRES_PASSWORD: twin, POSTGRES_DB: twin_eval }
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U twin -d twin_eval" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      # The agent's env (agentsEnvSchema). Secrets shared with the CMS and the eval runner are
+      # generated in the first step. Google and Telegram are stubbed: the live suite runs no approval
+      # and no free/busy eval, and nothing listens on the Telegram base.
+      TWIN_DATABASE_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
+      WORKFLOW_POSTGRES_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      # web_search is not asserted by any live eval; a placeholder keeps the env valid without the secret.
+      EXA_API_KEY: ${{ secrets.EXA_API_KEY || 'ci-no-exa-key' }}
+      CMS_URL: http://127.0.0.1:3001
+      PAYLOAD_MCP_URL: http://127.0.0.1:3001/api/mcp
+      GOOGLE_SERVICE_ACCOUNT_JSON: eyJjbGllbnRfZW1haWwiOiJvZmZsaW5lQGV4YW1wbGUuY29tIiwicHJpdmF0ZV9rZXkiOiItLS0tLUJFR0lOIFBSSVZBVEUgS0VZLS0tLS1cbm9mZmxpbmVcbi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS1cbiJ9
+      GOOGLE_CALENDAR_ID: ci@example.com
+      OWNER_TIMEZONE: America/Sao_Paulo
+      CAL_LINK: ci/intro
+      TELEGRAM_API_BASE: http://127.0.0.1:9
+      TELEGRAM_BOT_TOKEN: '1:ci'
+      TELEGRAM_OWNER_USER_ID: '1'
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
         with: { bun-version: 1.3.10 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 }
       - run: bun install --frozen-lockfile
-      - name: live evals per skill and acceptance
-        env:
-          TWIN_JWT_SECRET: ${{ secrets.TWIN_JWT_SECRET }}
-          TWIN_PROMPT_CANARY: ${{ secrets.TWIN_PROMPT_CANARY }}
-          CAL_WEBHOOK_SECRET: ${{ secrets.CAL_WEBHOOK_SECRET }}
-          TWIN_DATABASE_URL: ${{ secrets.TWIN_EVAL_DATABASE_URL }}
-          LIVE_URL: ${{ inputs.live_url }}
+      - name: generate throwaway secrets
         run: |
-          export EVE_EVAL_AUTH_TOKEN=$(bun apps/agents/scripts/mint-eval-token.ts)
-          bun run --cwd apps/agents skills
-          cd apps/agents && bunx eve eval --url "$LIVE_URL" --strict --junit .eve/junit.xml
+          for name in PAYLOAD_SECRET TWIN_REDACT_SECRET TWIN_JWT_SECRET TWIN_STABLE_KEY_SECRET CAL_WEBHOOK_SECRET TWIN_BOOKING_REF_SECRET TELEGRAM_WEBHOOK_SECRET; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+          canary="canary-$(openssl rand -hex 16)"
+          echo "::add-mask::$canary"
+          echo "TWIN_PROMPT_CANARY=$canary" >> "$GITHUB_ENV"
+      # NODE_ENV=production: the first Payload start (here, the seed) applies the committed migrations
+      # (prodMigrations) to the empty database instead of pushing a dev schema.
+      - name: throwaway cms (build, migrate, seed)
+        env:
+          DATABASE_URL: file:./.tmp/live.db
+          NODE_ENV: production
+          NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
+        run: |
+          mkdir -p apps/payload/.tmp
+          bun run --cwd apps/payload build
+          bun run --cwd apps/payload seed
+          # Adds a public fact, a voice sample and the twin's MCP key (three tools only); writes
+          # PAYLOAD_MCP_API_KEY to $GITHUB_ENV, masked.
+          bun run --cwd apps/payload payload run src/seed/twin-ci.ts
+      - name: start the cms
+        env:
+          DATABASE_URL: file:./.tmp/live.db
+          NODE_ENV: production
+          NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
+        run: |
+          nohup bun run --cwd apps/payload start > "$RUNNER_TEMP/cms.log" 2>&1 &
+          for _ in $(seq 60); do
+            curl -fsS http://127.0.0.1:3001/api/globals/profile > /dev/null && exit 0
+            sleep 2
+          done
+          tail -n 100 "$RUNNER_TEMP/cms.log"
+          exit 1
+      - name: build and start the agent
+        run: |
+          bun run --cwd apps/agents build
+          bun run --cwd apps/agents world:setup
+          bun run --cwd packages/twin db:migrate
+          PORT=4100 nohup bun run --cwd apps/agents start > "$RUNNER_TEMP/agent.log" 2>&1 &
+          for _ in $(seq 60); do
+            curl -fsS http://127.0.0.1:4100/eve/v1/health > /dev/null && exit 0
+            sleep 2
+          done
+          tail -n 100 "$RUNNER_TEMP/agent.log"
+          exit 1
+      - name: live evals per skill and acceptance
+        run: |
+          token=$(bun apps/agents/scripts/mint-eval-token.ts)
+          echo "::add-mask::$token"
+          export EVE_EVAL_AUTH_TOKEN="$token"
+          cd apps/agents && bunx eve eval --url http://127.0.0.1:4100 --strict --junit .eve/junit.xml
+      - name: service logs
+        if: failure()
+        run: |
+          tail -n 200 "$RUNNER_TEMP/cms.log" || true
+          tail -n 200 "$RUNNER_TEMP/agent.log" || true
