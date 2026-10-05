@@ -26,6 +26,16 @@ describe('escapeHtml', () => {
 
 describe('chipLinkHtml', () => {
   it('drops unsafe hrefs', () => {
-    expect(chipLinkHtml('x', 'X', '//evil')).not.toContain('href')
+    expect(chipLinkHtml({ label: 'x', chip: 'X', href: '//evil' })).not.toContain('href')
+  })
+  it('renders the icon image in the chip slot when one is given', () => {
+    const html = chipLinkHtml({ label: 'Autodoc', chip: 'A', href: 'https://autodoc.com.br', icon: 'http://cms.test/api/favicons/file/autodoc-favicon.ico' })
+    expect(html).toBe(
+      '<a class="fav" href="https://autodoc.com.br" target="_blank" rel="noopener noreferrer">' +
+        '<img class="chip chip-img" src="http://cms.test/api/favicons/file/autodoc-favicon.ico" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Autodoc</span></a>',
+    )
+  })
+  it('ignores non-http icons and falls back to the chip', () => {
+    expect(chipLinkHtml({ label: 'x', chip: 'X', icon: 'javascript:alert(1)' })).toContain('<i class="chip" aria-hidden="true">X</i>')
   })
 })

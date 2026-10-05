@@ -4,7 +4,7 @@ import { chipLinkHtml, curiousToggleHtml } from '@/shared/ui/chip-markup'
 
 describe('osBioHtml', () => {
   it('wraps paragraphs and keeps chip links', () => {
-    const chip = chipLinkHtml('Autodoc', 'A', 'https://autodoc.example')
+    const chip = chipLinkHtml({ label: 'Autodoc', chip: 'A', href: 'https://autodoc.example' })
     expect(osBioHtml([`I work at ${chip}.`])).toBe(`<p>I work at ${chip}.</p>`)
   })
   it('turns the curious toggle into plain inline text', () => {

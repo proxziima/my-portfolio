@@ -15,7 +15,7 @@ const str = (value: unknown) => (typeof value === 'string' ? value : '')
 function inlineBlock(fields: Record<string, unknown> = {}): string {
   switch (fields.blockType) {
     case 'chipLink':
-      return chipLinkHtml(str(fields.label), str(fields.chip), str(fields.url) || null)
+      return chipLinkHtml({ label: str(fields.label), chip: str(fields.chip), href: str(fields.url) || null })
     case 'curiousToggle':
       return curiousToggleHtml(str(fields.word) || 'curious')
     default:
