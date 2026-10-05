@@ -37,9 +37,10 @@ ENV NODE_ENV=production \
     PORT=3001 \
     DATABASE_URL=file:/data/payload.db \
     MEDIA_DIR=/data/media \
-    SCENES_DIR=/data/scenes
+    SCENES_DIR=/data/scenes \
+    FAVICONS_DIR=/data/favicons
 # /data is the volume (database + uploads). A new named volume copies this directory, owner included.
-RUN mkdir -p /data/media /data/scenes \
+RUN mkdir -p /data/media /data/scenes /data/favicons \
   && chown -R node:node /data apps/payload/.next
 USER node
 WORKDIR /app/apps/payload

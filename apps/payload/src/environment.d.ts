@@ -12,9 +12,10 @@ declare global {
       TWIN_REDACT_SECRET?: string
       /** Parent domain for the admin cookie in production, e.g. `.example.com`. */
       COOKIE_DOMAIN?: string
-      /** Upload directories; default to `public/media` and `public/scenes` in the app. */
+      /** Upload directories; default to `public/media`, `public/scenes` and `public/favicons` in the app. */
       MEDIA_DIR?: string
       SCENES_DIR?: string
+      FAVICONS_DIR?: string
     }
   }
 }

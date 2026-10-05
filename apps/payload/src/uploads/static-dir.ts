@@ -5,10 +5,11 @@ import { fileURLToPath } from 'url'
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 /**
- * Where an upload collection stores its files: `$MEDIA_DIR` / `$SCENES_DIR` when set (the Docker image
- * points them at the `/data` volume), otherwise `public/<folder>` inside the app, as in development.
+ * Where an upload collection stores its files: `$MEDIA_DIR` / `$SCENES_DIR` / `$FAVICONS_DIR` when set
+ * (the Docker image points them at the `/data` volume), otherwise `public/<folder>` inside the app, as in
+ * development.
  */
-export const uploadStaticDir = (envVar: 'MEDIA_DIR' | 'SCENES_DIR', folder: string): string => {
+export const uploadStaticDir = (envVar: 'MEDIA_DIR' | 'SCENES_DIR' | 'FAVICONS_DIR', folder: string): string => {
   const override = process.env[envVar]
   return override ? path.resolve(override) : path.resolve(appRoot, 'public', folder)
 }
