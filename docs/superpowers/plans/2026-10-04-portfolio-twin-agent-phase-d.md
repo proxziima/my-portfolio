@@ -937,7 +937,10 @@ export function useTwin() {
     },
   })
   const lines: Line[] = useMemo(() => toLines(agent.data.messages as readonly MessageLike[]), [agent.data.messages])
-  const typing = agent.status === 'submitted' || agent.status === 'streaming'
+  // An approval task holds the turn open for up to 15 minutes (`turn.waiting` on "tasks"), during
+  // which eve keeps the session non-ready. "Typing" must mean text is actually being produced: the
+  // turn is submitted, or streaming and not parked on a `turn.waiting`.
+  const typing = agent.status === 'submitted' || (agent.status === 'streaming' && !isParked(agent.events))
 
   const send = useCallback(
     async (text: string) => {
@@ -958,6 +961,8 @@ export function useTwin() {
   return { lines, typing, refusal, send, reset: agent.reset }
 }
 ```
+
+Implement `isParked(events)` in `parts.ts` (pure, unit-tested). It is true when the most recent turn-lifecycle event among `turn.started`, `step.started`, `message.appended`, `turn.waiting`, `turn.completed`, `turn.cancelled` and `turn.failed` is a `turn.waiting`. Test it with event fixtures. Check that the agent's `events` array (from `useEveAgent`) holds the stream events in order, and if it is capped, that the last turn-lifecycle event is still present.
 
 Verify in `eve/dist/src/react/use-eve-agent.d.ts` and the client error class:
 - that `headers` accepts a function
