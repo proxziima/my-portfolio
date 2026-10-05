@@ -156,7 +156,8 @@ export default defineChannel({
       const status = change.current === 'cancelled' ? 'cancelled' : wanted
       // Idempotency rests on the conversation state, not the bookings row: the row commits first, so
       // a redelivery after a later step failed sees an unchanged row but a stale state. An unchanged
-      // row for a uid the state has moved past is a stale event and is skipped. Decided inside the
+      // row for a uid the state has moved past is a stale event and is skipped, unless it is a
+      // reschedule linking to the recorded uid (its retry after a failed write). Decided inside the
       // locked update, so concurrent deliveries can't both write.
       let transition = { write: false, notify: false }
       const state = await updateConversation(db(), sessionId, (s) => {
@@ -165,6 +166,7 @@ export default defineChannel({
           status,
           startTime: booking.startTime,
           rowChanged: change.changed,
+          rescheduledFrom: booking.rescheduledFrom,
         })
         return transition.write
           ? { ...s, booking: { status, uid: booking.uid, startTime: booking.startTime } }

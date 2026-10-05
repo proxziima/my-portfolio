@@ -13,6 +13,8 @@ export interface BookingEvent {
   startTime: string
   /** `upsertBooking` reported a status change on the bookings row (or inserted it). */
   rowChanged: boolean
+  /** A reschedule's link to the booking it replaces (Cal.com `rescheduleUid`), when present. */
+  rescheduledFrom?: string
 }
 
 /** What a Cal.com booking event still owes the conversation. */
@@ -34,7 +36,9 @@ const sameStart = (recorded: string | undefined, incoming: string): boolean =>
  * - the state already holds this uid, status and start time (an earlier delivery finished);
  * - the row is unchanged while the state holds a different uid: a duplicate or retried event for a
  *   booking the conversation has moved past (created A, rescheduled to B, then A again), which
- *   must not roll the state back nor notify the visitor twice.
+ *   must not roll the state back nor notify the visitor twice. The exception is a reschedule that
+ *   links to the recorded uid: it is that booking's successor, retried after its state write
+ *   failed, so it is written and announced.
  * A same-uid event that only moves the start time is a reschedule and is written and announced.
  */
 export function bookingTransition(
@@ -42,7 +46,9 @@ export function bookingTransition(
   event: BookingEvent,
 ): BookingTransition {
   const recordedUid = stateBooking?.uid
-  const stale = !event.rowChanged && recordedUid !== undefined && recordedUid !== event.uid
+  const successor = recordedUid !== undefined && event.rescheduledFrom === recordedUid
+  const stale =
+    !event.rowChanged && recordedUid !== undefined && recordedUid !== event.uid && !successor
   const recorded =
     recordedUid === event.uid &&
     stateBooking?.status === event.status &&

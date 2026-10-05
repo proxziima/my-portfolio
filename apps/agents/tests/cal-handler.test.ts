@@ -63,10 +63,11 @@ function calBody(
   uid = 'bk_1',
   startTime = '2026-10-08T14:00:00Z',
   endTime = '2026-10-08T14:30:00Z',
+  rescheduleUid?: string,
 ): string {
   return JSON.stringify({
     triggerEvent,
-    payload: { uid, startTime, endTime, metadata: { bookingRef: 'abc.def' } },
+    payload: { uid, startTime, endTime, rescheduleUid, metadata: { bookingRef: 'abc.def' } },
   })
 }
 
@@ -155,6 +156,37 @@ describe('cal webhook handler redelivery', () => {
     })
     expect(mocks.send).toHaveBeenCalledTimes(2)
     expect(mocks.setOutcome).toHaveBeenCalledTimes(1)
+  })
+
+  it('a retried reschedule after a failed state write records the successor and notifies once', async () => {
+    // CREATED A.
+    await deliver()
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+    // RESCHEDULED B (links A): the row commits, then the state write fails.
+    const b = calBody('BOOKING_RESCHEDULED', 'bk_2', '2026-10-09T15:00:00Z', '2026-10-09T15:30:00Z', 'bk_1')
+    mocks.upsert.mockResolvedValue({ previous: null, current: 'rescheduled', changed: true })
+    mocks.failNextUpdate = true
+    await expect(deliver(b)).rejects.toThrow('db down')
+    expect(mocks.state.booking).toMatchObject({ status: 'confirmed', uid: 'bk_1' })
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+    // Cal.com redelivers B: its row is unchanged now, but it is A's legitimate successor.
+    mocks.upsert.mockResolvedValue({ previous: 'rescheduled', current: 'rescheduled', changed: false })
+    expect((await deliver(b)).status).toBe(200)
+    expect(mocks.state.booking).toMatchObject({
+      status: 'rescheduled',
+      uid: 'bk_2',
+      startTime: '2026-10-09T15:00:00Z',
+    })
+    expect(mocks.send).toHaveBeenCalledTimes(2)
+    expect(mocks.send.mock.calls[1]?.[0]).toContain('2026-10-09T15:00:00Z')
+    // A third delivery of B finds the state matching and stays quiet.
+    expect((await deliver(b)).status).toBe(200)
+    expect(mocks.send).toHaveBeenCalledTimes(2)
+    // A stale CREATED A afterwards is still skipped, no rollback.
+    mocks.upsert.mockResolvedValue({ previous: 'confirmed', current: 'confirmed', changed: false })
+    expect((await deliver()).status).toBe(200)
+    expect(mocks.state.booking).toMatchObject({ status: 'rescheduled', uid: 'bk_2' })
+    expect(mocks.send).toHaveBeenCalledTimes(2)
   })
 
   it('a same-uid reschedule that only moves the start time is recorded and notified', async () => {

@@ -82,6 +82,41 @@ describe('cal webhook', () => {
     })
   })
 
+  it('links a reschedule to the booking it replaces via payload.rescheduleUid', () => {
+    const resched = (extra: Record<string, unknown>, triggerEvent = 'BOOKING_RESCHEDULED') =>
+      parseCalWebhook({ ...envelope, triggerEvent, payload: { ...envelope.payload, ...extra } })
+    expect(resched({ uid: 'bk_2', rescheduleUid: 'bk_1' })).toEqual({
+      kind: 'booking',
+      booking: {
+        trigger: 'BOOKING_RESCHEDULED',
+        uid: 'bk_2',
+        startTime: '2026-10-08T14:00:00Z',
+        endTime: '2026-10-08T14:30:00Z',
+        bookingRef: 'abc.def',
+        rescheduledFrom: 'bk_1',
+      },
+    })
+    // Optional: absent or null means no link.
+    const plain = resched({ uid: 'bk_2' })
+    expect(plain.kind === 'booking' && 'rescheduledFrom' in plain.booking).toBe(false)
+    const nulled = resched({ uid: 'bk_2', rescheduleUid: null })
+    expect(nulled.kind === 'booking' && 'rescheduledFrom' in nulled.booking).toBe(false)
+    // Only a reschedule carries the link.
+    const created = resched({ rescheduleUid: 'bk_0' }, 'BOOKING_CREATED')
+    expect(created.kind === 'booking' && 'rescheduledFrom' in created.booking).toBe(false)
+    // Strict: a malformed link is an issue, never a silently different booking.
+    expect(resched({ rescheduleUid: 42 })).toEqual({
+      kind: 'invalid',
+      trigger: 'BOOKING_RESCHEDULED',
+      issues: ['payload.rescheduleUid'],
+    })
+    expect(resched({ rescheduleUid: '' })).toEqual({
+      kind: 'invalid',
+      trigger: 'BOOKING_RESCHEDULED',
+      issues: ['payload.rescheduleUid'],
+    })
+  })
+
   it('never echoes attendee data in the reported issues', () => {
     const parsed = parseCalWebhook({ ...envelope, payload: { ...envelope.payload, metadata: {} } })
     expect(JSON.stringify(parsed)).not.toMatch(/Ada|a@b\.c|Lisbon/)

@@ -52,6 +52,30 @@ describe('bookingTransition', () => {
       ),
     ).toEqual(none)
   })
+  it('writes and notifies a retried reschedule whose link is the recorded uid (state write failed)', () => {
+    expect(
+      bookingTransition(
+        { uid: 'u1', status: 'confirmed', startTime: T1 },
+        event({ uid: 'u2', status: 'rescheduled', startTime: T2, rowChanged: false, rescheduledFrom: 'u1' }),
+      ),
+    ).toEqual(both)
+  })
+  it('still skips an unchanged reschedule whose link is not the recorded uid', () => {
+    expect(
+      bookingTransition(
+        { uid: 'u3', status: 'rescheduled', startTime: T1 },
+        event({ uid: 'u2', status: 'rescheduled', startTime: T2, rowChanged: false, rescheduledFrom: 'u1' }),
+      ),
+    ).toEqual(none)
+  })
+  it('still skips the stale original after a reschedule even though the successor links to it', () => {
+    expect(
+      bookingTransition(
+        { uid: 'u2', status: 'rescheduled', startTime: T2 },
+        event({ uid: 'u1', rowChanged: false }),
+      ),
+    ).toEqual(none)
+  })
   it('writes and notifies a same-uid reschedule that only moves the start time', () => {
     expect(
       bookingTransition(

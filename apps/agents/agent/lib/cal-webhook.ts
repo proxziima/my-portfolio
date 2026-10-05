@@ -19,12 +19,16 @@ export type BookingTrigger = z.infer<typeof BookingTrigger>
 // Cal.com's envelope is `{ triggerEvent, createdAt, payload }`. Objects strip unknown keys, so
 // attendee data and everything else Cal.com sends is dropped at the boundary. Times must carry an
 // offset because they end up in `ConversationState.booking.startTime`.
+// `payload.rescheduleUid` is the uid of the booking a BOOKING_RESCHEDULED replaces (Cal.com gives
+// the reschedule a new uid): https://cal.com/docs/developing/guides/automation/webhooks
+// Optional (absent or null on other triggers), but a present value must be a non-empty string.
 const Envelope = z.object({
   triggerEvent: BookingTrigger,
   payload: z.object({
     uid: z.string().min(1),
     startTime: z.iso.datetime({ offset: true }),
     endTime: z.iso.datetime({ offset: true }),
+    rescheduleUid: z.string().min(1).nullish(),
     metadata: z.object({ bookingRef: z.string().min(1) }),
   }),
 })
@@ -36,6 +40,8 @@ export interface CalBooking {
   startTime: string
   endTime: string
   bookingRef: string
+  /** BOOKING_RESCHEDULED only: the uid of the booking this one replaces, when Cal.com links it. */
+  rescheduledFrom?: string
 }
 
 /**
@@ -62,6 +68,7 @@ export function parseCalWebhook(json: unknown): CalWebhook {
       trigger: trigger.data,
       issues: e.error.issues.map((i) => i.path.map(String).join('.') || '(root)'),
     }
+  const { rescheduleUid } = e.data.payload
   return {
     kind: 'booking',
     booking: {
@@ -70,6 +77,9 @@ export function parseCalWebhook(json: unknown): CalWebhook {
       startTime: e.data.payload.startTime,
       endTime: e.data.payload.endTime,
       bookingRef: e.data.payload.metadata.bookingRef,
+      ...(e.data.triggerEvent === 'BOOKING_RESCHEDULED' && rescheduleUid
+        ? { rescheduledFrom: rescheduleUid }
+        : {}),
     },
   }
 }
