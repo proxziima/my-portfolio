@@ -4,7 +4,7 @@ import { modelIds, tierModel, twinModel } from '../agent/lib/models'
 describe('modelIds', () => {
   it('uses the documented defaults when env is absent (build time)', () => {
     const { tiers, ...rest } = modelIds({})
-    expect(rest).toEqual({ primary: 'anthropic/claude-sonnet-5.5', chain: ['anthropic/claude-sonnet-5.5', 'deepseek/deepseek-v4.1-flash'], classifier: 'deepseek/deepseek-v4.1-flash', contextTokens: 1_000_000 })
+    expect(rest).toEqual({ primary: 'anthropic/claude-sonnet-5.5', chain: ['anthropic/claude-sonnet-5.5', 'deepseek/deepseek-v4.1-flash'], classifier: 'google/gemini-2.5-flash-lite', contextTokens: 1_000_000 })
     expect(tiers.standard).toMatchObject({ id: rest.primary, chain: rest.chain, contextTokens: rest.contextTokens })
   })
 

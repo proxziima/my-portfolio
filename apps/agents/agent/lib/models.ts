@@ -56,7 +56,12 @@ export function twinModel() {
   return tierModel('standard')
 }
 
-/** The cheap classifier used for intent and abuse; no fallback chain, since callers time out. */
+/**
+ * The fast classifier used for the pre-turn gate and the intent label. Its one fallback covers a
+ * provider outage; callers still time out, so a slow answer never delays a reply for long.
+ */
 export function classifierModel() {
-  return openrouter.chat(modelIds(process.env).classifier, { provider: { data_collection: 'deny' } })
+  const { classifier } = modelIds(process.env)
+  const models = [...new Set([classifier, MODEL_DEFAULTS.classifierFallback])]
+  return openrouter.chat(classifier, { models, provider: { data_collection: 'deny' } })
 }

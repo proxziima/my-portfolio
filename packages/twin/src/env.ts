@@ -37,7 +37,9 @@ const serviceAccount = z
 export const MODEL_DEFAULTS = {
   model: 'anthropic/claude-sonnet-5.5',
   fallbacks: ['deepseek/deepseek-v4.1-flash'],
-  classifier: 'deepseek/deepseek-v4.1-flash',
+  // Benchmarked 2026-10-05 on the gate's prompts: 12/12 correct, p90 under 0.9 s.
+  classifier: 'google/gemini-2.5-flash-lite',
+  classifierFallback: 'mistralai/ministral-8b-2512',
   contextTokens: 1_000_000,
   light: 'anthropic/claude-haiku-4.5',
   lightContextTokens: 200_000,
@@ -97,7 +99,7 @@ const agentsEnvObject = z.object({
   TWIN_APPROVAL_TIMEOUT: z.string().regex(/^\d+(s|m|h)$/).default('15m'),
   TWIN_CLASSIFIER_TIMEOUT_MS: z.coerce.number().int().positive().default(4_000),
   // Shorter than the intent classifier's: the abuse check is on the critical path before every reply.
-  TWIN_ABUSE_TIMEOUT_MS: z.coerce.number().int().positive().default(1_500),
+  TWIN_ABUSE_TIMEOUT_MS: z.coerce.number().int().positive().default(2_500),
 })
 
 /** Every variable the agents service reads. Parsed once, lazily, on first use at runtime. */

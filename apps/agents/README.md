@@ -260,9 +260,9 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `TWIN_MODEL_LIGHT_CONTEXT_TOKENS` | A | `200000` | Context window of the light tier | The light model's context window |
 | `TWIN_MODEL_DEEP` | A | `anthropic/claude-opus-5.5` | Deep tier: in-depth technical questions | OpenRouter model id |
 | `TWIN_MODEL_DEEP_CONTEXT_TOKENS` | A | `1000000` | Context window of the deep tier | The deep model's context window |
-| `TWIN_CLASSIFIER_MODEL` | A | `deepseek/deepseek-v4.1-flash` | Abuse gate and intent label | OpenRouter model id |
+| `TWIN_CLASSIFIER_MODEL` | A | `google/gemini-2.5-flash-lite` (falls back to `mistralai/ministral-8b-2512`) | Pre-turn gate (abuse, scope, depth) and intent label; pick a model that answers in well under the gate timeout | OpenRouter model id |
 | `TWIN_CLASSIFIER_TIMEOUT_MS` | A | `4000` | Intent label timeout (post-reply) | – |
-| `TWIN_ABUSE_TIMEOUT_MS` | A | `1500` | Abuse gate timeout (pre-dispatch, fails open) | – |
+| `TWIN_ABUSE_TIMEOUT_MS` | A | `2500` | Pre-turn gate timeout (fails open to `ok`/`standard`) | – |
 | `TWIN_JWT_SECRET` | A, W | required, ≥ 32 chars | HS256 key of the 60 s visitor JWT | `openssl rand -hex 32` |
 | `TWIN_PROMPT_CANARY` | A, W | required, ≥ 16 chars | Prompt marker the BFF blocks | `openssl rand -hex 16` |
 | `TWIN_STABLE_KEY_SECRET` | A | required, ≥ 32 chars | HMAC of a volunteered email (returning visitors) | `openssl rand -hex 32` |
