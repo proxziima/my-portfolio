@@ -54,8 +54,10 @@ recorded here with its reason.
       apple-touch-icon href>` tags, ranking them by declared `sizes` (largest first, with `any`
       or SVG counted as largest).
    3. Fall back to `<origin>/favicon.ico`.
-   4. Take the first candidate that returns `200` with an `image/*` content type and a non-empty
-      body under 512 KB. Store it with that MIME type and a filename derived from the owner.
+   4. Take the first candidate that returns `200` with a non-empty body under 512 KB whose
+      *content* normalizes to an icon (see point 6). The declared content type is never trusted.
+      Store it with the normalized type (`image/png` or `image/x-icon`) and a filename derived
+      from the owner.
    5. On any failure (fetch or store), log a warning and never fail the save. If the URL changed,
       the old favicon is removed. If an unchanged URL is being refreshed, the old favicon is kept.
       One exception: when replacing the file in place fails, the old favicon is removed too,
