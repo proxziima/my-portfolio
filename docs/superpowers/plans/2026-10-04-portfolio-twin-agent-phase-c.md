@@ -1192,6 +1192,13 @@ git add apps/agents/agent/lib/visitor-auth.ts apps/agents/agent/lib/abuse.ts app
 git commit -m "feat(agents): visitor JWT auth and an in-character abuse gate on the eve channel"
 ```
 
+**Amendments after the C4 review (they apply to every task below).**
+- `ConversationState.callOfferMade` is now `callOfferTurn: number | null`.
+- Untrusted-content nonces use `untrustedKey()` from `lib/untrusted.ts`, never the raw canary. Each tool that wraps content imports it, and drops `getEnv` when nothing else needs it.
+- Classifier calls use ai v7's `instructions:`, not the deprecated `system:`.
+- Grounding is resolved in the `turn.started` resolver through a TTL cache, and the prompt fails closed (`lib/prompt.ts`).
+- Payload MCP calls carry a 5 s timeout.
+
 ---
 
 ### Task C6: `search_portfolio` and the tool gate
@@ -1320,7 +1327,7 @@ const tool = defineTool({
     await updateConversation(db(), ctx.session.id, (s) => stateAfterSearch(s, result))
     return result
   },
-  toModelOutput: (result) => ({ type: 'text', value: searchForModel(result, getEnv().TWIN_PROMPT_CANARY) }),
+  toModelOutput: (result) => ({ type: 'text', value: searchForModel(result, untrustedKey()) }),
 })
 
 /** Offered only while a skill granting it is active (spec §5). */
@@ -1815,7 +1822,7 @@ const tool = defineTool({
   },
   toModelOutput: (r) => ({
     type: 'text',
-    value: untrusted('web', r.results.map((x) => `${x.title} (${x.url})\n${x.snippet}`).join('\n\n') || 'No results.', getEnv().TWIN_PROMPT_CANARY),
+    value: untrusted('web', r.results.map((x) => `${x.title} (${x.url})\n${x.snippet}`).join('\n\n') || 'No results.', untrustedKey()),
   }),
 })
 
@@ -2041,7 +2048,7 @@ export async function classifyIntent(turns: ReadonlyArray<{ role: 'visitor' | 't
   try {
     const { output } = await generateText({
       model: classifierModel(),
-      system: SYSTEM,
+      instructions: SYSTEM,
       prompt,
       output: Output.choice({ options: [...IntentClass.options] }),
       abortSignal: AbortSignal.timeout(timeoutMs),
@@ -2391,7 +2398,7 @@ export default defineWorkflowTool({
     if (status !== 'approved') return { status }
     return { status, item: await discloseItem(input.sourceId) }
   },
-  toModelOutput: (o) => ({ type: 'text', value: disclosureForModel(o, getEnv().TWIN_PROMPT_CANARY) }),
+  toModelOutput: (o) => ({ type: 'text', value: disclosureForModel(o, untrustedKey()) }),
 })
 ```
 
@@ -2754,7 +2761,7 @@ const provider = defineMemoryProvider({
       const history = await recallVisitorHistory(db(), visitorId, ctx.session.id)
       if (!history) return null
       await updateConversation(db(), ctx.session.id, (s) => (s.returningVisitor ? s : { ...s, returningVisitor: true }))
-      return { messages: [{ id: 'returning-visitor', content: recallText(history, getEnv().TWIN_PROMPT_CANARY) }] }
+      return { messages: [{ id: 'returning-visitor', content: recallText(history, untrustedKey()) }] }
     },
   },
 })
