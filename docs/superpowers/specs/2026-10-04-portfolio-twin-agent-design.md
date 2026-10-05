@@ -480,7 +480,7 @@ The Cal.com route verifies `X-Cal-Signature-256`, verifies the signed `metadata.
 
 - **Primary:** `anthropic/claude-sonnet-5.5`, chosen for persona fidelity and injection resistance.
 - **Fallback:** `deepseek/deepseek-v4.1-flash`, through OpenRouter `models`.
-- **Classifier (intent and abuse):** `deepseek/deepseek-v4.1-flash`.
+- **Classifier (intent, abuse and depth):** `google/gemini-2.5-flash-lite`, falling back to `mistralai/ministral-8b-2512` (changed from `deepseek/deepseek-v4.1-flash`; see the model-routing spec).
 - All are env-configurable (`TWIN_MODEL`, `TWIN_MODEL_FALLBACKS`, `TWIN_CLASSIFIER_MODEL`).
 - `provider: { data_collection: "deny" }`.
 - The OpenRouter key also carries a spend limit, as documented in the README operations section.

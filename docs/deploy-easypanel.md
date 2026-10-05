@@ -48,8 +48,10 @@ The portfolio twin adds the variables below. Each one is described in [`.env.dep
 | --- | --- | --- |
 | `TWIN_PG_USER`, `TWIN_PG_PASSWORD` | postgres, web, agents | Credentials of the twin database. Random password. |
 | `OPENROUTER_API_KEY` | agents | OpenRouter key. Give it a credit limit in OpenRouter (the hard stop behind `TWIN_DAILY_SPEND_USD`). |
-| `TWIN_MODEL`, `TWIN_MODEL_FALLBACKS`, `TWIN_MODEL_CONTEXT_TOKENS`, `TWIN_CLASSIFIER_MODEL` | agents | Optional model overrides. Leave them empty for the defaults in `packages/twin/src/env.ts`. |
-| `TWIN_CLASSIFIER_TIMEOUT_MS`, `TWIN_ABUSE_TIMEOUT_MS`, `TWIN_APPROVAL_TIMEOUT` | agents | Optional. Empty uses 4000 ms, 1500 ms and `15m`. |
+| `TWIN_MODEL`, `TWIN_MODEL_FALLBACKS`, `TWIN_MODEL_CONTEXT_TOKENS`, `TWIN_CLASSIFIER_MODEL` | agents | Optional model overrides for the standard tier and the classifier. Leave them empty for the defaults in `packages/twin/src/env.ts`. |
+| `TWIN_MODEL_LIGHT`, `TWIN_MODEL_LIGHT_CONTEXT_TOKENS` | agents | Optional. The light tier (greetings, small talk, deflections) and its context window in tokens. Empty uses `anthropic/claude-haiku-4.5` and 200000. |
+| `TWIN_MODEL_DEEP`, `TWIN_MODEL_DEEP_CONTEXT_TOKENS` | agents | Optional. The deep tier (in-depth technical questions) and its context window in tokens. Empty uses `anthropic/claude-opus-5.5` and 1000000. |
+| `TWIN_CLASSIFIER_TIMEOUT_MS`, `TWIN_ABUSE_TIMEOUT_MS`, `TWIN_APPROVAL_TIMEOUT` | agents | Optional. Empty uses 4000 ms, 2500 ms and `15m`. |
 | `TWIN_JWT_SECRET` | web, agents | Random. Web signs the 60-second visitor token, the agent verifies it. |
 | `TWIN_COOKIE_SECRET` | web | Random. Signs the visitor cookie. |
 | `TWIN_PROMPT_CANARY` | web, agents | Random, at least 16 characters. A reply that contains it is replaced before it reaches the browser. |
