@@ -16,6 +16,7 @@
     "test": "bun run test:int",
     "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation payload run src/seed/run.ts",
+    "favicons:refresh": "cross-env NODE_OPTIONS=--no-deprecation payload run src/scripts/refresh-favicons.ts",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
