@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
-/** Signature headers each provider sends; nothing else (cookies, auth) is forwarded. */
+/** Headers each provider needs (signature and event metadata); nothing else (cookies, auth) is forwarded. */
 const PROVIDERS = {
   cal: ['content-type', 'x-cal-signature-256', 'x-cal-webhook-version'],
   photon: ['content-type', 'x-spectrum-signature', 'x-spectrum-timestamp', 'x-spectrum-event', 'x-spectrum-webhook-id'],
