@@ -17,6 +17,8 @@ import {
   updateConversation,
   getCachedSearch,
   putCachedSearch,
+  appendTranscript,
+  recentTranscript,
   setEvaluationOutcome,
   setStableKeyHash,
 } from '../../src/db'
@@ -58,6 +60,19 @@ describe('evaluations', () => {
     expect(id).not.toBeNull()
     expect(await insertEvaluation(t.db, row)).toBeNull()
     await setEvaluationOutcome(t.db, id!, 'offered')
+  })
+})
+
+describe('transcripts', () => {
+  it('returns the last messages oldest first, ignoring redelivered duplicates', async () => {
+    await appendTranscript(t.db, { sessionId: 'sess-1', role: 'visitor', turnId: 't1', sequence: 1, text: 'one' })
+    await appendTranscript(t.db, { sessionId: 'sess-1', role: 'twin', turnId: 't1', sequence: 2, text: 'two' })
+    await appendTranscript(t.db, { sessionId: 'sess-1', role: 'twin', turnId: 't1', sequence: 2, text: 'two' })
+    await appendTranscript(t.db, { sessionId: 'sess-1', role: 'visitor', turnId: 't2', sequence: 1, text: 'three' })
+    expect(await recentTranscript(t.db, 'sess-1', 2)).toEqual([
+      { role: 'twin', text: 'two' },
+      { role: 'visitor', text: 'three' },
+    ])
   })
 })
 
