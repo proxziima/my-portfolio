@@ -1,9 +1,10 @@
 import type {
-  Contact, Content, Discipline as CmsDiscipline, Experience, Media, Messenger as CmsMessenger, Navigation, Post, Profile, Project, SiteSetting,
+  Company, Contact, Content, Discipline as CmsDiscipline, Experience, Messenger as CmsMessenger, Navigation, Post, Profile, Project, SiteSetting,
 } from '@repo/cms-types'
 import { formatPeriod } from '@/lib/format/period'
 import { safeHref } from '@/shared/ui/chip-markup'
 import { bioParagraphs } from './bio-html'
+import { findRecord, type Brand, type Records } from './records'
 import type { Discipline, Entry, LinkItem, Messenger, MessengerPerson, NavItem, Portfolio, PostView, Settings, Spotlight } from './types'
 
 type Related = number | CmsDiscipline
@@ -11,33 +12,65 @@ type Related = number | CmsDiscipline
 const slugsOf = (list: Related[] | null | undefined): string[] =>
   (list ?? []).flatMap((d) => (typeof d === 'object' ? [d.slug] : []))
 
-export const toDiscipline = (d: CmsDiscipline): Discipline => ({
+type BrandDoc = Pick<Company, 'name' | 'chip' | 'url' | 'logo' | 'favicon'>
+
+/** The icon beside a company or project: its uploaded logo, else its fetched favicon. The chip shows otherwise. */
+export const brandIcon = (doc: Pick<Company, 'logo' | 'favicon'>, base: string): string | undefined =>
+  mediaUrl(doc.logo, base) ?? mediaUrl(doc.favicon, base)
+
+export const toBrand = (doc: BrandDoc, base: string): Brand => ({
+  label: doc.name,
+  chip: doc.chip,
+  href: safeHref(doc.url),
+  icon: brandIcon(doc, base),
+})
+
+/** The lookup every reference (experience → company, project → company, bio → record) resolves through. */
+export const toRecords = (companies: Company[], projects: Project[], base: string): Records =>
+  new Map([
+    ...companies.map((c) => [`companies:${c.id}`, toBrand(c, base)] as const),
+    ...projects.map((p) => [`projects:${p.id}`, toBrand(p, base)] as const),
+  ])
+
+export const toDiscipline = (d: CmsDiscipline, records: Records = new Map()): Discipline => ({
   slug: d.slug,
   title: d.title,
   level: d.level,
   caption: d.figureCaption,
-  bio: bioParagraphs(d.bio),
+  bio: bioParagraphs(d.bio, records),
   notes: (d.curiousNotes ?? []).map((n) => ({ side: n.side, text: n.text, ...(n.formula ? { formula: n.formula } : {}) })),
 })
 
-export const toExperienceEntry = (e: Experience): Entry => ({
-  id: String(e.id),
-  chip: e.chip,
-  label: e.company,
-  href: safeHref(e.url),
-  meta: e.title,
-  aside: formatPeriod(e.startYear, e.endYear),
-  disciplines: slugsOf(e.disciplines),
-})
+/** A Work row from its company; undefined when the site cannot read that company (it is not public). */
+export const toExperienceEntry = (e: Experience, records: Records): Entry | undefined => {
+  const company = findRecord(records, 'companies', e.company)
+  if (!company) return undefined
+  return {
+    id: String(e.id),
+    chip: company.chip,
+    label: company.label,
+    href: company.href,
+    icon: company.icon,
+    meta: e.title,
+    aside: formatPeriod(e.startYear, e.endYear),
+    disciplines: slugsOf(e.disciplines),
+  }
+}
 
-export const toProjectEntry = (p: Project): Entry => ({
-  id: String(p.id),
-  chip: p.chip,
-  label: p.name,
-  href: safeHref(p.url),
-  meta: p.summary,
-  disciplines: slugsOf(p.disciplines),
-})
+export const toProjectEntry = (p: Project, records: Records, base: string): Entry => {
+  const brand = toBrand(p, base)
+  const company = p.company ? findRecord(records, 'companies', p.company) : undefined
+  return {
+    id: String(p.id),
+    chip: brand.chip,
+    label: brand.label,
+    href: brand.href,
+    icon: brand.icon,
+    meta: p.summary,
+    ...(company ? { aside: company.label } : {}),
+    disciplines: slugsOf(p.disciplines),
+  }
+}
 
 export const toContentEntry = (c: Content): Entry => ({
   id: String(c.id),
@@ -50,7 +83,7 @@ export const toContentEntry = (c: Content): Entry => ({
 })
 
 /** An upload document (media…) as a relation returns it: an id at depth 0, the document at depth ≥ 1. */
-type Upload = number | Pick<Media, 'url'> | null | undefined
+type Upload = number | { url?: string | null } | null | undefined
 
 export const mediaUrl = (m: Upload, base: string): string | undefined => {
   if (!m || typeof m !== 'object' || !m.url) return undefined
@@ -88,13 +121,15 @@ export interface CmsSnapshot {
   navigation: Navigation
   settings: SiteSetting
   disciplines: CmsDiscipline[]
+  companies: Company[]
   experiences: Experience[]
   projects: Project[]
   content: Content[]
 }
 
 export function toPortfolio(snap: CmsSnapshot, base: string): Portfolio {
-  const disciplines = snap.disciplines.map(toDiscipline)
+  const records = toRecords(snap.companies, snap.projects, base)
+  const disciplines = snap.disciplines.map((d) => toDiscipline(d, records))
   const configuredRef = snap.settings.defaultDiscipline
   const configured = typeof configuredRef === 'object' ? configuredRef?.slug : undefined
   const defaultSlug = disciplines.some((d) => d.slug === configured) ? configured : undefined
@@ -102,8 +137,8 @@ export function toPortfolio(snap: CmsSnapshot, base: string): Portfolio {
     profile: { name: snap.profile.name, headlineTail: snap.profile.headlineTail, email: snap.profile.email },
     disciplines,
     defaultSlug: defaultSlug ?? disciplines[0]?.slug ?? '',
-    work: snap.experiences.map(toExperienceEntry),
-    projects: snap.projects.map(toProjectEntry),
+    work: snap.experiences.flatMap((e) => toExperienceEntry(e, records) ?? []),
+    projects: snap.projects.map((p) => toProjectEntry(p, records, base)),
     content: snap.content.map(toContentEntry),
     contactLinks: toLinks(snap.contact),
     nav: toNav(snap.navigation),

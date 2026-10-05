@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { bioParagraphs, type RichTextValue } from '@/lib/cms/bio-html'
+import type { Records } from '@/lib/cms/records'
 
 const t = (text: string, format = 0) => ({ type: 'text', text, format })
 const p = (...children: unknown[]) => ({ type: 'paragraph', children })
@@ -29,5 +30,13 @@ describe('bioParagraphs', () => {
   })
   it('returns [] for missing content', () => {
     expect(bioParagraphs(null)).toEqual([])
+  })
+  it('renders record links from the lookup and drops unresolved ones', () => {
+    const records: Records = new Map([['companies:3', { label: 'Autodoc', chip: 'A', href: 'https://autodoc.com.br', icon: 'http://cms.test/f.ico' }]])
+    const link = (relationTo: string, value: unknown) => inline({ blockType: 'recordLink', record: { relationTo, value } })
+    const [html] = bioParagraphs(doc(p(t('At '), link('companies', 3), t(' and '), link('projects', 9), t('.'))), records)
+    expect(html).toBe('At <a class="fav" href="https://autodoc.com.br" target="_blank" rel="noopener noreferrer"><img class="chip chip-img" src="http://cms.test/f.ico" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Autodoc</span></a> and .')
+    const [populated] = bioParagraphs(doc(p(link('companies', { id: 3, name: 'Autodoc' }))), records)
+    expect(populated).toContain('<span>Autodoc</span>')
   })
 })

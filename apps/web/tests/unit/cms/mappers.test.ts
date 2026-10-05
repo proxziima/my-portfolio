@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Messenger as CmsMessenger, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
-import { mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toMessenger, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
+import type { Company, Contact, Content, Discipline as CmsDiscipline, Experience, Media, Messenger as CmsMessenger, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
+import { brandIcon, mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toMessenger, toPortfolio, toProjectEntry, toRecords, type CmsSnapshot } from '@/lib/cms/mappers'
+import type { Records } from '@/lib/cms/records'
 
 const discipline = { id: 1, slug: 'se', title: 'Software engineer', order: 1, level: 'LV 9', figureCaption: 'Fig. 1', bio: { root: { children: [] } }, curiousNotes: [{ id: 'n', side: 'left', text: 'x', formula: null }], updatedAt: '', createdAt: '' } as unknown as CmsDiscipline
 
@@ -8,17 +9,44 @@ describe('mappers', () => {
   it('maps a discipline and drops null formulas', () => {
     expect(toDiscipline(discipline)).toEqual({ slug: 'se', title: 'Software engineer', level: 'LV 9', caption: 'Fig. 1', bio: [], notes: [{ side: 'left', text: 'x' }] })
   })
-  it('maps an experience with a period and populated disciplines', () => {
-    const e = { id: 7, company: 'Autodoc', chip: 'A', url: null, title: 'Senior SE', startYear: 2023, endYear: null, disciplines: [discipline], order: 1 } as unknown as Experience
-    expect(toExperienceEntry(e)).toEqual({ id: '7', chip: 'A', label: 'Autodoc', href: undefined, meta: 'Senior SE', aside: '2023–', disciplines: ['se'] })
-  })
-  it('maps a project', () => {
-    const p = { id: 3, name: 'Sonda', chip: 'S', url: 'https://x.dev', summary: 'Sampler', disciplines: [], order: 1 } as unknown as Project
-    expect(toProjectEntry(p)).toEqual({ id: '3', chip: 'S', label: 'Sonda', href: 'https://x.dev', meta: 'Sampler', disciplines: [] })
-  })
 })
 
 const BASE = 'http://cms.test'
+const media = (url: string) => ({ id: 1, url, alt: '' })
+const autodoc = { id: 3, name: 'Autodoc', chip: 'A', url: 'https://autodoc.com.br', logo: null, favicon: { id: 5, url: '/api/favicons/file/a.ico' }, disclosure: 'public' } as unknown as Company
+
+describe('brand icons', () => {
+  it('prefers the logo, then the favicon, else none', () => {
+    expect(brandIcon({ logo: media('/api/media/file/logo.png'), favicon: { id: 5, url: '/f.ico' } } as never, BASE)).toBe('http://cms.test/api/media/file/logo.png')
+    expect(brandIcon({ logo: null, favicon: { id: 5, url: '/f.ico' } } as never, BASE)).toBe('http://cms.test/f.ico')
+    expect(brandIcon({ logo: null, favicon: null } as never, BASE)).toBeUndefined()
+  })
+})
+
+describe('entries through the record lookup', () => {
+  const records: Records = toRecords([autodoc], [], BASE)
+  it('maps an experience from its company', () => {
+    const e = { id: 7, company: 3, title: 'Senior SE', startYear: 2023, endYear: null, disciplines: [discipline], order: 1 } as unknown as Experience
+    expect(toExperienceEntry(e, records)).toEqual({ id: '7', chip: 'A', label: 'Autodoc', href: 'https://autodoc.com.br', icon: 'http://cms.test/api/favicons/file/a.ico', meta: 'Senior SE', aside: '2023–', disciplines: ['se'] })
+  })
+  it('drops an experience whose company the site cannot read', () => {
+    const e = { id: 8, company: 99, title: 'x', startYear: 2020, endYear: null, disciplines: [], order: 1 } as unknown as Experience
+    expect(toExperienceEntry(e, records)).toBeUndefined()
+  })
+  it('maps a project with its own icon and its company as the aside', () => {
+    const p = { id: 3, name: 'Sonda', chip: 'S', url: 'https://x.dev', logo: media('/l.png'), favicon: null, summary: 'Sampler', company: { id: 3 }, disciplines: [], order: 1 } as unknown as Project
+    expect(toProjectEntry(p, records, BASE)).toEqual({ id: '3', chip: 'S', label: 'Sonda', href: 'https://x.dev', icon: 'http://cms.test/l.png', meta: 'Sampler', aside: 'Autodoc', disciplines: [] })
+  })
+  it('omits the company aside when the company is not readable', () => {
+    const p = { id: 4, name: 'Sonda', chip: 'S', url: null, logo: null, favicon: null, summary: 's', company: 99, disciplines: [], order: 1 } as unknown as Project
+    expect(toProjectEntry(p, records, BASE)).not.toHaveProperty('aside')
+  })
+  it('keeps work rows only for readable companies in the portfolio', () => {
+    const readable = { id: 7, company: 3, title: 'Senior SE', startYear: 2023, endYear: null, disciplines: [], order: 1 } as unknown as Experience
+    const hidden = { ...readable, id: 8, company: 99 } as unknown as Experience
+    expect(toPortfolio(snapshot({ companies: [autodoc], experiences: [readable, hidden] }), BASE).work.map((w) => w.id)).toEqual(['7'])
+  })
+})
 
 const snapshot = (overrides: Partial<CmsSnapshot> = {}): CmsSnapshot => ({
   profile: { id: 1, name: 'N', headlineTail: 'and builder.', email: 'a@b.dev' } as Profile,
@@ -33,6 +61,7 @@ const snapshot = (overrides: Partial<CmsSnapshot> = {}): CmsSnapshot => ({
     pageNotes: { headline: '', columnWidth: '', wallSwitch: '', sectionGap: '', chips: '', role: '' },
   } as unknown as SiteSetting,
   disciplines: [discipline],
+  companies: [],
   experiences: [],
   projects: [],
   content: [],
