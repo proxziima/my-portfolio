@@ -30,12 +30,22 @@ describe('rasterizeSvg', () => {
     expect(await sharp(png!).metadata()).toMatchObject({ width: 64, height: 64 })
     expect(await opaquePixels(png!)).toBe(64 * 32)
   })
+  it('renders an SVG declared at a large size (2048×2048) to 64×64', async () => {
+    const png = await rasterizeSvg(svg('<rect width="2048" height="2048" fill="blue"/>', 'width="2048" height="2048"'))
+    expect(await sharp(png!).metadata()).toMatchObject({ format: 'png', width: 64, height: 64 })
+    expect(await opaquePixels(png!)).toBe(64 * 64)
+  })
+  it('renders an SVG declared without a size', async () => {
+    const png = await rasterizeSvg(svg('<rect width="100" height="100" fill="blue"/>', 'viewBox="0 0 100 100"'))
+    expect(await sharp(png!).metadata()).toMatchObject({ format: 'png', width: 64, height: 64 })
+  })
   it('returns null for malformed SVG or bytes that are not an image', async () => {
     expect(await rasterizeSvg(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect'))).toBeNull()
     expect(await rasterizeSvg(Buffer.from('not an image at all'))).toBeNull()
   })
-  it('returns null when the rendered size exceeds the pixel cap', async () => {
-    expect(await rasterizeSvg(svg('<rect width="1" height="1"/>', 'width="100000" height="100000"'))).toBeNull()
+  it('returns null when even the lowest density exceeds the pixel cap', async () => {
+    // At the minimum density (1 dpi) this still renders at ~13889 px square, beyond the 4096² cap.
+    expect(await rasterizeSvg(svg('<rect width="1" height="1"/>', 'width="1000000" height="1000000"'))).toBeNull()
   })
   it('never loads external references', async () => {
     let requests = 0
