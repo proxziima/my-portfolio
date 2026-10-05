@@ -26,9 +26,23 @@ async function previousExchange(sessionId: string) {
   }
 }
 
+/**
+ * The state with this message's tier, unless a message that began classifying later already wrote its own:
+ * with `steer`, classifications of messages sent close together can finish out of order, and the newer
+ * message must win. Runs inside the row-locked updater, so the comparison and the write are atomic.
+ */
+function withTier<S extends { modelTier: ModelTier; modelTierAt: string | null }>(
+  s: S,
+  modelTier: ModelTier,
+  startedAt: string,
+): S {
+  if (s.modelTierAt !== null && startedAt < s.modelTierAt) return s
+  return { ...s, modelTier, modelTierAt: startedAt }
+}
+
 /** Records the tier the turn about to start runs on; the agent's model resolver reads it. */
-async function storeTier(sessionId: string, modelTier: ModelTier) {
-  await updateConversation(db(), sessionId, (s) => ({ ...s, modelTier }))
+async function storeTier(sessionId: string, modelTier: ModelTier, startedAt: string) {
+  await updateConversation(db(), sessionId, (s) => withTier(s, modelTier, startedAt))
 }
 
 /**
@@ -40,6 +54,8 @@ export default eveChannel({
   turnPolicy: 'steer',
   uploadPolicy: 'disabled',
   async onMessage(ctx, message) {
+    // Taken before any await: it orders this message against steered ones still classifying.
+    const startedAt = new Date().toISOString()
     const auth = defaultEveAuth(ctx)
     const sessionId = ctx.eve.sessionId
     // The web BFF always creates the session without a message and then sends to /session/:id,
@@ -49,7 +65,7 @@ export default eveChannel({
     const current = await ensureConversation(sessionId, auth)
     if (current.ended) {
       // The closing turn is a goodbye; it needs no big model.
-      await storeTier(sessionId, 'light')
+      await storeTier(sessionId, 'light', startedAt)
       return { auth, context: [closingContext()] }
     }
     const { verdict, depth } = await classifyMessage(
@@ -60,16 +76,16 @@ export default eveChannel({
     // Deflections are one short line in character, so anything that isn't ok runs on the light tier.
     const modelTier: ModelTier = verdict === 'ok' ? depth : 'light'
     if (verdict === 'ok') {
-      await storeTier(sessionId, modelTier)
+      await storeTier(sessionId, modelTier, startedAt)
       return { auth }
     }
     if (!countsAsViolation(verdict)) {
-      await storeTier(sessionId, modelTier)
+      await storeTier(sessionId, modelTier, startedAt)
       return { auth, context: [offScopeContext()] }
     }
     const state = await updateConversation(db(), sessionId, (s) => {
       const violations = s.violations + 1
-      return { ...s, violations, ended: s.ended || violations >= TWIN_LIMITS.maxViolations, modelTier }
+      return withTier({ ...s, violations, ended: s.ended || violations >= TWIN_LIMITS.maxViolations }, modelTier, startedAt)
     })
     return { auth, context: [deflectionContext(verdict, state.ended)] }
   },

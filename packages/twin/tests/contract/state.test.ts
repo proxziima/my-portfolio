@@ -43,6 +43,13 @@ describe('ConversationState model tier', () => {
     expect(ConversationState.parse({ modelTier: 'deep' }).modelTier).toBe('deep')
     expect(() => ConversationState.parse({ modelTier: 'huge' })).toThrow()
   })
+
+  it('records when the stored tier was decided, null until a message is classified', () => {
+    expect(initialConversationState().modelTierAt).toBeNull()
+    const { modelTierAt: _omitted, ...legacy } = initialConversationState()
+    expect(ConversationState.parse(legacy).modelTierAt).toBeNull()
+    expect(ConversationState.parse({ modelTierAt: '2026-10-05T12:00:00.000Z' }).modelTierAt).toBe('2026-10-05T12:00:00.000Z')
+  })
 })
 
 describe('ConversationState hardening', () => {

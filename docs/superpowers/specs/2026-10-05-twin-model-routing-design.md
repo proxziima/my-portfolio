@@ -55,7 +55,8 @@ The channel (`agent/channels/eve.ts`) stores the turn's tier in conversation sta
 ### Applying the tier (`agent/agent.ts`)
 
 - **`model` is `defineDynamic`** with a `step.started` handler. It reads `modelTier` from the session's conversation row and returns `{ model, modelContextWindowTokens, reasoning }` for that tier. `step.started` is the only scope that can return live `LanguageModel` objects, which the OpenRouter instances are.
-- **Stable within a turn:** the tier is written before the turn starts, so every step of a turn sees the same value.
+- **Latest message wins:** the tier is written when a message arrives, before its turn starts. With `turnPolicy: 'steer'`, a message sent mid-turn rewrites it and the model follows from the next step on, so a turn's steps are not guaranteed to share one model. That is acceptable: the newest message describes what the visitor wants now.
+- **Out-of-order classifications:** `modelTierAt` (ISO time the message began classifying) is stored beside `modelTier`. The channel writes a tier only if its start time is no earlier than the stored one, inside the `updateConversation` updater (under the row lock), so a slower, older classification never overwrites a newer one. Violations are still counted either way.
 - **The resolver never throws:** a missing row or a failed read gives `standard`. A throwing resolver would fail the turn.
 - **Top-level `modelContextWindowTokens` is removed.** Dynamic agents can't set it, and each selection carries its own.
 - **Compaction keeps a fixed model** (the standard tier) if eve's config allows it. Otherwise it follows the current selection. Verify against `agent-config.md` "Compaction".

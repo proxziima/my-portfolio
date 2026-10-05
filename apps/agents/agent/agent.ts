@@ -9,7 +9,8 @@ export default defineAgent({
   // window, because a dynamic agent cannot set `modelContextWindowTokens` at the top level.
   model: defineDynamic({
     events: {
-      // The channel writes the turn's tier before the turn starts, so every step of a turn agrees.
+      // The channel writes the tier when a message arrives, before its turn starts. A message steered into
+      // an open turn rewrites it (the latest message wins), so the model follows from the next step on.
       'step.started': async (_event, ctx) => tierSelection(await currentTier(ctx.session.id)),
     },
   }),
