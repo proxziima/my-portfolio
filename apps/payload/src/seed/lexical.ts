@@ -1,29 +1,37 @@
 import { randomBytes } from 'crypto'
 
-type Segment = string | { bold: string } | { chip: string; label: string; url?: string } | { curious: string }
+export type RecordCollection = 'companies' | 'projects'
+export type Segment = string | { bold: string } | { chip: string; label: string; url?: string } | { curious: string } | { record: RecordCollection; name: string }
+export type ResolveRecord = (relationTo: RecordCollection, name: string) => number | undefined
 
 export const b = (bold: string): Segment => ({ bold })
 export const chip = (label: string, code: string, url?: string): Segment => ({ chip: code, label, url })
 export const curious = (word = 'curious'): Segment => ({ curious: word })
+export const company = (name: string): Segment => ({ record: 'companies', name })
+export const project = (name: string): Segment => ({ record: 'projects', name })
 
 const id = () => randomBytes(12).toString('hex')
 const text = (value: string, format: 0 | 1) => ({ type: 'text', text: value, format, detail: 0, mode: 'normal', style: '', version: 1 })
 const inline = (fields: Record<string, unknown>) => ({ type: 'inlineBlock', version: 1, fields: { id: id(), blockName: '', ...fields } })
 
-function toNode(segment: Segment) {
+function toNode(segment: Segment, resolve: ResolveRecord) {
   if (typeof segment === 'string') return text(segment, 0)
   if ('bold' in segment) return text(segment.bold, 1)
+  if ('record' in segment) {
+    const id = resolve(segment.record, segment.name)
+    return id === undefined ? text(segment.name, 0) : inline({ blockType: 'recordLink', record: { relationTo: segment.record, value: id } })
+  }
   if ('curious' in segment) return inline({ blockType: 'curiousToggle', word: segment.curious })
   return inline({ blockType: 'chipLink', label: segment.label, chip: segment.chip, url: segment.url ?? null })
 }
 
-export function richText(paragraphs: Segment[][]) {
+export function richText(paragraphs: Segment[][], resolve: ResolveRecord = () => undefined) {
   return {
     root: {
       type: 'root', format: '', indent: 0, version: 1, direction: 'ltr' as const,
       children: paragraphs.map((segments) => ({
         type: 'paragraph', format: '', indent: 0, version: 1, direction: 'ltr' as const, textFormat: 0, textStyle: '',
-        children: segments.map(toNode),
+        children: segments.map((s) => toNode(s, resolve)),
       })),
     },
   }
