@@ -4326,14 +4326,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'available'"
-        },
         "status_message": {
           "name": "status_message",
           "type": "text",
@@ -5326,6 +5318,6 @@
   "internal": {
     "indexes": {}
   },
-  "id": "0db2e6b7-377c-487a-a910-8e5e710ab81e",
+  "id": "dcd1a421-86e1-4806-b56c-7d1ea8c6f777",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }

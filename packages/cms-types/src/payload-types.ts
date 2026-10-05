@@ -1354,10 +1354,6 @@ export interface Profile {
    */
   avatar?: (number | null) | Media;
   /**
-   * Your Messenger status, shown next to your name.
-   */
-  status: 'available' | 'busy' | 'away' | 'offline';
-  /**
    * Shown under your name in Messenger, like an MSN personal message.
    */
   statusMessage?: string | null;
@@ -1480,7 +1476,7 @@ export interface Messenger {
     avatar?: (number | null) | Media;
   };
   /**
-   * The one contact (the owner). Name, status, status message and avatar come from the Profile global; replies come from the twin agent.
+   * The one contact (the owner). Name, status message and avatar come from the Profile global; replies come from the twin agent.
    */
   contact?: {
     /**
@@ -1597,7 +1593,6 @@ export interface ProfileSelect<T extends boolean = true> {
   email?: T;
   location?: T;
   avatar?: T;
-  status?: T;
   statusMessage?: T;
   updatedAt?: T;
   createdAt?: T;

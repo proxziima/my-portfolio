@@ -135,10 +135,13 @@ const toViewer = (p: CmsMessenger['viewer'], base: string): MessengerPerson => (
   avatar: mediaUrl(p.avatar, base),
 })
 
-/** The owner as Messenger shows them: identity and presence from Profile, the song from Messenger. */
+/**
+ * The owner as Messenger shows them: name, status message and avatar from Profile, the song from
+ * Messenger. Always available: the twin answers around the clock.
+ */
 const toOwner = (owner: Profile, contact: CmsMessenger['contact'], base: string): MessengerPerson => ({
   name: owner.name,
-  status: owner.status,
+  status: 'available',
   personalMessage: owner.statusMessage?.trim() || undefined,
   listeningTo: contact?.listeningTo?.trim() || undefined,
   avatar: mediaUrl(owner.avatar, base),

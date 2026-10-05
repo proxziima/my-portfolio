@@ -1,12 +1,10 @@
 import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-sqlite'
 
 export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
-  await db.run(sql`ALTER TABLE \`profile\` ADD \`status\` text DEFAULT 'available' NOT NULL;`)
   await db.run(sql`ALTER TABLE \`profile\` ADD \`status_message\` text DEFAULT 'building things on the web, one pixel at a time';`)
-  // The owner's Messenger presence moves to Profile: carry over what the contact group held
+  // The owner's Messenger identity moves to Profile: carry over what the contact group held
   // (a deployed CMS may have set it), before the Messenger table is rebuilt without it.
   await db.run(sql`UPDATE \`profile\` SET
-    \`status\` = COALESCE((SELECT \`contact_status\` FROM \`messenger\` LIMIT 1), \`status\`),
     \`status_message\` = COALESCE((SELECT \`contact_personal_message\` FROM \`messenger\` LIMIT 1), \`status_message\`),
     \`avatar_id\` = COALESCE(\`avatar_id\`, (SELECT \`contact_avatar_id\` FROM \`messenger\` LIMIT 1));`)
   await db.run(sql`PRAGMA foreign_keys=OFF;`)
@@ -65,9 +63,7 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   await db.run(sql`CREATE INDEX \`messenger_contact_contact_avatar_idx\` ON \`messenger\` (\`contact_avatar_id\`);`)
   await db.run(sql`UPDATE \`messenger\` SET
     \`contact_name\` = COALESCE((SELECT \`name\` FROM \`profile\` LIMIT 1), \`contact_name\`),
-    \`contact_status\` = COALESCE((SELECT \`status\` FROM \`profile\` LIMIT 1), \`contact_status\`),
     \`contact_personal_message\` = (SELECT \`status_message\` FROM \`profile\` LIMIT 1),
     \`contact_avatar_id\` = (SELECT \`avatar_id\` FROM \`profile\` LIMIT 1);`)
-  await db.run(sql`ALTER TABLE \`profile\` DROP COLUMN \`status\`;`)
   await db.run(sql`ALTER TABLE \`profile\` DROP COLUMN \`status_message\`;`)
 }

@@ -41,7 +41,7 @@ export const Messenger: GlobalConfig = {
       type: 'group',
       admin: {
         description:
-          'The one contact (the owner). Name, status, status message and avatar come from the Profile global; replies come from the twin agent.',
+          'The one contact (the owner). Name, status message and avatar come from the Profile global; replies come from the twin agent.',
       },
       fields: [listeningTo()],
     },

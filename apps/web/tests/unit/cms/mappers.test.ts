@@ -116,7 +116,6 @@ describe('toMessenger', () => {
     name: 'Vinicius Queiroz',
     headlineTail: 'and builder.',
     email: 'v@example.com',
-    status: 'away',
     statusMessage: ' building things ',
     avatar: { url: '/api/media/file/v.png' },
   } as unknown as Profile
@@ -126,7 +125,7 @@ describe('toMessenger', () => {
     expect(m.viewer).toEqual({ name: 'Visitor', status: 'available', personalMessage: undefined, avatar: undefined })
     expect(m.contact).toEqual({
       name: 'Vinicius Queiroz',
-      status: 'away',
+      status: 'available',
       personalMessage: 'building things',
       listeningTo: 'Daft Punk - Digital Love',
       avatar: 'http://cms.test/api/media/file/v.png',

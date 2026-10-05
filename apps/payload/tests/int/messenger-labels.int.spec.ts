@@ -13,7 +13,7 @@ describe('messenger global for the twin', () => {
   it('takes the owner from Profile: the contact group keeps only the song', () => {
     expect(group('contact')?.fields?.map((f) => f.name)).toEqual(['listeningTo'])
     const profile = (Profile.fields as Named[]).map((f) => f.name)
-    for (const n of ['name', 'avatar', 'status', 'statusMessage']) expect(profile).toContain(n)
+    for (const n of ['name', 'avatar', 'statusMessage']) expect(profile).toContain(n)
   })
 
   it('has the labels the twin conversation needs', () => {

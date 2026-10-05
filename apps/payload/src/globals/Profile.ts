@@ -1,6 +1,5 @@
 import type { GlobalConfig } from 'payload'
 import { publicGlobalAccess } from '../access/public-read'
-import { presenceStatusField } from '../fields/presence'
 import { revalidateGlobalHooks } from '../hooks/revalidate-web'
 
 export const Profile: GlobalConfig = {
@@ -13,7 +12,6 @@ export const Profile: GlobalConfig = {
     { name: 'email', type: 'email', required: true },
     { name: 'location', type: 'text' },
     { name: 'avatar', type: 'upload', relationTo: 'media', admin: { description: 'Also your picture in Messenger.' } },
-    presenceStatusField('Your Messenger status, shown next to your name.'),
     {
       name: 'statusMessage',
       type: 'text',

@@ -101,7 +101,6 @@ export const profile = {
   headlineTail: 'and builder.',
   email: 'vqueiroz@autodoc.com.br',
   location: 'Brazil',
-  status: 'available' as const,
   statusMessage: 'building things on the web, one pixel at a time',
 }
 export const contactLinks = [
