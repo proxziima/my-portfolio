@@ -108,7 +108,9 @@ evals/                      evals.config.ts, skills/<name>/*.eval.ts, acceptance
   restricted or never-tier items.
 - **A new `knowledge` collection** for facts that are not portfolio entries (notice period, rates
   policy, relocation, work authorisation, preferred stack, writing samples). Its fields: `topic`,
-  `category` (`availability | compensation | logistics | background | other`), `answer` (text),
+  `category` (`availability | compensation | logistics | background | voice | other`), `answer` (text).
+  `voice` entries hold 3–5 real writing samples pasted by the owner; the `identity` skill quotes them
+  and nothing is invented. Further fields:
   `disclosure`, and `redactTerms[]`, which is used only on `never` entries and read only by the
   authenticated BFF.
 - **Two custom MCP tools** in `src/mcp/twin-tools.ts`, registered through the plugin's `mcp.tools`, so
@@ -239,9 +241,12 @@ Its result drives the **next** turn through the state digest. The consequences:
   in the same turn, and the evaluation records `requesting_call → hot` with reason `explicit request`.
 - **The idempotency key is `(sessionId, assistantMessageId)`.** At-least-once hook delivery is
   deduplicated by a unique index.
-- **Budget:** the classifier call is aborted after `classifierTimeoutMs` (200 ms, in the config). On
-  timeout, the evaluation is persisted with `outcome: "classifier_timeout"`, the tier is left unchanged,
-  and the next message re-evaluates.
+- **Budget:** the brief's 200 ms limit protected a *blocking* evaluation. This design never blocks, so
+  the classifier gets `classifierTimeoutMs` (4,000 ms, in the config). On timeout, the evaluation is
+  persisted with `outcome: "classifier_timeout"` and scored from deterministic signals only, and the next
+  message re-evaluates.
+- **Idempotency key, concretely:** `(sessionId, turnId, sequence)` from the `message.completed` event,
+  restricted to `finishReason !== "tool-calls"`.
 
 **Scoring** (`agent/lib/intent/`, pure):
 
@@ -324,6 +329,10 @@ The resolver injects a compact **state digest** (≤ 600 chars), not raw history
 
 ### Long-term
 
+- **Visitor auth:** eve's `jwtHmac` always yields `principalType: "service"`. `channels/eve.ts` therefore
+  wraps `verifyJwtHmac` and maps the result to `principalType: "user"`. For every proxied request, the BFF
+  mints a 60-second HS256 JWT with `sub = visitorId` and a validated `tz` claim (the browser's IANA zone).
+  Tools read it from `ctx.session.auth.current.attributes.tz`. The browser never sees the JWT.
 - **Visitor identity:** `twin.visitors` keyed by a random visitor id held in an HMAC-signed, httpOnly,
   `SameSite=Lax`, 90-day cookie (`twin_vid`).
 - **Stable identifier:** an optional `stable_key_hash` (HMAC-SHA256 of a volunteered email) links devices.
@@ -357,6 +366,10 @@ The resolver injects a compact **state digest** (≤ 600 chars), not raw history
 - `search_cache`
 - `rate_limits` (fixed-window counters, atomic upsert)
 - `spend_ledger` (per model call, cost reported by OpenRouter)
+
+### Booking acknowledgement
+
+The Cal.com route verifies `X-Cal-Signature-256`, verifies the signed `metadata.bookingRef` → session id, upserts `twin.bookings`, updates `conversation.booking`, then `attachSession(sessionId).send(encodeNotice({ kind: "booking.confirmed", startTime }), { auth: <service principal "cal-webhook">, turnPolicy: "queue" })`. The notice is a typed JSON envelope (`TwinNotice` in `@repo/twin/contract`); the Messenger window renders it as an MSN system line instead of a visitor bubble, and the turn's dynamic instructions (driven by the DB booking status, not the message text) make the agent acknowledge in character. A spoofed notice typed by a visitor changes nothing: behaviour reads state, not text.
 
 ## 9. Persona and response depth
 
@@ -398,7 +411,8 @@ The resolver injects a compact **state digest** (≤ 600 chars), not raw history
 
 - Payload excludes `never` items in `twinSearch`/`twinDisclose` and in public REST.
 - Independently, the BFF redacts at the output boundary. It uses `redactTerms` that the CMS holds on
-  `never` knowledge entries (fetched server-side with `CMS_TWIN_API_KEY`), plus email and phone patterns
+  `never` knowledge entries (served by a Payload custom endpoint, `GET /api/twin/redact-terms`, guarded by
+  `TWIN_REDACT_SECRET` and compared in constant time), plus email and phone patterns
   minus public contact allow-listed values.
 - The redactor streams with a holdback of K characters, where K is the longest term (min 64) and the
   remainder flushes on `message.completed`.
