@@ -1,16 +1,34 @@
 // @vitest-environment node
+import { gzipSync } from 'node:zlib'
 import sharp from 'sharp'
 import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_LIMITS, discoverFavicon, iconLinks } from '@/favicons/discover'
 
-const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
-const PNG_BIG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9, 9, 9, 9])
+const PNG_MAGIC = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const solid = (background: string) => sharp({ create: { width: 16, height: 16, channels: 4, background } })
+const PNG = new Uint8Array(await solid('#f00').png().toBuffer())
+const PNG_BLUE = new Uint8Array(await solid('#00f').png().toBuffer())
+const JPEG = new Uint8Array(await solid('#f00').jpeg().toBuffer())
 const ICO = Uint8Array.from([0, 0, 1, 0, 1, 0, 16, 16])
-const SVG = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="blue"/></svg>')
+const SVG_TEXT = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="blue"/></svg>'
+const SVG = new TextEncoder().encode(SVG_TEXT)
+/** Enough filtered shapes to take well over a few milliseconds to draw, within every structural limit. */
+const SLOW_SVG = new TextEncoder().encode(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><filter id="b"><feGaussianBlur stdDeviation="3"/></filter>${'<rect width="16" height="16" fill="red" filter="url(#b)"/>'.repeat(1000)}</svg>`,
+)
 
 const html = (head: string) => new Response(`<html><head>${head}</head></html>`, { headers: { 'content-type': 'text/html; charset=utf-8' } })
 const image = (bytes: Uint8Array, type: string) => new Response(bytes, { headers: { 'content-type': type } })
 const notFound = () => new Response('nope', { status: 404, headers: { 'content-type': 'text/html' } })
+
+/** Asserts the stored icon is a freshly encoded 64×64 PNG; resolves to its top-left pixel (RGBA). */
+async function expectPng(found: Awaited<ReturnType<typeof discoverFavicon>>) {
+  expect(found).toMatchObject({ mimetype: 'image/png', ext: 'png' })
+  expect(found!.data.subarray(0, 8).equals(Buffer.from(PNG_MAGIC))).toBe(true)
+  expect(await sharp(found!.data).metadata()).toMatchObject({ format: 'png', width: 64, height: 64 })
+  const { data } = await sharp(found!.data).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  return [...data.subarray(0, 4)]
+}
 
 /** A fetch stub answering from a url → response factory table; anything else 404s. */
 const stub = (routes: Record<string, () => Response>) =>
@@ -63,20 +81,18 @@ describe('discoverFavicon', () => {
       'https://a.dev/': () => html('<link rel="icon" href="/icon.png" sizes="32x32">'),
       'https://a.dev/icon.png': () => image(PNG, 'image/png'),
     })
-    const found = await discoverFavicon('https://a.dev/', fetchImpl)
-    expect(found).toMatchObject({ mimetype: 'image/png', ext: 'png' })
-    expect(found?.data.length).toBe(PNG.length)
+    expect(await expectPng(await discoverFavicon('https://a.dev/', fetchImpl))).toEqual([255, 0, 0, 255])
   })
   it('fetches the largest declared icon first', async () => {
     const fetchImpl = stub({
       'https://a.dev/': () =>
         html('<link rel="icon" href="/s.png" sizes="16x16"><link rel="icon" href="/b.png" sizes="64x64">'),
       'https://a.dev/s.png': () => image(PNG, 'image/png'),
-      'https://a.dev/b.png': () => image(PNG_BIG, 'image/png'),
+      'https://a.dev/b.png': () => image(PNG_BLUE, 'image/png'),
     })
     const found = await discoverFavicon('https://a.dev/', fetchImpl)
     expect(fetchImpl.mock.calls[1]![0]).toBe('https://a.dev/b.png')
-    expect(found?.data.length).toBe(PNG_BIG.length)
+    expect(await expectPng(found)).toEqual([0, 0, 255, 255])
   })
   it('falls back to /favicon.ico at the origin', async () => {
     const fetchImpl = stub({
@@ -124,26 +140,46 @@ describe('discoverFavicon', () => {
     const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(junk, 'application/octet-stream') })
     expect(await discoverFavicon('https://a.dev/', fetchImpl)).toBeNull()
   })
-  it('trusts the bytes over a wrong declared type', async () => {
-    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(PNG, 'image/gif') })
-    expect(await discoverFavicon('https://a.dev/', fetchImpl)).toMatchObject({ mimetype: 'image/png', ext: 'png' })
+  it('stores a PNG declared as a JPEG as a re-encoded PNG', async () => {
+    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(PNG, 'image/jpeg') })
+    expect(await expectPng(await discoverFavicon('https://a.dev/', fetchImpl))).toEqual([255, 0, 0, 255])
+  })
+  it('stores a JPEG as a PNG', async () => {
+    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(JPEG, 'image/jpeg') })
+    await expectPng(await discoverFavicon('https://a.dev/', fetchImpl))
+  })
+  it.each([
+    ['a comment', 'image/png', `<!-- logo -->\n${SVG_TEXT}`],
+    ['a DOCTYPE', 'image/jpeg', `<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n${SVG_TEXT}`],
+  ])('stores an SVG that starts with %s, declared %s, as a drawn PNG', async (_, type, body) => {
+    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(new TextEncoder().encode(body), type) })
+    const found = await discoverFavicon('https://a.dev/', fetchImpl)
+    expect(await expectPng(found)).toEqual([0, 0, 255, 255])
+    expect(found!.data.toString('latin1')).not.toContain('<svg')
+  })
+  it('rejects an HTML body declared as a PNG', async () => {
+    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(new TextEncoder().encode('<!doctype html><p>hi'), 'image/png') })
+    expect(await discoverFavicon('https://a.dev/', fetchImpl)).toBeNull()
+  })
+  it('rejects a gzip-compressed SVG quickly', async () => {
+    const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(gzipSync(SVG), 'image/svg+xml') })
+    const started = Date.now()
+    expect(await discoverFavicon('https://a.dev/', fetchImpl)).toBeNull()
+    expect(Date.now() - started).toBeLessThan(500)
   })
   it('rasterizes a declared SVG icon to a 64×64 PNG', async () => {
     const fetchImpl = stub({
       'https://a.dev/': () => html('<link rel="icon" href="/fav.svg">'),
       'https://a.dev/fav.svg': () => image(SVG, 'image/svg+xml'),
     })
-    const found = await discoverFavicon('https://a.dev/', fetchImpl)
-    expect(found).toMatchObject({ mimetype: 'image/png', ext: 'png' })
-    expect(found!.data.subarray(0, 8).equals(Buffer.from(PNG.subarray(0, 8)))).toBe(true)
-    expect(await sharp(found!.data).metadata()).toMatchObject({ format: 'png', width: 64, height: 64 })
+    expect(await expectPng(await discoverFavicon('https://a.dev/', fetchImpl))).toEqual([0, 0, 255, 255])
   })
   it('accepts an SVG served from /favicon.ico (e.g. after a redirect)', async () => {
     const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(SVG, 'image/svg+xml') })
     expect(await discoverFavicon('https://a.dev/', fetchImpl)).toMatchObject({ mimetype: 'image/png', ext: 'png' })
   })
-  it('sniffs an SVG served without an SVG content type', async () => {
-    const xml = new TextEncoder().encode(`  <?xml version="1.0"?>\n${new TextDecoder().decode(SVG)}`)
+  it('recognises an SVG served without an SVG content type', async () => {
+    const xml = new TextEncoder().encode(`<?xml version="1.0"?>\n${SVG_TEXT}`)
     const fetchImpl = stub({ 'https://a.dev/favicon.ico': () => image(xml, 'application/octet-stream') })
     expect(await discoverFavicon('https://a.dev/', fetchImpl)).toMatchObject({ mimetype: 'image/png', ext: 'png' })
   })
@@ -156,6 +192,26 @@ describe('discoverFavicon', () => {
     })
     expect(await discoverFavicon('https://a.dev/', fetchImpl)).toMatchObject({ mimetype: 'image/x-icon', ext: 'ico' })
     expect(fetchImpl.mock.calls.map(([url]) => String(url))).toEqual(['https://a.dev/', 'https://a.dev/fav.svg', 'https://a.dev/favicon.ico'])
+  })
+  it('moves on to the next candidate when drawing runs out of time', async () => {
+    const fetchImpl = stub({
+      'https://a.dev/': () => html('<link rel="icon" href="/fav.svg">'),
+      'https://a.dev/fav.svg': () => image(SLOW_SVG, 'image/svg+xml'),
+      'https://a.dev/favicon.ico': () => image(ICO, 'image/x-icon'),
+    })
+    const found = await discoverFavicon('https://a.dev/', fetchImpl, { ...DEFAULT_LIMITS, renderTimeoutMs: 1 })
+    expect(found).toMatchObject({ mimetype: 'image/x-icon', ext: 'ico' })
+  })
+  it('stops drawing once the overall deadline has passed', async () => {
+    const fetchImpl = stub({
+      'https://a.dev/': () => html('<link rel="icon" href="/fav.svg">'),
+      'https://a.dev/fav.svg': () => image(SLOW_SVG, 'image/svg+xml'),
+      'https://a.dev/favicon.ico': () => image(ICO, 'image/x-icon'),
+    })
+    const started = Date.now()
+    expect(await discoverFavicon('https://a.dev/', fetchImpl, { ...DEFAULT_LIMITS, totalTimeoutMs: 50 })).toBeNull()
+    expect(Date.now() - started).toBeLessThan(300)
+    expect(fetchImpl.mock.calls.map(([url]) => String(url))).not.toContain('https://a.dev/favicon.ico')
   })
   it('skips candidates that are not images', async () => {
     const fetchImpl = stub({
@@ -173,7 +229,7 @@ describe('discoverFavicon', () => {
   })
   it('skips icons whose body exceeds the size cap', async () => {
     const big = new Uint8Array(600_000)
-    big.set(PNG)
+    big.set(PNG_MAGIC)
     const fetchImpl = stub({
       'https://a.dev/': () => html('<link rel="icon" href="/big.png">'),
       'https://a.dev/big.png': () => image(big, 'image/png'),

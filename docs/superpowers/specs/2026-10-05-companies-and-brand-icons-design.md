@@ -60,10 +60,21 @@ recorded here with its reason.
       the old favicon is removed. If an unchanged URL is being refreshed, the old favicon is kept.
       One exception: when replacing the file in place fails, the old favicon is removed too,
       because Payload deletes the old file before it writes the new one.
-   6. Only raster files are stored (ICO, PNG, JPEG, GIF, WebP, AVIF). A third-party SVG served
-      from the CMS origin could run script if opened directly. Many sites only declare an SVG icon
-      (autodoc.com.br does), so SVG candidates are rasterized with sharp to a 64×64 PNG before
-      storing. The stored file is then plain pixels, and an SVG is never served.
+   6. The content decides what is stored, never the declared type. A third-party SVG (or anything
+      a browser could read as markup) served from the CMS origin could run script if opened
+      directly, so only two kinds of file are stored:
+      - an ICO (by its magic bytes), kept as it is: sharp cannot read it, and an ICO runs nothing;
+      - a 64×64 PNG freshly encoded with sharp from any other image: PNG, JPEG, GIF (first frame),
+        WebP, TIFF and AVIF are decoded, and SVG is drawn. Many sites only declare an SVG icon
+        (autodoc.com.br does). No polyglot or mislabelled bytes survive the re-encode.
+
+      Anything else is refused, and so is gzip (sharp would inflate it as an SVG). Before sharp
+      parses an SVG, a cheap check on its markup refuses entity declarations, XInclude, more than
+      5000 elements, `<use>` nesting that could multiply into more than 100k elements, and inline
+      `data:` URLs other than small raster images; external references never load. Decoded
+      images are capped at 4096² pixels. Decoding or drawing gets 3 s (and never more than what
+      is left of the 15 s), after which the candidate counts as failed; libvips cannot be
+      cancelled, so the abandoned work finishes in the background, within those bounds.
 
    `context.skipFavicon` turns the hook off (tests, migrations), and `context.refreshFavicon`
    forces a re-fetch.

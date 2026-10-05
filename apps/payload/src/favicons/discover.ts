@@ -1,41 +1,26 @@
-import { rasterizeSvg } from './rasterize'
+import { type FoundFavicon, normalizeIcon } from './normalize'
 
-/** A favicon ready to store: its bytes, MIME type and file extension. */
-export interface FoundFavicon {
-  data: Buffer
-  mimetype: string
-  ext: string
-}
+export type { FoundFavicon }
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>
 
-/** Time budgets in milliseconds: one per request, and one for the whole discovery. */
+/**
+ * Time budgets in milliseconds: one per request, one for decoding or drawing each fetched image, and
+ * one for the whole discovery.
+ */
 export interface Limits {
   requestTimeoutMs: number
+  renderTimeoutMs: number
   totalTimeoutMs: number
 }
 
-export const DEFAULT_LIMITS: Limits = { requestTimeoutMs: 5000, totalTimeoutMs: 15_000 }
+export const DEFAULT_LIMITS: Limits = { requestTimeoutMs: 5000, renderTimeoutMs: 3000, totalTimeoutMs: 15_000 }
 
 const PAGE_LIMIT = 1_000_000
 const ICON_LIMIT = 512_000
 /** Declared icons to try, best first; `/favicon.ico` is always tried on top of these. */
 const MAX_DECLARED = 4
 const USER_AGENT = 'Mozilla/5.0 (compatible; portfolio-favicon/1.0)'
-
-/**
- * The types stored as they are: raster only. An SVG stored on the CMS origin could run script when
- * opened directly, so SVG icons are rasterized to PNG instead (see rasterize.ts).
- */
-const EXTENSIONS: Record<string, string> = {
-  'image/x-icon': 'ico',
-  'image/vnd.microsoft.icon': 'ico',
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-  'image/avif': 'avif',
-}
 
 const isHttp = (url: URL) => url.protocol === 'http:' || url.protocol === 'https:'
 
@@ -63,23 +48,6 @@ async function readCapped(res: Response, limit: number, { truncate = false } = {
     }
   }
   return Buffer.concat(chunks)
-}
-
-/** ICO and PNG files by their magic bytes, which win over whatever the server declared. */
-function sniff(data: Buffer): string | undefined {
-  if (data.length >= 4 && data[0] === 0 && data[1] === 0 && data[2] === 1 && data[3] === 0) return 'image/x-icon'
-  if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png'
-  return undefined
-}
-
-/**
- * The body as SVG markup, whatever the server declared: `<svg …`, or an XML prolog followed by an
- * `<svg` root, after leading whitespace (which an XML prolog may not follow, so it is dropped).
- */
-function svgMarkup(data: Buffer): Buffer | null {
-  const text = data.toString('utf8').trimStart()
-  const lower = text.toLowerCase()
-  return (lower.startsWith('<svg') || lower.startsWith('<?xml')) && lower.includes('<svg') ? Buffer.from(text, 'utf8') : null
 }
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&#38;': '&', '&quot;': '"', '&#34;': '"' }
@@ -124,11 +92,14 @@ export function iconLinks(html: string, base: string): string[] {
 
 /**
  * Finds a site's icon: up to four icons its page declares, best first, then `/favicon.ico` at the
- * origin the page ended up on. The first candidate that answers 200 with an image under 512 KB
- * wins: a raster one as it is, its type from the ICO/PNG magic bytes, else from the declared type;
- * an SVG one (declared or sniffed) rasterized to a 64×64 PNG, skipped if it will not render. Each
- * request times out after 5 s and the whole search after 15 s. Returns null for non-http(s) URLs
- * or when nothing qualifies; never throws.
+ * origin the page ended up on. The first candidate that answers 200 with an image (or untyped) body
+ * of at most 512 KB, which normalizeIcon accepts, wins: an ICO as it is, any other image as a 64×64
+ * PNG re-encoded from its pixels. The content decides; the declared type only filters out pages.
+ *
+ * Bounds, by default (see `limits`): each request 5 s; decoding or drawing each image 3 s; the
+ * whole search 15 s, which also cuts short a request or a drawing in progress. The page is read up
+ * to 1 MB, each icon up to 512 KB. Returns null for non-http(s) URLs or when nothing qualifies;
+ * never throws.
  */
 export async function discoverFavicon(
   url: string,
@@ -142,6 +113,7 @@ export async function discoverFavicon(
     return null
   }
   if (!isHttp(page)) return null
+  const endsAt = Date.now() + limits.totalTimeoutMs
   const deadline = AbortSignal.timeout(limits.totalTimeoutMs)
   const get = (target: string) =>
     fetchImpl(target, {
@@ -178,16 +150,10 @@ export async function discoverFavicon(
       }
       const data = await readCapped(res, ICON_LIMIT)
       if (!data || data.length === 0) continue
-      const sniffed = sniff(data)
-      const svg = sniffed ? null : (svgMarkup(data) ?? (declared === 'image/svg+xml' ? data : null))
-      if (svg) {
-        const png = await rasterizeSvg(svg)
-        if (png) return { data: png, mimetype: 'image/png', ext: 'png' }
-        continue
-      }
-      const mimetype = sniffed ?? declared
-      const ext = EXTENSIONS[mimetype]
-      if (ext) return { data, mimetype, ext }
+      const budget = Math.min(limits.renderTimeoutMs, endsAt - Date.now())
+      if (budget <= 0) break
+      const icon = await normalizeIcon(data, budget)
+      if (icon) return icon
     } catch {
       // Try the next candidate.
     }
