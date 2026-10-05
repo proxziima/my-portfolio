@@ -194,7 +194,7 @@ export default defineAgent({
 - [ ] **Step 5: Run the test and discovery.**
 
 Run: `bunx --cwd apps/agents vitest run tests/models.test.ts`. Expected: PASS.
-Run: `cd apps/agents && WORKFLOW_POSTGRES_URL=postgres://twin:twin@localhost:5433/twin bunx eve info`.
+Run: `cd apps/agents && WORKFLOW_POSTGRES_URL=postgres://twin:twin@127.0.0.1:5433/twin bunx eve info`.
 Expected: the agent is discovered, the model shows as a runtime entry, and there are no `defaultTools` tools. If eve reports that `retention: 0` is unsupported by the Postgres world, keep it (the docs say it falls back to the world default), and note that in the README in E6.
 
 - [ ] **Step 6: Commit**
@@ -2802,7 +2802,7 @@ export default defineSchedule({
 bun run --cwd apps/agents test
 bun run --cwd apps/agents check-types
 bun run --cwd apps/agents info
-WORKFLOW_POSTGRES_URL=postgres://twin:twin@localhost:5433/twin bun run --cwd apps/agents build
+WORKFLOW_POSTGRES_URL=postgres://twin:twin@127.0.0.1:5433/twin bun run --cwd apps/agents build
 ```
 
 Expected:

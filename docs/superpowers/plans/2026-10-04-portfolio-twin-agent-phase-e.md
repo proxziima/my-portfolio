@@ -146,8 +146,8 @@ export function startTelegramStub(port: number): Promise<Server> {
 
 `apps/agents/fixtures/offline/.env.example`. Copy it to `.env` locally; CI sets the same values.
 ```
-TWIN_DATABASE_URL=postgres://twin:twin@localhost:5433/twin
-WORKFLOW_POSTGRES_URL=postgres://twin:twin@localhost:5433/twin
+TWIN_DATABASE_URL=postgres://twin:twin@127.0.0.1:5433/twin
+WORKFLOW_POSTGRES_URL=postgres://twin:twin@127.0.0.1:5433/twin
 OPENROUTER_API_KEY=offline-unused
 TWIN_JWT_SECRET=offline-offline-offline-offline-00
 TWIN_PROMPT_CANARY=offline-canary-0123
@@ -294,7 +294,7 @@ That is three turns, so the criterion holds.
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d postgres
-TWIN_DATABASE_URL=postgres://twin:twin@localhost:5433/twin bun run --cwd packages/twin db:migrate
+TWIN_DATABASE_URL=postgres://twin:twin@127.0.0.1:5433/twin bun run --cwd packages/twin db:migrate
 bun run --cwd apps/agents world:setup
 cd apps/agents/fixtures/offline && cp .env.example .env && bun run eval
 ```
@@ -764,8 +764,8 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U twin -d twin" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      TWIN_DATABASE_URL: postgres://twin:twin@localhost:5433/twin
-      WORKFLOW_POSTGRES_URL: postgres://twin:twin@localhost:5433/twin
+      TWIN_DATABASE_URL: postgres://twin:twin@127.0.0.1:5433/twin
+      WORKFLOW_POSTGRES_URL: postgres://twin:twin@127.0.0.1:5433/twin
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2

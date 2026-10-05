@@ -35,7 +35,7 @@ TWIN_AGENT_URL=http://localhost:4100
 TWIN_JWT_SECRET=change-me-32-characters-minimum-000
 # Signs the visitor cookie (web only).
 TWIN_COOKIE_SECRET=change-me-32-characters-minimum-111
-TWIN_DATABASE_URL=postgres://twin:twin@localhost:5433/twin
+TWIN_DATABASE_URL=postgres://twin:twin@127.0.0.1:5433/twin
 # Shared with apps/payload and apps/agents: guards GET /api/twin/redact-terms.
 TWIN_REDACT_SECRET=change-me-32-characters-minimum-222
 # Shared with apps/agents: the system-prompt canary the output filter blocks.

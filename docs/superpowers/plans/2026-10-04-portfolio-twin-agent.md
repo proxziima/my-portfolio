@@ -74,7 +74,7 @@ Execute the phases in order. The tasks within a phase are ordered by dependency.
    - End every message with the line `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
    - Commit only the files the task lists.
 7. **Commands run from the repo root** unless the step says otherwise. On Windows use the Bash tool (Git Bash).
-8. **Local Postgres:** `docker compose -f docker-compose.dev.yml up -d postgres` (task A1). Connection string: `postgres://twin:twin@localhost:5433/twin`.
+8. **Local Postgres:** this machine has no Docker. PostgreSQL 17 runs in WSL `Ubuntu-24.04` on port 5433 with role and database `twin`/`twin` (`wsl -d Ubuntu-24.04 -u root -- pg_lsclusters` wakes it). Connection string: `postgres://twin:twin@127.0.0.1:5433/twin`. Always use `127.0.0.1`, never `localhost`: localhost resolves to ::1, which WSL does not forward. `docker-compose.dev.yml` is the equivalent for machines with Docker. Wherever a task says `docker compose -f docker-compose.dev.yml up -d postgres`, check `pg_isready -h 127.0.0.1 -p 5433` instead (psql tools are at `C:/Users/felip/AppData/Local/Programs/pgsql/bin`).
 
 ## File map
 

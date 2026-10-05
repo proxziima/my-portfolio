@@ -524,8 +524,8 @@ const secret = 'x'.repeat(32)
 const sa = Buffer.from(JSON.stringify({ client_email: 'twin@p.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n' })).toString('base64')
 
 const agents = {
-  TWIN_DATABASE_URL: 'postgres://twin:twin@localhost:5433/twin',
-  WORKFLOW_POSTGRES_URL: 'postgres://twin:twin@localhost:5433/twin',
+  TWIN_DATABASE_URL: 'postgres://twin:twin@127.0.0.1:5433/twin',
+  WORKFLOW_POSTGRES_URL: 'postgres://twin:twin@127.0.0.1:5433/twin',
   OPENROUTER_API_KEY: 'sk-or-1',
   TWIN_JWT_SECRET: secret,
   TWIN_PROMPT_CANARY: 'canary-0123456789abcdef',
@@ -995,7 +995,7 @@ Expected: PASS. If the `as unknown as TwinDb` cast fails type checking, do not w
 
 - [ ] **Step 6: Apply it to the dev database**
 
-Run: `TWIN_DATABASE_URL=postgres://twin:twin@localhost:5433/twin bun run --cwd packages/twin db:migrate`
+Run: `TWIN_DATABASE_URL=postgres://twin:twin@127.0.0.1:5433/twin bun run --cwd packages/twin db:migrate`
 Expected: exits 0. Then run `docker compose -f docker-compose.dev.yml exec postgres psql -U twin -c '\dt twin.*'`; it lists 9 tables.
 
 - [ ] **Step 7: Commit**
