@@ -17,6 +17,7 @@ export async function createTestDb(): Promise<TestDb> {
   const db = drizzle(client, { schema })
   await migrate(db, {
     migrationsFolder: fileURLToPath(new URL('../../migrations', import.meta.url)),
+    migrationsSchema: 'twin_migrations',
   })
   return { db: db as unknown as TwinDb, close: () => client.close() }
 }

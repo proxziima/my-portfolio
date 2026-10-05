@@ -12,7 +12,7 @@ async function main(): Promise<void> {
   if (!url) throw new Error('TWIN_DATABASE_URL is required to migrate')
   const pool = new Pool({ connectionString: url, max: 1 })
   try {
-    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS_FOLDER })
+    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS_FOLDER, migrationsSchema: 'twin_migrations' })
   } finally {
     await pool.end()
   }
