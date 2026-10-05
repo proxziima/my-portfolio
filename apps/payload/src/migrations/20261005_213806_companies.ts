@@ -1,10 +1,9 @@
 import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-sqlite'
 
 // Both functions use only `db` (no `payload`, no `req`), so they can also be applied directly to a
-// push-mode DB. SQLite migrations run outside a transaction here, so `PRAGMA foreign_keys=OFF` takes
-// effect: every table rebuild sits inside it, otherwise dropping the old table would cascade-delete its
-// `_rels` rows (experiences_rels, projects_rels).
+// push-mode DB. Each first reads and works out everything it will write, then applies it atomically.
 
+type DB = MigrateUpArgs['db']
 type Row = Record<string, unknown>
 
 /** Visits every Lexical node depth-first. */
@@ -14,9 +13,121 @@ const walk = (node: unknown, visit: (n: Row) => void): void => {
   for (const child of ((node as Row).children as unknown[] | undefined) ?? []) walk(child, visit)
 }
 
-const TIERS = ['public', 'restricted', 'never']
+const TIERS = ['public', 'restricted', 'never'] as const
+const PUBLIC = 0
+const NEVER = 2
+
+const nonEmpty = (value: unknown): string | null => (typeof value === 'string' && value ? value : null)
+
+/**
+ * Runs the writes in one transaction, so a failure leaves the DB as it was (Payload's SQLite runner
+ * opens none of its own). Foreign keys are off around it, since the libsql connection enables them:
+ * otherwise dropping a table during a rebuild would cascade-delete its `_rels` rows. The PRAGMA is a
+ * no-op inside a transaction, so it is set before BEGIN and restored after COMMIT or ROLLBACK.
+ */
+async function atomically(db: DB, writes: () => Promise<void>): Promise<void> {
+  await db.run(sql`PRAGMA foreign_keys=OFF;`)
+  try {
+    await db.run(sql`BEGIN;`)
+    try {
+      await writes()
+      await db.run(sql`COMMIT;`)
+    } catch (err) {
+      try {
+        await db.run(sql`ROLLBACK;`)
+      } catch {
+        // SQLite may already have rolled back on its own; the original error is the one to report.
+      }
+      throw err
+    }
+  } finally {
+    await db.run(sql`PRAGMA foreign_keys=ON;`)
+  }
+}
+
+interface UpPlan {
+  companies: { id: number; name: string; chip: string; url: string | null; tier: number }[]
+  /** Project id → url, from the bio chip link that becomes a link to that project. */
+  projectUrls: Map<number, string>
+  /** The bios that change, already rewritten. */
+  bios: { id: unknown; bio: unknown }[]
+}
 
 export async function up({ db }: MigrateUpArgs): Promise<void> {
+  const plan = await planUp(db)
+  await atomically(db, () => applyUp(db, plan))
+}
+
+async function planUp(db: DB): Promise<UpPlan> {
+  const experiences = (await db.all(sql`SELECT "company", "chip", "url", "disclosure" FROM "experiences" ORDER BY "order", "id"`)) as Row[]
+  const projects = (await db.all(sql`SELECT "id", "name", "url", "disclosure" FROM "projects"`)) as Row[]
+  const disciplines = (await db.all(sql`SELECT "id", "bio" FROM "disciplines"`)) as Row[]
+  const bios = disciplines.filter((d) => nonEmpty(d.bio)).map((d) => ({ id: d.id, bio: JSON.parse(String(d.bio)) as Row }))
+
+  const chipLinks = (bio: Row, visit: (n: Row, f: Row & { label: string }) => void) =>
+    walk(bio.root, (n) => {
+      const f = n.fields as Row | undefined
+      if (n.type === 'inlineBlock' && f?.blockType === 'chipLink' && typeof f.label === 'string') visit(n, f as Row & { label: string })
+    })
+  const bioUrls = new Map<string, string | null>()
+  for (const { bio } of bios) {
+    chipLinks(bio, (_n, f) => {
+      if (!bioUrls.has(f.label)) bioUrls.set(f.label, nonEmpty(f.url))
+    })
+  }
+
+  // One company per distinct experience name: the chip and url of its first row by order, the url
+  // falling back to the bio's chip link; its tier is the most visible tier among its experiences. An
+  // unknown tier fails closed (never).
+  const companies = new Map<string, UpPlan['companies'][number]>()
+  for (const e of experiences) {
+    const name = String(e.company)
+    const known = TIERS.indexOf(String(e.disclosure) as (typeof TIERS)[number])
+    const tier = known < 0 ? NEVER : known
+    const company = companies.get(name)
+    if (company) {
+      company.url ??= nonEmpty(e.url)
+      company.tier = Math.min(company.tier, tier)
+    } else {
+      companies.set(name, { id: companies.size + 1, name, chip: String(e.chip), url: nonEmpty(e.url), tier })
+    }
+  }
+  for (const c of companies.values()) c.url ??= bioUrls.get(c.name) ?? null
+
+  // A bio chip link whose label names a company (first) or a project becomes a link to that record,
+  // but only to a public one: bios are public prose and the block only accepts public records, so a
+  // link to a hidden record stays a chip link. A label that names a company is never read as a project.
+  // Any other chip link (e.g. "Ted Lasso") stays as it is.
+  const projectByName = new Map(projects.map((p) => [String(p.name), p]))
+  const projectUrls = new Map<number, string>()
+  const changed: UpPlan['bios'] = []
+  for (const d of bios) {
+    let rewritten = false
+    chipLinks(d.bio, (n, f) => {
+      const company = companies.get(f.label)
+      const project = company ? undefined : projectByName.get(f.label)
+      let record: { relationTo: 'companies' | 'projects'; value: number }
+      if (company) {
+        if (company.tier !== PUBLIC) return
+        record = { relationTo: 'companies', value: company.id }
+      } else if (project) {
+        if (project.disclosure !== 'public') return
+        record = { relationTo: 'projects', value: Number(project.id) }
+        // The link took its url from the chip; keep it on the project when the project has none.
+        const url = nonEmpty(f.url)
+        if (url && !nonEmpty(project.url) && !projectUrls.has(record.value)) projectUrls.set(record.value, url)
+      } else {
+        return
+      }
+      n.fields = { id: f.id, blockName: f.blockName ?? '', blockType: 'recordLink', record }
+      rewritten = true
+    })
+    if (rewritten) changed.push(d)
+  }
+  return { companies: [...companies.values()], projectUrls, bios: changed }
+}
+
+async function applyUp(db: DB, plan: UpPlan): Promise<void> {
   await db.run(sql`CREATE TABLE \`favicons\` (
   	\`id\` integer PRIMARY KEY NOT NULL,
   	\`updated_at\` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
@@ -53,40 +164,10 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.run(sql`CREATE INDEX \`companies_disclosure_idx\` ON \`companies\` (\`disclosure\`);`)
   await db.run(sql`CREATE INDEX \`companies_updated_at_idx\` ON \`companies\` (\`updated_at\`);`)
   await db.run(sql`CREATE INDEX \`companies_created_at_idx\` ON \`companies\` (\`created_at\`);`)
-
-  // One company per distinct experience name: the chip and url of its first row by order, the url
-  // falling back to the bio's chip link; its tier is the most visible tier among its experiences.
-  const experiences = (await db.all(sql`SELECT "company", "chip", "url", "disclosure" FROM "experiences" ORDER BY "order", "id"`)) as Row[]
-  const disciplines = (await db.all(sql`SELECT "id", "bio" FROM "disciplines"`)) as Row[]
-  const bios = disciplines.filter((d) => typeof d.bio === 'string' && d.bio)
-  const bioChips = new Map<string, { chip: string; url: string | null }>()
-  for (const d of bios) {
-    walk(JSON.parse(String(d.bio)).root, (n) => {
-      const f = n.fields as Row | undefined
-      if (n.type === 'inlineBlock' && f?.blockType === 'chipLink' && typeof f.label === 'string' && !bioChips.has(f.label)) {
-        bioChips.set(f.label, { chip: String(f.chip ?? ''), url: typeof f.url === 'string' && f.url ? f.url : null })
-      }
-    })
-  }
-  const companies = new Map<string, { chip: string; url: string | null; tier: number }>()
-  for (const e of experiences) {
-    const name = String(e.company)
-    const tier = Math.max(0, TIERS.indexOf(String(e.disclosure)))
-    const url = typeof e.url === 'string' && e.url ? e.url : null
-    const known = companies.get(name)
-    if (known) {
-      known.url ??= url
-      known.tier = Math.min(known.tier, tier)
-    } else {
-      companies.set(name, { chip: String(e.chip), url, tier })
-    }
-  }
-  for (const [name, c] of companies) {
-    const url = c.url ?? bioChips.get(name)?.url ?? null
-    await db.run(sql`INSERT INTO "companies" ("name", "chip", "url", "disclosure") VALUES (${name}, ${c.chip}, ${url}, ${TIERS[c.tier]})`)
+  for (const c of plan.companies) {
+    await db.run(sql`INSERT INTO "companies" ("id", "name", "chip", "url", "disclosure") VALUES (${c.id}, ${c.name}, ${c.chip}, ${c.url}, ${TIERS[c.tier]})`)
   }
 
-  await db.run(sql`PRAGMA foreign_keys=OFF;`)
   await db.run(sql`CREATE TABLE \`__new_experiences\` (
   	\`id\` integer PRIMARY KEY NOT NULL,
   	\`company_id\` integer NOT NULL,
@@ -170,7 +251,6 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.run(sql`INSERT INTO \`__new_payload_locked_documents_rels\`("id", "order", "parent_id", "path", "disciplines_id", "experiences_id", "projects_id", "content_id", "knowledge_id", "posts_id", "categories_id", "media_id", "scenes_id", "users_id", "search_id", "redirects_id", "payload_mcp_api_keys_id") SELECT "id", "order", "parent_id", "path", "disciplines_id", "experiences_id", "projects_id", "content_id", "knowledge_id", "posts_id", "categories_id", "media_id", "scenes_id", "users_id", "search_id", "redirects_id", "payload_mcp_api_keys_id" FROM \`payload_locked_documents_rels\`;`)
   await db.run(sql`DROP TABLE \`payload_locked_documents_rels\`;`)
   await db.run(sql`ALTER TABLE \`__new_payload_locked_documents_rels\` RENAME TO \`payload_locked_documents_rels\`;`)
-  await db.run(sql`PRAGMA foreign_keys=ON;`)
   await db.run(sql`CREATE INDEX \`experiences_company_idx\` ON \`experiences\` (\`company_id\`);`)
   await db.run(sql`CREATE INDEX \`experiences_order_idx\` ON \`experiences\` (\`order\`);`)
   await db.run(sql`CREATE INDEX \`experiences_disclosure_idx\` ON \`experiences\` (\`disclosure\`);`)
@@ -205,57 +285,48 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.run(sql`ALTER TABLE \`payload_mcp_api_keys\` ADD \`companies_create\` integer DEFAULT false;`)
   await db.run(sql`ALTER TABLE \`payload_mcp_api_keys\` ADD \`companies_update\` integer DEFAULT false;`)
   await db.run(sql`ALTER TABLE \`payload_mcp_api_keys\` ADD \`companies_delete\` integer DEFAULT false;`)
+  // Companies split off experiences, so an existing MCP key may do with companies what it may do with experiences.
+  await db.run(sql`UPDATE "payload_mcp_api_keys" SET "companies_find" = "experiences_find", "companies_create" = "experiences_create", "companies_update" = "experiences_update", "companies_delete" = "experiences_delete";`)
 
-  // A bio chip link whose label names a company (first) or a project becomes a link to that record;
-  // any other chip link (e.g. "Ted Lasso") stays as it is.
-  const ids = async (table: 'companies' | 'projects') =>
-    new Map(((await db.all(sql.raw(`SELECT "id", "name" FROM "${table}"`))) as Row[]).map((r) => [String(r.name), Number(r.id)]))
-  const companyIds = await ids('companies')
-  const projectIds = await ids('projects')
-  for (const d of bios) {
-    const bio = JSON.parse(String(d.bio))
-    walk(bio.root, (n) => {
-      const f = n.fields as Row | undefined
-      if (n.type !== 'inlineBlock' || f?.blockType !== 'chipLink' || typeof f.label !== 'string') return
-      const companyId = companyIds.get(f.label)
-      const projectId = companyId === undefined ? projectIds.get(f.label) : undefined
-      if (companyId === undefined && projectId === undefined) return
-      n.fields = {
-        id: f.id,
-        blockName: f.blockName ?? '',
-        blockType: 'recordLink',
-        record: companyId !== undefined ? { relationTo: 'companies', value: companyId } : { relationTo: 'projects', value: projectId },
-      }
-    })
-    await db.run(sql`UPDATE "disciplines" SET "bio" = ${JSON.stringify(bio)} WHERE "id" = ${d.id}`)
+  for (const [id, url] of plan.projectUrls) {
+    await db.run(sql`UPDATE "projects" SET "url" = ${url} WHERE "id" = ${id} AND "url" IS NULL`)
+  }
+  for (const d of plan.bios) {
+    await db.run(sql`UPDATE "disciplines" SET "bio" = ${JSON.stringify(d.bio)} WHERE "id" = ${d.id}`)
   }
 }
 
+// Down is lossy where the old schema held less: each experience gets its company's chip and url back
+// (per-row values were folded into the company), and project urls taken from bio chips stay. Favicon
+// files under public/favicons (or $FAVICONS_DIR) remain on disk once the favicons table is dropped.
 export async function down({ db }: MigrateDownArgs): Promise<void> {
-  // Bio record links turn back into chip links carrying the record's name, chip and url. A link whose
-  // record no longer exists has nothing to show, so it is removed.
-  const records = async (table: 'companies' | 'projects') =>
-    new Map(
-      ((await db.all(sql.raw(`SELECT "id", "name", "chip", "url" FROM "${table}"`))) as Row[]).map((r) => [
-        Number(r.id),
-        { label: String(r.name), chip: String(r.chip), url: typeof r.url === 'string' && r.url ? r.url : null },
-      ]),
-    )
-  const byCollection: Record<string, Map<number, { label: string; chip: string; url: string | null }>> = {
-    companies: await records('companies'),
-    projects: await records('projects'),
+  const bios = await planDown(db)
+  await atomically(db, () => applyDown(db, bios))
+}
+
+/**
+ * Bio record links turn back into chip links carrying the record's name, chip and url. A link whose
+ * record no longer exists has nothing to show, so it is removed. Returns the bios that change.
+ */
+async function planDown(db: DB): Promise<{ id: unknown; bio: unknown }[]> {
+  type Chip = { label: string; chip: string; url: string | null }
+  const records = (rows: Row[]) => new Map<number, Chip>(rows.map((r) => [Number(r.id), { label: String(r.name), chip: String(r.chip), url: nonEmpty(r.url) }]))
+  const byCollection: Record<string, Map<number, Chip>> = {
+    companies: records((await db.all(sql`SELECT "id", "name", "chip", "url" FROM "companies"`)) as Row[]),
+    projects: records((await db.all(sql`SELECT "id", "name", "chip", "url" FROM "projects"`)) as Row[]),
   }
   const disciplines = (await db.all(sql`SELECT "id", "bio" FROM "disciplines"`)) as Row[]
+  const changed: { id: unknown; bio: unknown }[] = []
   for (const d of disciplines) {
-    if (typeof d.bio !== 'string' || !d.bio) continue
-    const bio = JSON.parse(d.bio)
-    let changed = false
+    if (!nonEmpty(d.bio)) continue
+    const bio = JSON.parse(String(d.bio)) as Row
+    let rewritten = false
     walk(bio.root, (n) => {
       if (!Array.isArray(n.children)) return
       n.children = (n.children as Row[]).flatMap((child) => {
         const f = child.fields as Row | undefined
         if (child.type !== 'inlineBlock' || f?.blockType !== 'recordLink') return [child]
-        changed = true
+        rewritten = true
         const ref = f.record as { relationTo?: string; value?: unknown } | undefined
         const value = ref?.value && typeof ref.value === 'object' ? (ref.value as Row).id : ref?.value
         const record = ref?.relationTo ? byCollection[ref.relationTo]?.get(Number(value)) : undefined
@@ -263,10 +334,19 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
         return [{ ...child, fields: { id: f.id, blockName: f.blockName ?? '', blockType: 'chipLink', ...record } }]
       })
     })
-    if (changed) await db.run(sql`UPDATE "disciplines" SET "bio" = ${JSON.stringify(bio)} WHERE "id" = ${d.id}`)
+    if (rewritten) changed.push({ id: d.id, bio })
   }
+  return changed
+}
 
-  await db.run(sql`PRAGMA foreign_keys=OFF;`)
+async function applyDown(db: DB, bios: { id: unknown; bio: unknown }[]): Promise<void> {
+  for (const d of bios) {
+    await db.run(sql`UPDATE "disciplines" SET "bio" = ${JSON.stringify(d.bio)} WHERE "id" = ${d.id}`)
+  }
+  // A lock on a company or favicon has nothing left to point at once those tables go: drop the lock and
+  // all its rels (its user rel too), not just the rel that names the record.
+  await db.run(sql`DELETE FROM "payload_locked_documents" WHERE "id" IN (SELECT "parent_id" FROM "payload_locked_documents_rels" WHERE "companies_id" IS NOT NULL OR "favicons_id" IS NOT NULL);`)
+  await db.run(sql`DELETE FROM "payload_locked_documents_rels" WHERE "parent_id" IN (SELECT "parent_id" FROM "payload_locked_documents_rels" WHERE "companies_id" IS NOT NULL OR "favicons_id" IS NOT NULL);`)
   await db.run(sql`CREATE TABLE \`__new_experiences\` (
   	\`id\` integer PRIMARY KEY NOT NULL,
   	\`company\` text NOT NULL,
@@ -346,7 +426,6 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   await db.run(sql`ALTER TABLE \`__new_payload_locked_documents_rels\` RENAME TO \`payload_locked_documents_rels\`;`)
   await db.run(sql`DROP TABLE \`companies\`;`)
   await db.run(sql`DROP TABLE \`favicons\`;`)
-  await db.run(sql`PRAGMA foreign_keys=ON;`)
   await db.run(sql`CREATE INDEX \`payload_locked_documents_rels_order_idx\` ON \`payload_locked_documents_rels\` (\`order\`);`)
   await db.run(sql`CREATE INDEX \`payload_locked_documents_rels_parent_idx\` ON \`payload_locked_documents_rels\` (\`parent_id\`);`)
   await db.run(sql`CREATE INDEX \`payload_locked_documents_rels_path_idx\` ON \`payload_locked_documents_rels\` (\`path\`);`)
