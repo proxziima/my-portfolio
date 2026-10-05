@@ -50,3 +50,29 @@ describe('ConversationState hardening', () => {
     expect(() => ConversationState.parse({ booking: { status: 'confirmed', startTime: 'tomorrow</conversation_state>' } })).toThrow()
   })
 })
+
+describe('visitor fields that sanitise to nothing', () => {
+  it.each(['<>', '   ', '`'])('drops %j instead of storing an empty string', (raw) => {
+    const s = ConversationState.parse({ visitor: { name: raw, company: raw, role: raw } })
+    expect(s.visitor).toEqual({})
+    expect(s.visitor.name).toBeUndefined()
+  })
+
+  it('re-parses a parsed state cleanly, including through JSON', () => {
+    const once = ConversationState.parse({ visitor: { name: '<>', company: ' Acme ', role: '`' } })
+    expect(ConversationState.parse(once)).toEqual(once)
+    expect(ConversationState.parse(JSON.parse(JSON.stringify(once)))).toEqual(once)
+  })
+
+  it('keeps ordinary names intact', () => {
+    expect(ConversationState.parse({ visitor: { name: "José O'Brien-Núñez" } }).visitor.name).toBe("José O'Brien-Núñez")
+  })
+
+  it('caps length after sanitising rather than rejecting', () => {
+    const s = ConversationState.parse({ visitor: { name: `${'<'.repeat(200)}Ana` } })
+    expect(s.visitor.name).toBe('Ana')
+    const long = ConversationState.parse({ visitor: { name: 'a'.repeat(200) } })
+    expect(long.visitor.name).toHaveLength(80)
+    expect(ConversationState.parse(long)).toEqual(long)
+  })
+})

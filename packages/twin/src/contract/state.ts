@@ -18,18 +18,23 @@ export type BookingStatus = z.infer<typeof BookingStatus>
 /**
  * Visitor-volunteered text ends up in system-role prompt text (the state digest), so it is
  * flattened to one line with no tag or code delimiters: it can never close or forge a block.
+ * Sanitising runs before any check, so the length cap applies to what is stored, and a value that
+ * sanitises to nothing is dropped (the fields are optional) rather than stored empty, which would
+ * fail every later parse of the record. The output is a fixed point, so re-parsing is idempotent.
  */
 const visitorText = (max: number) =>
   z
     .string()
-    .min(1)
-    .max(max)
-    .transform((v) => v.replace(/[<>`]/g, '').replace(/\s+/g, ' ').trim())
+    .transform((v) => {
+      const clean = v.replace(/[<>`]/g, '').replace(/\s+/g, ' ').trim().slice(0, max).trim()
+      return clean ? clean : undefined
+    })
+    .optional()
 
 const Visitor = z.object({
-  name: visitorText(80).optional(),
-  company: visitorText(120).optional(),
-  role: visitorText(120).optional(),
+  name: visitorText(80),
+  company: visitorText(120),
+  role: visitorText(120),
   kind: VisitorKind.optional(),
   technical: z.boolean().optional(),
 })
