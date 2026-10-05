@@ -1,0 +1,126 @@
+import { describe, expect, it } from 'vitest'
+import { LEAK_DEFLECTION } from '@repo/twin/contract'
+import { createEventFilter, filterStream, ndjsonLines } from '@/lib/twin/filter'
+
+const rules = { terms: ['Acme Secret'], allow: [] }
+const canary = 'canary-0123456789abcdef'
+const ev = (type: string, data: Record<string, unknown>) => ({ type, data, meta: { id: `evt_${type}`, at: 't' } })
+const step = { turnId: 't', stepIndex: 0, sequence: 1 }
+
+const streamOf = (chunks: string[]) =>
+  new ReadableStream<Uint8Array>({
+    start(c) {
+      for (const x of chunks) c.enqueue(new TextEncoder().encode(x))
+      c.close()
+    },
+  })
+
+describe('createEventFilter', () => {
+  it('redacts deltas with holdback and puts the remainder in the completed event', () => {
+    const f = createEventFilter(rules, canary)
+    const a = f(ev('message.appended', { ...step, messageDelta: 'I worked at Acme ' }))
+    const b = f(ev('message.appended', { ...step, messageDelta: 'Secret for years.', sequence: 2 }))
+    const c = f(ev('message.completed', { ...step, message: 'I worked at Acme Secret for years.', finishReason: 'stop', sequence: 3 }))
+    const streamed = String(a.data.messageDelta) + String(b.data.messageDelta)
+    expect(streamed).not.toContain('Acme Secret')
+    expect(c.data.message).toBe('I worked at [redacted] for years.')
+  })
+
+  it('emits redacted text once it is past the holdback', () => {
+    const f = createEventFilter(rules, canary)
+    const long = `${'word '.repeat(30)}Acme Secret ${'tail '.repeat(30)}`
+    const out = String(f(ev('message.appended', { ...step, messageDelta: long })).data.messageDelta)
+    expect(out.length).toBeGreaterThan(0)
+    expect(out).not.toContain('Acme Secret')
+  })
+
+  it('replaces a reply containing the canary with the deflection', () => {
+    const f = createEventFilter(rules, canary)
+    const a = f(ev('message.appended', { ...step, messageDelta: `marker ${canary}` }))
+    const c = f(ev('message.completed', { ...step, message: `marker ${canary}`, finishReason: 'stop', sequence: 2 }))
+    expect(String(a.data.messageDelta)).not.toContain(canary)
+    expect(c.data.message).toBe(LEAK_DEFLECTION)
+  })
+
+  it('blanks reasoning text', () => {
+    const f = createEventFilter(rules, canary)
+    expect(f(ev('reasoning.appended', { ...step, reasoningDelta: 'secret plan' })).data).toEqual({ ...step, reasoningDelta: '' })
+    expect(f(ev('reasoning.completed', { ...step, reasoning: 'secret plan' })).data).toEqual({ ...step, reasoning: '' })
+  })
+
+  it('blanks streamed tool input unless the tool is schedule_call', () => {
+    const f = createEventFilter(rules, canary)
+    const hidden = f(ev('action.input.appended', { ...step, callId: 'c1', toolName: 'search_portfolio', inputTextDelta: '{"q":"x' }))
+    expect(hidden.data).toEqual({ ...step, callId: 'c1', toolName: 'search_portfolio', inputTextDelta: '' })
+    const shown = f(ev('action.input.appended', { ...step, callId: 'c2', toolName: 'schedule_call', inputTextDelta: '{"slot' }))
+    expect(shown.data.inputTextDelta).toBe('{"slot')
+  })
+
+  it('blanks requested action input unless the action is schedule_call', () => {
+    const f = createEventFilter(rules, canary)
+    const r = f(
+      ev('actions.requested', {
+        ...step,
+        actions: [
+          { kind: 'tool-call', callId: 'c1', toolName: 'search_portfolio', input: { q: 'x' } },
+          { kind: 'tool-call', callId: 'c2', toolName: 'schedule_call', input: { slot: 's' } },
+          { kind: 'load-skill', callId: 'c3', input: { name: 'k' } },
+        ],
+      }),
+    )
+    expect(r.data.actions).toEqual([
+      { kind: 'tool-call', callId: 'c1', toolName: 'search_portfolio', input: null },
+      { kind: 'tool-call', callId: 'c2', toolName: 'schedule_call', input: { slot: 's' } },
+      { kind: 'load-skill', callId: 'c3', input: null },
+    ])
+  })
+
+  it('blanks tool results and partials unless the tool is schedule_call, keeping every event', () => {
+    const f = createEventFilter(rules, canary)
+    const r = f(ev('action.result', { ...step, status: 'completed', result: { kind: 'tool-result', toolName: 'search_portfolio', callId: 'c', output: { items: [1] } } }))
+    expect(r.type).toBe('action.result')
+    expect(r.data.result).toEqual({ kind: 'tool-result', toolName: 'search_portfolio', callId: 'c', output: null })
+    const failed = f(ev('action.result', { ...step, status: 'failed', error: { code: 'X', message: 'db at 10.0.0.1 down' }, result: { kind: 'tool-result', toolName: 'search_portfolio', callId: 'c', output: 'boom' } }))
+    expect(failed.data.error).toEqual({ code: 'X', message: '' })
+    const p = f(ev('action.partial', { ...step, result: { kind: 'tool-result', toolName: 'search_portfolio', callId: 'c', output: { n: 1 } } }))
+    expect((p.data.result as { output: unknown }).output).toBeNull()
+    const w = f(ev('action.result', { ...step, status: 'completed', result: { kind: 'tool-result', toolName: 'schedule_call', callId: 'c', output: { status: 'rendered' } } }))
+    expect((w.data.result as { output: unknown }).output).toEqual({ status: 'rendered' })
+  })
+
+  it('blanks input-request actions and settled task output unless they belong to schedule_call', () => {
+    const f = createEventFilter(rules, canary)
+    const q = f(ev('input.requested', { ...step, requests: [{ requestId: 'r', kind: 'tool-approval', prompt: 'ok?', action: { kind: 'tool-call', callId: 'c', toolName: 'notify_owner', input: { text: 'x' } } }] }))
+    expect((q.data.requests as { action: { input: unknown } }[])[0]?.action.input).toBeNull()
+    const s = f(ev('task.settled', { turnId: 't', callId: 'c', taskId: 'k', name: 'search_portfolio', status: 'completed', output: { a: 1 } }))
+    expect(s.data.output).toBeNull()
+    const keep = f(ev('task.settled', { turnId: 't', callId: 'c', taskId: 'k', name: 'schedule_call', status: 'completed', output: { a: 1 } }))
+    expect(keep.data.output).toEqual({ a: 1 })
+  })
+
+  it('passes other events through untouched', () => {
+    const f = createEventFilter(rules, canary)
+    const e = ev('turn.completed', { turnId: 't', sequence: 9 })
+    expect(f(e)).toBe(e)
+  })
+})
+
+describe('ndjsonLines', () => {
+  it('splits across chunk boundaries and passes blank and control lines through', async () => {
+    const chunks = ['{"type":"a","data":{},"meta":{"id":"1"}}\n{"ty', 'pe":"b","data":{},"meta":{"id":"2"}}\n\n{"$eve":"stream.lease-ended","version":1}\n']
+    const out: string[] = []
+    for await (const line of ndjsonLines(streamOf(chunks))) out.push(line)
+    expect(out).toEqual(['{"type":"a","data":{},"meta":{"id":"1"}}', '{"type":"b","data":{},"meta":{"id":"2"}}', '', '{"$eve":"stream.lease-ended","version":1}'])
+  })
+})
+
+describe('filterStream', () => {
+  it('rewrites events line by line and keeps blank and control lines in order', async () => {
+    const body = streamOf([
+      `${JSON.stringify(ev('reasoning.appended', { ...step, reasoningDelta: 'hm' }))}\n\n`,
+      '{"$eve":"stream.lease-ended","version":1}\n',
+    ])
+    const text = await new Response(filterStream(body, createEventFilter(rules, canary))).text()
+    expect(text).toBe(`${JSON.stringify(ev('reasoning.appended', { ...step, reasoningDelta: '' }))}\n\n{"$eve":"stream.lease-ended","version":1}\n`)
+  })
+})
