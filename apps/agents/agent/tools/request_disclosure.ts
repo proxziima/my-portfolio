@@ -18,6 +18,10 @@ import { untrustedKey } from '../lib/untrusted'
  * Durable, asynchronous owner approval for restricted items (spec §8). A `task`, so the
  * conversation continues; a webhook race against `sleep` is eve's documented deadline pattern.
  * Static, as workflow tools can't be dynamic; the portfolio-recall skill (always active) owns it.
+ *
+ * Every failure degrades to "not available", never to an error the model could relay: a failed
+ * notification expires the approval, a failed release reads as denied. Whatever wakes the body,
+ * `finalizeApproval` trusts only the decision recorded in the database.
  */
 export default defineWorkflowTool({
   description:
@@ -29,14 +33,29 @@ export default defineWorkflowTool({
   ]),
   async task(input, ctx): Promise<DisclosureOutcome> {
     'use workflow'
-    const approvalId = await openApproval(ctx.session.id, input)
     const decision = createWebhook()
-    await notifyOwner(approvalId, decision.url, input)
-    const timeout = await approvalTimeout()
-    const arrived = await Promise.race([decision, sleep(timeout)])
-    const status = await finalizeApproval(ctx.session.id, approvalId, arrived === undefined)
+    const opened = await openApproval(ctx.session.id, ctx.callId, decision.url, input)
+    if (opened.kind === 'capped') return { status: 'denied' }
+    let status: DisclosureOutcome['status']
+    if (opened.kind === 'alreadyDecided') {
+      status = opened.status
+    } else {
+      try {
+        await notifyOwner(opened.approvalId, input)
+      } catch {
+        await finalizeApproval(ctx.session.id, opened.approvalId)
+        return { status: 'expired' }
+      }
+      const timeout = await approvalTimeout()
+      await Promise.race([decision, sleep(timeout)])
+      status = await finalizeApproval(ctx.session.id, opened.approvalId)
+    }
     if (status !== 'approved') return { status }
-    return { status, item: await discloseItem(input.sourceId) }
+    try {
+      return { status, item: await discloseItem(input.sourceId) }
+    } catch {
+      return { status: 'denied' }
+    }
   },
   toModelOutput: (o) => ({ type: 'text', value: disclosureForModel(o, untrustedKey()) }),
 })

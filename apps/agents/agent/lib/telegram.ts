@@ -1,3 +1,4 @@
+import { FatalError } from 'workflow'
 import { z } from 'zod'
 import { getEnv } from './env'
 
@@ -50,23 +51,55 @@ export function parseCallback(u: TelegramUpdate): {
   }
 }
 
-/** Calls one Bot API method and validates `ok`. */
+const BOT_TIMEOUT_MS = 10_000
+
+const BotReply = z.object({
+  ok: z.boolean(),
+  result: z.unknown().optional(),
+  description: z.string().optional(),
+})
+
+/** The reply body as JSON, or null when it is not (a proxy's HTML error page, a cut-off body). */
+function parseReply(text: string): z.infer<typeof BotReply> | null {
+  try {
+    const parsed = BotReply.safeParse(JSON.parse(text))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Calls one Bot API method and validates `ok`. 400 and 403 are permanent (bad request, owner never
+ * started or blocked the bot), so they throw `FatalError` and the calling step doesn't retry;
+ * 429, 5xx and network failures stay retryable. The URL carries the token, so no error mentions
+ * it: messages are built from the method, the status and Telegram's description only.
+ */
 async function bot<T>(
   method: string,
   body: Record<string, unknown>,
   result: z.ZodType<T>,
 ): Promise<T> {
   const env = getEnv()
-  const res = await fetch(`${env.TELEGRAM_API_BASE}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const json = z
-    .object({ ok: z.boolean(), result: z.unknown().optional(), description: z.string().optional() })
-    .parse(await res.json())
-  if (!json.ok) throw new Error(`Telegram ${method} failed: ${json.description ?? res.status}`)
-  return result.parse(json.result)
+  const redact = (s: string) =>
+    s.replaceAll(env.TELEGRAM_API_BASE, '<api>').replaceAll(env.TELEGRAM_BOT_TOKEN, '<token>')
+  let res: Response
+  try {
+    res = await fetch(`${env.TELEGRAM_API_BASE}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(BOT_TIMEOUT_MS),
+    })
+  } catch (e) {
+    const kind = e instanceof Error && e.name === 'TimeoutError' ? 'timed out' : 'request failed'
+    throw new Error(`Telegram ${method} ${kind}`)
+  }
+  const reply = parseReply(await res.text())
+  if (res.ok && reply?.ok) return result.parse(reply.result)
+  const message = redact(`Telegram ${method} failed: HTTP ${res.status}${reply?.description ? ` ${reply.description}` : ''}`)
+  if (res.status === 400 || res.status === 403) throw new FatalError(message)
+  throw new Error(message)
 }
 
 /** Sends the approval request to the owner; returns the message id to edit later. */
