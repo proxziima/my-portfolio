@@ -38,7 +38,7 @@ const agents = {
 describe('env', () => {
   it('parses a complete agents env and applies defaults', () => {
     const env = parseEnv(agentsEnvSchema, agents)
-    expect(env.TWIN_MODEL_FALLBACKS).toEqual(['deepseek/deepseek-v4.1-flash'])
+    expect(env.TWIN_MODEL_FALLBACKS).toEqual(['anthropic/claude-haiku-4.5'])
     expect(env.TWIN_APPROVAL_TIMEOUT).toBe('15m')
     expect(requireIntegration(env, 'google').GOOGLE_SERVICE_ACCOUNT_JSON.client_email).toBe('twin@p.iam.gserviceaccount.com')
     expect(env.TWIN_ABUSE_TIMEOUT_MS).toBe(2_500)
@@ -52,19 +52,19 @@ describe('env', () => {
   })
 
   it('treats empty strings as unset so defaults apply', () => {
-    expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL: '' }).TWIN_MODEL).toBe('anthropic/claude-sonnet-5.5')
+    expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL: '' }).TWIN_MODEL).toBe('deepseek/deepseek-v4.1-flash')
   })
 
   it('treats whitespace-only values as unset too', () => {
     const env = parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL_FALLBACKS: '  ', TWIN_MODEL_CONTEXT_TOKENS: ' ' })
-    expect(env.TWIN_MODEL_FALLBACKS).toEqual(['deepseek/deepseek-v4.1-flash'])
+    expect(env.TWIN_MODEL_FALLBACKS).toEqual(['anthropic/claude-haiku-4.5'])
     expect(env.TWIN_MODEL_CONTEXT_TOKENS).toBe(1_000_000)
   })
 
   it('defaults the light and deep tiers and lets each be overridden', () => {
     const env = parseEnv(agentsEnvSchema, agents)
-    expect(env.TWIN_MODEL_LIGHT).toBe('anthropic/claude-haiku-4.5')
-    expect(env.TWIN_MODEL_LIGHT_CONTEXT_TOKENS).toBe(200_000)
+    expect(env.TWIN_MODEL_LIGHT).toBe('deepseek/deepseek-v4.1-flash')
+    expect(env.TWIN_MODEL_LIGHT_CONTEXT_TOKENS).toBe(1_000_000)
     expect(env.TWIN_MODEL_DEEP).toBe('anthropic/claude-opus-5.5')
     expect(env.TWIN_MODEL_DEEP_CONTEXT_TOKENS).toBe(1_000_000)
     const custom = parseEnv(agentsEnvSchema, {
@@ -79,7 +79,7 @@ describe('env', () => {
 
   it('treats blank tier variables as unset so the tier defaults apply', () => {
     const env = parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL_LIGHT: '', TWIN_MODEL_DEEP_CONTEXT_TOKENS: ' ' })
-    expect(env.TWIN_MODEL_LIGHT).toBe('anthropic/claude-haiku-4.5')
+    expect(env.TWIN_MODEL_LIGHT).toBe('deepseek/deepseek-v4.1-flash')
     expect(env.TWIN_MODEL_DEEP_CONTEXT_TOKENS).toBe(1_000_000)
   })
 

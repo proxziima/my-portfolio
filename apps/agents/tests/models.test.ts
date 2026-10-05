@@ -4,7 +4,7 @@ import { modelIds, tierModel, twinModel } from '../agent/lib/models'
 describe('modelIds', () => {
   it('uses the documented defaults when env is absent (build time)', () => {
     const { tiers, ...rest } = modelIds({})
-    expect(rest).toEqual({ primary: 'anthropic/claude-sonnet-5.5', chain: ['anthropic/claude-sonnet-5.5', 'deepseek/deepseek-v4.1-flash'], classifier: 'google/gemini-2.5-flash-lite', contextTokens: 1_000_000 })
+    expect(rest).toEqual({ primary: 'deepseek/deepseek-v4.1-flash', chain: ['deepseek/deepseek-v4.1-flash', 'anthropic/claude-haiku-4.5'], classifier: 'google/gemini-2.5-flash-lite', contextTokens: 1_000_000 })
     expect(tiers.standard).toMatchObject({ id: rest.primary, chain: rest.chain, contextTokens: rest.contextTokens })
   })
 
@@ -41,9 +41,9 @@ describe('modelIds', () => {
 describe('modelIds tiers', () => {
   it('resolves each tier to its default model, window and reasoning', () => {
     const { tiers } = modelIds({})
-    expect(tiers.light).toEqual({ id: 'anthropic/claude-haiku-4.5', chain: ['anthropic/claude-haiku-4.5', 'deepseek/deepseek-v4.1-flash'], contextTokens: 200_000, reasoning: 'low' })
-    expect(tiers.standard).toEqual({ id: 'anthropic/claude-sonnet-5.5', chain: ['anthropic/claude-sonnet-5.5', 'deepseek/deepseek-v4.1-flash'], contextTokens: 1_000_000, reasoning: 'low' })
-    expect(tiers.deep).toEqual({ id: 'anthropic/claude-opus-5.5', chain: ['anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5', 'deepseek/deepseek-v4.1-flash'], contextTokens: 1_000_000, reasoning: 'medium' })
+    expect(tiers.light).toEqual({ id: 'deepseek/deepseek-v4.1-flash', chain: ['deepseek/deepseek-v4.1-flash', 'anthropic/claude-haiku-4.5'], contextTokens: 1_000_000, reasoning: 'low' })
+    expect(tiers.standard).toEqual({ id: 'deepseek/deepseek-v4.1-flash', chain: ['deepseek/deepseek-v4.1-flash', 'anthropic/claude-haiku-4.5'], contextTokens: 1_000_000, reasoning: 'low' })
+    expect(tiers.deep).toEqual({ id: 'anthropic/claude-opus-5.5', chain: ['anthropic/claude-opus-5.5', 'deepseek/deepseek-v4.1-flash', 'anthropic/claude-haiku-4.5'], contextTokens: 1_000_000, reasoning: 'medium' })
   })
 
   it('makes deep fall back through standard, and light only through the shared tail', () => {

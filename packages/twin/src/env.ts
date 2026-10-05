@@ -35,14 +35,15 @@ const serviceAccount = z
  * env exists) and must resolve the same ids as the runtime schema.
  */
 export const MODEL_DEFAULTS = {
-  model: 'anthropic/claude-sonnet-5.5',
-  fallbacks: ['deepseek/deepseek-v4.1-flash'],
+  // Cost-driven (2026-10-05): input tokens dominate the bill, and DeepSeek is ~7x cheaper than Sonnet.
+  model: 'deepseek/deepseek-v4.1-flash',
+  fallbacks: ['anthropic/claude-haiku-4.5'],
   // Benchmarked 2026-10-05 on the gate's prompts: 12/12 correct, p90 under 0.9 s.
   classifier: 'google/gemini-2.5-flash-lite',
   classifierFallback: 'mistralai/ministral-8b-2512',
   contextTokens: 1_000_000,
-  light: 'anthropic/claude-haiku-4.5',
-  lightContextTokens: 200_000,
+  light: 'deepseek/deepseek-v4.1-flash',
+  lightContextTokens: 1_000_000,
   deep: 'anthropic/claude-opus-5.5',
   deepContextTokens: 1_000_000,
 } as const

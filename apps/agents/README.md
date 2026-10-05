@@ -253,11 +253,11 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `TWIN_DATABASE_URL` | A, W | required | Twin schema (state, approvals, ledger, limits) | Postgres; same DB for web and agents |
 | `WORKFLOW_POSTGRES_URL` | A | required | eve's durable Workflow world | Postgres (same DB is fine) |
 | `OPENROUTER_API_KEY` | A | required | Model and classifier calls | OpenRouter > Keys (set a credit limit) |
-| `TWIN_MODEL` | A | `anthropic/claude-sonnet-5.5` | Primary model | OpenRouter model id |
-| `TWIN_MODEL_FALLBACKS` | A | `deepseek/deepseek-v4.1-flash` | Comma list, OpenRouter `models` fallback chain | OpenRouter model ids |
+| `TWIN_MODEL` | A | `deepseek/deepseek-v4.1-flash` | Primary (standard tier) model | OpenRouter model id |
+| `TWIN_MODEL_FALLBACKS` | A | `anthropic/claude-haiku-4.5` | Comma list, OpenRouter `models` fallback chain | OpenRouter model ids |
 | `TWIN_MODEL_CONTEXT_TOKENS` | A | `1000000` | Context window of the standard tier (not in eve's catalog) | The primary model's context window |
-| `TWIN_MODEL_LIGHT` | A | `anthropic/claude-haiku-4.5` | Light tier: greetings, small talk, logistics, deflections | OpenRouter model id |
-| `TWIN_MODEL_LIGHT_CONTEXT_TOKENS` | A | `200000` | Context window of the light tier | The light model's context window |
+| `TWIN_MODEL_LIGHT` | A | `deepseek/deepseek-v4.1-flash` | Light tier: greetings, small talk, logistics, deflections | OpenRouter model id |
+| `TWIN_MODEL_LIGHT_CONTEXT_TOKENS` | A | `1000000` | Context window of the light tier | The light model's context window |
 | `TWIN_MODEL_DEEP` | A | `anthropic/claude-opus-5.5` | Deep tier: in-depth technical questions | OpenRouter model id |
 | `TWIN_MODEL_DEEP_CONTEXT_TOKENS` | A | `1000000` | Context window of the deep tier | The deep model's context window |
 | `TWIN_CLASSIFIER_MODEL` | A | `google/gemini-2.5-flash-lite` (falls back to `mistralai/ministral-8b-2512`) | Pre-turn gate (abuse, scope, depth) and intent label; pick a model that answers in well under the gate timeout | OpenRouter model id |
@@ -495,8 +495,8 @@ Each turn runs on the cheapest model that answers it well. The tier is chosen be
 
 | Tier | Default model | Window | Used for |
 | --- | --- | --- | --- |
-| `light` | `anthropic/claude-haiku-4.5` | 200k | Greetings, small talk, thanks, logistics, simple facts; every off-scope or abusive message; the closing turn of an ended conversation |
-| `standard` | `anthropic/claude-sonnet-5.5` (`TWIN_MODEL`) | 1M | Explaining the owner's work, projects, experience and opinions |
+| `light` | `deepseek/deepseek-v4.1-flash` | 1M | Greetings, small talk, thanks, logistics, simple facts; every off-scope or abusive message; the closing turn of an ended conversation |
+| `standard` | `deepseek/deepseek-v4.1-flash` (`TWIN_MODEL`) | 1M | Explaining the owner's work, projects, experience and opinions |
 | `deep` | `anthropic/claude-opus-5.5` | 1M | Architecture, system design, trade-offs, debugging reasoning, and short follow-ups inside such a thread |
 
 - **How the tier is chosen.** The abuse gate's single classifier call returns `{ verdict, depth }`. It sees the previous exchange (from `recentTurns`, 600 characters each) to judge depth only. The message and the exchange are fenced in `<message>` and `<previous>` tags, with angle brackets stripped from the visitor's text, and the system prompt calls their content data to classify, never instructions. The channel writes `modelTier` to the conversation state: `light` whenever the verdict is not `ok`, otherwise the classifier's `depth`. `agent.ts` sets `model` to `defineDynamic` with a `step.started` handler. It reads `modelTier` with `currentTier` and returns `tierSelection(tier)`: the OpenRouter model, its context window and its reasoning effort (`low`, `low`, `medium`). The channel stamps each write with when the message began classifying (`modelTierAt`) and, under the row lock, writes only if no later message has already written, so classifications that finish out of order can't leave the older tier. With `steer`, a message sent mid-turn rewrites the tier and the model follows from the next step on: the latest message wins, and a turn's steps are not guaranteed to share one model.
