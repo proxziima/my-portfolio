@@ -65,18 +65,26 @@ recorded here with its reason.
    6. The content decides what is stored, never the declared type. A third-party SVG (or anything
       a browser could read as markup) served from the CMS origin could run script if opened
       directly, so only two kinds of file are stored:
-      - an ICO (by its magic bytes), kept as it is: sharp cannot read it, and an ICO runs nothing;
+      - a well-formed ICO, kept as it is: its directory must list at least one image, each inside
+        the file and starting as a PNG or a BMP header. Sharp cannot read ICO, and an ICO runs
+        nothing;
       - a 64×64 PNG freshly encoded with sharp from any other image: PNG, JPEG, GIF (first frame),
         WebP, TIFF and AVIF are decoded, and SVG is drawn. Many sites only declare an SVG icon
         (autodoc.com.br does). No polyglot or mislabelled bytes survive the re-encode.
 
-      Anything else is refused, and so is gzip (sharp would inflate it as an SVG). Before sharp
-      parses an SVG, a cheap check on its markup refuses entity declarations, XInclude, more than
-      5000 elements, `<use>` nesting that could multiply into more than 100k elements, and inline
-      `data:` URLs other than small raster images; external references never load. Decoded
-      images are capped at 4096² pixels. Decoding or drawing gets 3 s (and never more than what
-      is left of the 15 s), after which the candidate counts as failed; libvips cannot be
-      cancelled, so the abandoned work finishes in the background, within those bounds.
+      Anything else is refused, and so is gzip (sharp would inflate it as an SVG).
+
+      The guarantee is isolation: sharp decodes and draws in a child process of the CMS. The CMS
+      kills it after 3 s (never later than what is left of the 15 s), and the child exits itself
+      above 256 MB of resident memory. Either way the candidate counts as failed, and libvips's
+      threads die with the process. Decoded images are capped at 4096² pixels.
+
+      A cheap pre-check on SVG markup runs first, so known-hostile shapes never cost a process. It
+      refuses DTD declarations and XInclude. URLs must point inside the document or at an inline
+      base64 PNG/JPEG/GIF/WebP: `href`/`src` are `#id` or such a `data:` URL, CSS `url()` is
+      `url(#id)`, and there is no `@import`. These are judged after XML and CSS decoding (escapes
+      and line continuations). It also refuses more than 5000 elements, or `#id` references (other
+      than to gradients) that could multiply into more than 100k drawn elements.
 
    `context.skipFavicon` turns the hook off (tests, migrations), and `context.refreshFavicon`
    forces a re-fetch.

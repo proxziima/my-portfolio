@@ -9,12 +9,19 @@ const solid = (background: string) => sharp({ create: { width: 16, height: 16, c
 const PNG = new Uint8Array(await solid('#f00').png().toBuffer())
 const PNG_BLUE = new Uint8Array(await solid('#00f').png().toBuffer())
 const JPEG = new Uint8Array(await solid('#f00').jpeg().toBuffer())
-const ICO = Uint8Array.from([0, 0, 1, 0, 1, 0, 16, 16])
+/** A one-image ICO: the ICONDIR header, one 16-byte entry, then the PNG it points at. */
+const ICO = new Uint8Array(
+  Buffer.concat([
+    Buffer.from([0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0, 32, 0]),
+    Buffer.from(Uint32Array.of(PNG.length, 22).buffer),
+    PNG,
+  ]),
+)
 const SVG_TEXT = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="blue"/></svg>'
 const SVG = new TextEncoder().encode(SVG_TEXT)
-/** Enough filtered shapes to take well over a few milliseconds to draw, within every structural limit. */
+/** Enough translucent shapes to take a few hundred milliseconds to draw, within every structural limit. */
 const SLOW_SVG = new TextEncoder().encode(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><filter id="b"><feGaussianBlur stdDeviation="3"/></filter>${'<rect width="16" height="16" fill="red" filter="url(#b)"/>'.repeat(1000)}</svg>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">${'<circle cx="8" cy="8" r="8" fill="red" opacity="0.5"/>'.repeat(4900)}</svg>`,
 )
 
 const html = (head: string) => new Response(`<html><head>${head}</head></html>`, { headers: { 'content-type': 'text/html; charset=utf-8' } })

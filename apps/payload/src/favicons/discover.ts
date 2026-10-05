@@ -5,16 +5,22 @@ export type { FoundFavicon }
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>
 
 /**
- * Time budgets in milliseconds: one per request, one for decoding or drawing each fetched image, and
- * one for the whole discovery.
+ * Budgets: time in milliseconds for each request, for decoding or drawing each fetched image (in
+ * its own process), and for the whole discovery; and that process's resident memory in MB.
  */
 export interface Limits {
   requestTimeoutMs: number
   renderTimeoutMs: number
+  renderMemoryMb: number
   totalTimeoutMs: number
 }
 
-export const DEFAULT_LIMITS: Limits = { requestTimeoutMs: 5000, renderTimeoutMs: 3000, totalTimeoutMs: 15_000 }
+export const DEFAULT_LIMITS: Limits = {
+  requestTimeoutMs: 5000,
+  renderTimeoutMs: 3000,
+  renderMemoryMb: 256,
+  totalTimeoutMs: 15_000,
+}
 
 const PAGE_LIMIT = 1_000_000
 const ICON_LIMIT = 512_000
@@ -96,10 +102,10 @@ export function iconLinks(html: string, base: string): string[] {
  * of at most 512 KB, which normalizeIcon accepts, wins: an ICO as it is, any other image as a 64×64
  * PNG re-encoded from its pixels. The content decides; the declared type only filters out pages.
  *
- * Bounds, by default (see `limits`): each request 5 s; decoding or drawing each image 3 s; the
- * whole search 15 s, which also cuts short a request or a drawing in progress. The page is read up
- * to 1 MB, each icon up to 512 KB. Returns null for non-http(s) URLs or when nothing qualifies;
- * never throws.
+ * Bounds, by default (see `limits`): each request 5 s; decoding or drawing each image 3 s and 256 MB,
+ * in a child process that is killed at either; the whole search 15 s, which also cuts short a
+ * request or a drawing in progress. The page is read up to 1 MB, each icon up to 512 KB. Returns
+ * null for non-http(s) URLs or when nothing qualifies; never throws.
  */
 export async function discoverFavicon(
   url: string,
@@ -150,9 +156,9 @@ export async function discoverFavicon(
       }
       const data = await readCapped(res, ICON_LIMIT)
       if (!data || data.length === 0) continue
-      const budget = Math.min(limits.renderTimeoutMs, endsAt - Date.now())
-      if (budget <= 0) break
-      const icon = await normalizeIcon(data, budget)
+      const timeoutMs = Math.min(limits.renderTimeoutMs, endsAt - Date.now())
+      if (timeoutMs <= 0) break
+      const icon = await normalizeIcon(data, { timeoutMs, memoryMb: limits.renderMemoryMb })
       if (icon) return icon
     } catch {
       // Try the next candidate.
