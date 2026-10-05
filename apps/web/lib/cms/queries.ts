@@ -6,7 +6,7 @@ import { toMessenger, toPortfolio } from './mappers'
 import type { Messenger, Portfolio } from './types'
 
 interface List<T> { docs: T[] }
-const cmsList = <T>(slug: string, sort = 'order') => cmsGet<List<T>>(`/api/${slug}?sort=${sort}&limit=100&depth=1`).then((r) => r.docs)
+const cmsList = <T>(slug: string, sort: 'order' | 'name' = 'order') => cmsGet<List<T>>(`/api/${slug}?sort=${sort}&limit=100&depth=1`).then((r) => r.docs)
 const cmsGlobal = <T>(slug: string) => cmsGet<T>(`/api/globals/${slug}?depth=1`)
 
 export const getPortfolio = cache(async (): Promise<Portfolio> => {

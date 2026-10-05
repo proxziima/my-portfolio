@@ -13,7 +13,7 @@ export interface RichTextValue { root: { children: LexicalNode[] } }
 const IS_BOLD = 1
 const str = (value: unknown) => (typeof value === 'string' ? value : '')
 
-function inlineBlock(fields: Record<string, unknown> = {}, records: Records): string {
+function inlineBlock(records: Records, fields: Record<string, unknown> = {}): string {
   switch (fields.blockType) {
     case 'chipLink':
       return chipLinkHtml({ label: str(fields.label), chip: str(fields.chip), href: str(fields.url) || null })
@@ -39,12 +39,12 @@ function node(n: LexicalNode, records: Records): string {
     case 'linebreak':
       return ' '
     case 'inlineBlock':
-      return inlineBlock(n.fields, records)
+      return inlineBlock(records, n.fields)
     default:
       return (n.children ?? []).map((c) => node(c, records)).join('')
   }
 }
 
-export function bioParagraphs(value: RichTextValue | null | undefined, records: Records = new Map()): string[] {
+export function bioParagraphs(value: RichTextValue | null | undefined, records: Records): string[] {
   return (value?.root.children ?? []).map((p) => (p.children ?? []).map((c) => node(c, records)).join('').trim()).filter(Boolean)
 }

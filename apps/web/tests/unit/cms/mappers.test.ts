@@ -7,7 +7,7 @@ const discipline = { id: 1, slug: 'se', title: 'Software engineer', order: 1, le
 
 describe('mappers', () => {
   it('maps a discipline and drops null formulas', () => {
-    expect(toDiscipline(discipline)).toEqual({ slug: 'se', title: 'Software engineer', level: 'LV 9', caption: 'Fig. 1', bio: [], notes: [{ side: 'left', text: 'x' }] })
+    expect(toDiscipline(discipline, new Map())).toEqual({ slug: 'se', title: 'Software engineer', level: 'LV 9', caption: 'Fig. 1', bio: [], notes: [{ side: 'left', text: 'x' }] })
   })
 })
 

@@ -32,7 +32,7 @@ export const toRecords = (companies: Company[], projects: Project[], base: strin
     ...projects.map((p) => [`projects:${p.id}`, toBrand(p, base)] as const),
   ])
 
-export const toDiscipline = (d: CmsDiscipline, records: Records = new Map()): Discipline => ({
+export const toDiscipline = (d: CmsDiscipline, records: Records): Discipline => ({
   slug: d.slug,
   title: d.title,
   level: d.level,
