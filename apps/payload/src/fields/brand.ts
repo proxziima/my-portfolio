@@ -14,6 +14,8 @@ export const brandFields = (): Field[] => [
     name: 'favicon',
     type: 'upload',
     relationTo: 'favicons',
+    // Written only by the favicon hooks (Local API, which skips field access); API clients cannot set it.
+    access: { create: () => false, update: () => false },
     admin: {
       readOnly: true,
       position: 'sidebar',

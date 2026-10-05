@@ -35,8 +35,13 @@ recorded here with its reason.
      filled by a hook from `url`.
    - `chip`: stays required, because it is the guaranteed fallback.
 6. **Favicons are fetched on save and self-hosted.** They are not hotlinked or fetched at render
-   time. A `beforeChange` hook resolves the site's icon when `url` changes or no favicon is stored
-   yet, then saves the bytes into the hidden `favicons` upload collection. Reasons:
+   time. An `afterChange` hook resolves the site's icon when `url` changes or no favicon is stored
+   yet, then saves the bytes into the hidden `favicons` upload collection and writes the favicon's
+   id back onto the record. The hook runs *after* the record has been validated and written: a
+   `beforeChange` hook runs before field validation, so a save that then failed validation would
+   leave orphaned icons, or an icon replaced for a URL that was never saved. Field-level access
+   (`create`/`update: () => false`) keeps API clients from setting `favicon` themselves; the hook
+   writes it through the Local API. Reasons for self-hosting:
    - Visitors' browsers never call third-party hosts.
    - A site that later moves its icon can't break the page.
    - The web app just renders an uploaded image URL, the same path as the logo.
@@ -51,7 +56,10 @@ recorded here with its reason.
    3. Fall back to `<origin>/favicon.ico`.
    4. Take the first candidate that returns `200` with an `image/*` content type and a non-empty
       body under 512 KB. Store it with that MIME type and a filename derived from the owner.
-   5. On any failure, store no favicon and log a warning. A failed fetch never blocks a save.
+   5. On any failure (fetch or store), log a warning and never fail the save. If the URL changed,
+      the old favicon is removed. If an unchanged URL is being refreshed, the old favicon is kept.
+   6. Only raster icons (ICO, PNG, JPEG, GIF, WebP, AVIF) are accepted. SVG is excluded because a
+      third-party SVG served from the CMS origin could run script if opened directly.
 
    `context.skipFavicon` turns the hook off (tests, migrations), and `context.refreshFavicon`
    forces a re-fetch.
@@ -119,7 +127,7 @@ recorded here with its reason.
 | `stricterTier` | `apps/payload/src/fields/disclosure.ts` | Combines two tiers |
 | `brandFields()` | `apps/payload/src/fields/brand.ts` | chip, url, logo, favicon fields |
 | `discoverFavicon(url, fetchImpl?)` | `apps/payload/src/favicons/discover.ts` | Pure network lookup → `{ data, mimetype, filename } \| null` |
-| `faviconHooks` | `apps/payload/src/favicons/hooks.ts` | beforeChange/afterDelete keeping the favicon doc in step with `url` |
+| `faviconHooks` | `apps/payload/src/favicons/hooks.ts` | afterChange/afterDelete keeping the favicon doc in step with `url` |
 | `Favicons` | `apps/payload/src/collections/Favicons.ts` | Hidden upload collection (`FAVICONS_DIR` / `public/favicons`), public read, `focalPoint:false`, `crop:false` |
 | `Companies` | `apps/payload/src/collections/Companies.ts` | The new collection |
 | `RecordLinkBlock` | `apps/payload/src/blocks/record-link.ts` | Polymorphic bio link |
