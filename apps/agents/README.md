@@ -23,7 +23,7 @@ A first-person "twin" of the portfolio owner that answers recruiters and clients
 What has been checked:
 
 - **Unit tests pass locally:** `apps/agents` has 33 files and 197 tests, `packages/twin` has 11 files and 77 tests, and `apps/web` has 65 files and 416 tests, at the commit that last updated these counts.
-- **The offline evals pass against local Postgres (`twin_eval`):** 4 evals and 18 gates, with the scripted model and local stubs, at the same commit.
+- **The offline evals pass against local Postgres (`twin_eval`):** 5 evals and 20 gates, with the scripted model and local stubs, at the same commit.
 - **The approval timeout has no offline eval.** It is proven by `tests/request-disclosure-body.test.ts` (the real workflow body, `workflow` mocked) plus the step tests in `tests/approval-steps.test.ts`; `eve build` proves the body compiles. See [Where the code differs from the spec](#where-the-code-differs-from-the-spec).
 - **CI has the jobs listed under [Testing](#testing).** No CI run result has been reviewed for this README.
 
@@ -666,12 +666,12 @@ Put the key in `PAYLOAD_MCP_API_KEY`.
 
 **Offline evals** (`fixtures/offline/`). This is a separate eve app:
 
-- **The model** is a scripted `mockModel` with keyword-driven paths: `BOOK`, `PUSH`, `NO`, `FACT`.
+- **The model** is a scripted `mockModel` with keyword-driven paths (`BOOK`, `PUSH`, `NO`, `FACT`), one per routing tier, picked per step by the real `currentTier` through `defineDynamic`.
 - **The channels and tools** re-export the real ones from `agent/`.
 - **Stubs** for Payload MCP (`:4310`) and Telegram (`:4312`) start in the eval setup.
 - **The database** is the real Postgres world on `twin_eval`.
 
-The evals cover widget guards, decline, portfolio search and the Cal.com booking webhook. **`request_disclosure` is not in the fixture**, because eve compiles workflow directives only under the app root. Its body is proven by `tests/request-disclosure-body.test.ts` instead, which runs it uncompiled with `workflow` mocked: approved, denied, deadline to expired, notification failure, failed release and an item the session was never offered.
+The evals cover widget guards, decline, portfolio search, the Cal.com booking webhook and the dynamic model resolver (the fixture's gate times out by design, so every step must start on the standard mock). **`request_disclosure` is not in the fixture**, because eve compiles workflow directives only under the app root. Its body is proven by `tests/request-disclosure-body.test.ts` instead, which runs it uncompiled with `workflow` mocked: approved, denied, deadline to expired, notification failure, failed release and an item the session was never offered.
 
 ```bash
 export TWIN_DATABASE_URL=postgres://twin:twin@127.0.0.1:5433/twin_eval WORKFLOW_POSTGRES_URL=postgres://twin:twin@127.0.0.1:5433/twin_eval
