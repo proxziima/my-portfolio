@@ -58,17 +58,19 @@ const route = (channel as unknown as { routes: { path: string; handler: Handler 
   (r) => r.path === '/webhooks/cal',
 )!.handler
 
-const body = JSON.stringify({
-  triggerEvent: 'BOOKING_CREATED',
-  payload: {
-    uid: 'bk_1',
-    startTime: '2026-10-08T14:00:00Z',
-    endTime: '2026-10-08T14:30:00Z',
-    metadata: { bookingRef: 'abc.def' },
-  },
-})
+function calBody(
+  triggerEvent = 'BOOKING_CREATED',
+  uid = 'bk_1',
+  startTime = '2026-10-08T14:00:00Z',
+  endTime = '2026-10-08T14:30:00Z',
+): string {
+  return JSON.stringify({
+    triggerEvent,
+    payload: { uid, startTime, endTime, metadata: { bookingRef: 'abc.def' } },
+  })
+}
 
-async function deliver(): Promise<Response> {
+async function deliver(body = calBody()): Promise<Response> {
   const req = new Request('http://x/webhooks/cal', {
     method: 'POST',
     body,
@@ -133,5 +135,42 @@ describe('cal webhook handler redelivery', () => {
     await deliver()
     expect(mocks.send).not.toHaveBeenCalled()
     expect(mocks.state.booking.status).toBe('cancelled')
+  })
+
+  it('a duplicate create for the original uid after a reschedule neither rolls back nor notifies', async () => {
+    // CREATED A: new row.
+    await deliver()
+    // RESCHEDULED B: Cal.com gives the reschedule a new uid, so a new row.
+    mocks.upsert.mockResolvedValue({ previous: null, current: 'rescheduled', changed: true })
+    await deliver(calBody('BOOKING_RESCHEDULED', 'bk_2', '2026-10-09T15:00:00Z', '2026-10-09T15:30:00Z'))
+    expect(mocks.state.booking).toMatchObject({ status: 'rescheduled', uid: 'bk_2' })
+    expect(mocks.send).toHaveBeenCalledTimes(2)
+    // CREATED A again (duplicate or retry): A's row is unchanged.
+    mocks.upsert.mockResolvedValue({ previous: 'confirmed', current: 'confirmed', changed: false })
+    expect((await deliver()).status).toBe(200)
+    expect(mocks.state.booking).toMatchObject({
+      status: 'rescheduled',
+      uid: 'bk_2',
+      startTime: '2026-10-09T15:00:00Z',
+    })
+    expect(mocks.send).toHaveBeenCalledTimes(2)
+    expect(mocks.setOutcome).toHaveBeenCalledTimes(1)
+  })
+
+  it('a same-uid reschedule that only moves the start time is recorded and notified', async () => {
+    mocks.upsert.mockResolvedValue({ previous: null, current: 'rescheduled', changed: true })
+    const first = calBody('BOOKING_RESCHEDULED', 'bk_1', '2026-10-08T14:00:00Z', '2026-10-08T14:30:00Z')
+    await deliver(first)
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+    // Same uid and status, new time: the row's status is unchanged.
+    mocks.upsert.mockResolvedValue({ previous: 'rescheduled', current: 'rescheduled', changed: false })
+    await deliver(calBody('BOOKING_RESCHEDULED', 'bk_1', '2026-10-10T09:00:00Z', '2026-10-10T09:30:00Z'))
+    expect(mocks.state.booking).toMatchObject({
+      status: 'rescheduled',
+      uid: 'bk_1',
+      startTime: '2026-10-10T09:00:00Z',
+    })
+    expect(mocks.send).toHaveBeenCalledTimes(2)
+    expect(mocks.send.mock.calls[1]?.[0]).toContain('2026-10-10T09:00:00Z')
   })
 })
