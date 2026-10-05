@@ -14,7 +14,8 @@ const LOCAL_CHAR = /^[\p{L}\p{N}._%+-]$/u
 // Anything an email or phone may still grow through: the local part, '@', domain and digits.
 const TOKEN_CHAR = /^[\p{L}\p{N}._%+@-]$/u
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** Escapes `s` for literal use in a RegExp; term matching (and anything that must agree with it) builds on this. */
+export const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /** Reads one code point ending at `end` (exclusive), so astral letters count as one char. */
 function charBefore(text: string, end: number): string {
@@ -76,7 +77,7 @@ export function scan(text: string, rules: RedactionRules): { redact: Span[]; gua
     .filter((t) => t.length > 0)
     .sort((a, b) => b.length - a.length)
   if (terms.length > 0) {
-    for (const m of text.matchAll(new RegExp(terms.map(escape).join('|'), 'giu'))) add(m.index, m.index + m[0].length)
+    for (const m of text.matchAll(new RegExp(terms.map(escapeRegExp).join('|'), 'giu'))) add(m.index, m.index + m[0].length)
   }
   // The bounded local part can start mid-run; widen back over the whole run so no prefix leaks.
   let floor = 0

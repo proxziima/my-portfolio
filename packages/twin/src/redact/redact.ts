@@ -1,5 +1,7 @@
 import { scan } from './scan'
 
+export { escapeRegExp } from './scan'
+
 /** What replaces redacted spans; visible so readers know something was withheld. */
 export const REDACTED = '[redacted]'
 

@@ -1,22 +1,24 @@
 // Verified against eve 0.71.0 dist/src/client/message-reducer.js + message-run-parts.js: `message.completed` sets the text part to `data.message`, replacing the streamed deltas, so the held-back tail can ride in the completed event.
 // Verified against dist/src/client/url.js + shared/eve-route-path.js: an absolute `host` keeps its path, so `${origin}/api/twin` resolves to `/api/twin/eve/v1/...`.
 import { LEAK_DEFLECTION } from '@repo/twin/contract'
-import { redactText, StreamRedactor, type RedactionRules } from '@repo/twin/redact'
+import { escapeRegExp, redactText, StreamRedactor, type RedactionRules } from '@repo/twin/redact'
 import { z } from 'zod'
 
+type Data = Record<string, unknown>
+const isData = (v: unknown): v is Data => typeof v === 'object' && v !== null && !Array.isArray(v)
+
 /**
- * One eve stream event (NDJSON line). Only `data` content is ever rewritten; unknown keys pass
- * through. `meta` is optional here although eve always stamps it: everything the filter rewrites
- * lives in `data`, so a missing `meta` must not exempt an event from filtering.
+ * One eve stream event (NDJSON line): any record with a string `type`, as that is all eve's client
+ * needs to render it. Nothing else is validated, so no malformed field can exempt an event from
+ * filtering: `meta` is never checked (the client only reads `meta?.id`), and a `data` that is not a
+ * record (absent, null, an array, a scalar) becomes `{}`, since the filter cannot tell which of its
+ * content is safe. Only `data` content is ever rewritten; other keys pass through.
  */
 export const StreamEvent = z.looseObject({
   type: z.string(),
-  data: z.record(z.string(), z.unknown()),
-  meta: z.record(z.string(), z.unknown()).optional(),
+  data: z.unknown().transform((d): Data => (isData(d) ? d : {})),
 })
-export type StreamEvent = z.infer<typeof StreamEvent>
-
-type Data = Record<string, unknown>
+export type StreamEvent = z.output<typeof StreamEvent>
 
 /** Only the booking dialog's payload reaches the browser; other tool I/O is the agent's business. */
 const VISIBLE_TOOL = 'schedule_call'
@@ -33,7 +35,7 @@ const VISIBLE_TOOL = 'schedule_call'
  */
 const isVisibleAction = (a: Data) => (a.kind === 'tool-call' || a.kind === 'workflow-tool-call') && a.toolName === VISIBLE_TOOL
 const isVisibleResult = (r: Data) => r.kind === 'tool-result' && r.toolName === VISIBLE_TOOL
-const asData = (v: unknown): Data => (typeof v === 'object' && v !== null ? (v as Data) : {})
+const asData = (v: unknown): Data => (isData(v) ? v : {})
 
 /** A request with its input blanked, unless it belongs to the visible tool. */
 const blankAction = (a: Data): Data => (isVisibleAction(a) ? a : { ...a, input: null })
@@ -69,9 +71,9 @@ export interface EventFilterHooks {
  */
 export function createEventFilter(rules: RedactionRules, canary: string, hooks: EventFilterHooks = {}): (e: StreamEvent) => StreamEvent {
   const withCanary: RedactionRules = { terms: [...rules.terms, canary], allow: rules.allow }
-  // Case-insensitive, like the redactor's own term matching.
-  const needle = canary.toLowerCase()
-  const hasCanary = (text: string) => text.toLowerCase().includes(needle)
+  // The redactor's own term matching (trimmed, escaped, Unicode case folding), so `ſ` counts as `s` here too.
+  const canaryPattern = new RegExp(escapeRegExp(canary.trim()), 'iu')
+  const hasCanary = (text: string) => canaryPattern.test(text)
   /*
    * Per text block: its redactor, the raw tail that might hold the start of a split canary, and
    * whether the canary has appeared. The canary is the first line of the system prompt, so seeing
@@ -157,8 +159,11 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
   }
 
   return (e) => {
-    if (typeof e.data !== 'object' || e.data === null) return e
-    return stripUsage(filterContent(e))
+    // Only reachable by callers that skip `StreamEvent` parsing, which guarantees a `data` record.
+    if (!isData(e.data)) return e
+    const out = filterContent(e)
+    const data = stripUsage(out.data)
+    return data === out.data ? out : { ...out, data }
   }
 }
 
@@ -169,18 +174,24 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
  * operator's business. Stripped from any event that has the key. Only keys present on the original
  * are touched, so no shape changes.
  */
-function stripUsage(e: StreamEvent): StreamEvent {
-  const d = e.data
-  if (!('usage' in d) && !('usageInputTokens' in d) && !('providerMetadata' in d)) return e
+function stripUsage(d: Data): Data {
+  if (!('usage' in d) && !('usageInputTokens' in d) && !('providerMetadata' in d)) return d
   return {
-    ...e,
-    data: {
-      ...d,
-      ...('usage' in d ? { usage: undefined } : {}),
-      ...('usageInputTokens' in d ? { usageInputTokens: null } : {}),
-      ...('providerMetadata' in d ? { providerMetadata: undefined } : {}),
-    },
+    ...d,
+    ...('usage' in d ? { usage: undefined } : {}),
+    ...('usageInputTokens' in d ? { usageInputTokens: null } : {}),
+    ...('providerMetadata' in d ? { providerMetadata: undefined } : {}),
   }
+}
+
+/**
+ * A record without a string `type` is not an event eve's client can render, so it passes, keeping
+ * one line out per line in (clients resume by absolute event index). Its `data` still loses what
+ * needs no `type` to recognise: usage and spend, and `message` / `details` text.
+ */
+function filterUntyped(record: unknown): unknown {
+  if (!isData(record) || !isData(record.data)) return record
+  return { ...record, data: stripUsage(blankFailure(record.data)) }
 }
 
 /** Splits a byte stream into NDJSON lines (including blank and `$eve` control lines). */
@@ -220,13 +231,15 @@ export function filterStream(body: ReadableStream<Uint8Array>, filter: (e: Strea
       if (done) return controller.close()
       if (value.trim() === '') return controller.enqueue(encoder.encode(`${value}\n`))
       const record: unknown = JSON.parse(value)
-      // `$eve` control records (lease ended) are transport and pass verbatim. So does any record
-      // that is not a stream event (non-objects, no string `type`, no `data` record): it is
-      // upstream data with nothing the filter could rewrite, so it is never dropped, and passing it
-      // keeps one line out per line in, as clients resume by absolute event index.
-      const isControl = typeof record === 'object' && record !== null && '$eve' in record
-      const event = isControl ? null : StreamEvent.safeParse(record)
-      if (!event?.success) return controller.enqueue(encoder.encode(`${value}\n`))
+      // `$eve` control records (lease ended) are transport and pass verbatim. Every record with a
+      // string `type` is filtered, whatever else it holds; any other record is never dropped (see
+      // `filterUntyped`), so one line still goes out per line in.
+      if (isData(record) && '$eve' in record) return controller.enqueue(encoder.encode(`${value}\n`))
+      const event = StreamEvent.safeParse(record)
+      if (!event.success) {
+        const out = filterUntyped(record)
+        return controller.enqueue(encoder.encode(`${out === record ? value : JSON.stringify(out)}\n`))
+      }
       controller.enqueue(encoder.encode(`${JSON.stringify(filter(event.data))}\n`))
     },
     async cancel() {
