@@ -94,10 +94,18 @@ export const webTwinEnvSchema = z.object({
 })
 export type WebTwinEnv = z.infer<typeof webTwinEnvSchema>
 
+/**
+ * An env value with blank (empty or whitespace-only) read as unset. docker-compose renders `${VAR:-}`
+ * as '', which must behave like an absent variable. Every reader of the env goes through this, so
+ * the schema and the build-time readers (`agent/lib/models.ts`) can't disagree about defaults.
+ */
+export function blankToUndefined(value: string | undefined): string | undefined {
+  return value === undefined || value.trim() === '' ? undefined : value
+}
+
 /** Parses an env source, throwing one error that lists every bad variable. */
 export function parseEnv<S extends z.ZodType>(schema: S, source: Record<string, string | undefined>): z.infer<S> {
-  // docker-compose renders `${VAR:-}` as '', which must behave like an unset variable.
-  const cleaned = Object.fromEntries(Object.entries(source).map(([k, v]) => [k, v === '' ? undefined : v]))
+  const cleaned = Object.fromEntries(Object.entries(source).map(([k, v]) => [k, blankToUndefined(v)]))
   const result = schema.safeParse(cleaned)
   if (result.success) return result.data
   const lines = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`)

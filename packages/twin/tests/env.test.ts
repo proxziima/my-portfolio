@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agentsEnvSchema, parseEnv, webTwinEnvSchema } from '../src/env'
+import { agentsEnvSchema, blankToUndefined, parseEnv, webTwinEnvSchema } from '../src/env'
 
 const secret = 'x'.repeat(32)
 const sa = Buffer.from(JSON.stringify({ client_email: 'twin@p.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n' })).toString('base64')
@@ -45,6 +45,16 @@ describe('env', () => {
 
   it('treats empty strings as unset so defaults apply', () => {
     expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL: '' }).TWIN_MODEL).toBe('anthropic/claude-sonnet-5.5')
+  })
+
+  it('treats whitespace-only values as unset too', () => {
+    const env = parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL_FALLBACKS: '  ', TWIN_MODEL_CONTEXT_TOKENS: ' ' })
+    expect(env.TWIN_MODEL_FALLBACKS).toEqual(['deepseek/deepseek-v4.1-flash'])
+    expect(env.TWIN_MODEL_CONTEXT_TOKENS).toBe(1_000_000)
+  })
+
+  it('blankToUndefined keeps non-blank values untouched', () => {
+    expect([undefined, '', ' 	', 'a', ' a '].map(blankToUndefined)).toEqual([undefined, undefined, undefined, 'a', ' a '])
   })
 
   it('still rejects an empty required variable', () => {

@@ -1,14 +1,19 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import { MODEL_DEFAULTS } from '@repo/twin/env'
+import { blankToUndefined, MODEL_DEFAULTS } from '@repo/twin/env'
 
-/** Model ids resolved from env with the shared defaults; safe at build time (no required vars). */
-export function modelIds(env: Record<string, string | undefined>): { primary: string; chain: string[]; classifier: string } {
-  const primary = env.TWIN_MODEL?.trim() || MODEL_DEFAULTS.model
-  const fallbacks = (env.TWIN_MODEL_FALLBACKS?.split(',') ?? [...MODEL_DEFAULTS.fallbacks]).map((s) => s.trim()).filter(Boolean)
+/**
+ * Model settings resolved from env with the shared defaults; safe at build time (no required vars).
+ * A blank variable counts as absent, exactly as in `parseEnv`, so compose's `${VAR:-}` keeps the defaults.
+ */
+export function modelIds(env: Record<string, string | undefined>): { primary: string; chain: string[]; classifier: string; contextTokens: number } {
+  const read = (name: string) => blankToUndefined(env[name])?.trim()
+  const primary = read('TWIN_MODEL') ?? MODEL_DEFAULTS.model
+  const fallbacks = (read('TWIN_MODEL_FALLBACKS')?.split(',') ?? [...MODEL_DEFAULTS.fallbacks]).map((s) => s.trim()).filter(Boolean)
   return {
     primary,
     chain: [...new Set([primary, ...fallbacks])],
-    classifier: env.TWIN_CLASSIFIER_MODEL?.trim() || MODEL_DEFAULTS.classifier,
+    classifier: read('TWIN_CLASSIFIER_MODEL') ?? MODEL_DEFAULTS.classifier,
+    contextTokens: Number(read('TWIN_MODEL_CONTEXT_TOKENS') ?? MODEL_DEFAULTS.contextTokens),
   }
 }
 
