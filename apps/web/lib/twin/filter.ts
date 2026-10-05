@@ -2,13 +2,19 @@
 // Verified against dist/src/client/url.js + shared/eve-route-path.js: an absolute `host` keeps its path, so `${origin}/api/twin` resolves to `/api/twin/eve/v1/...`.
 import { LEAK_DEFLECTION } from '@repo/twin/contract'
 import { redactText, StreamRedactor, type RedactionRules } from '@repo/twin/redact'
+import { z } from 'zod'
 
-/** One eve stream event (NDJSON line). Only `data` content is ever rewritten. */
-export interface StreamEvent {
-  type: string
-  data: Record<string, unknown>
-  meta: Record<string, unknown>
-}
+/**
+ * One eve stream event (NDJSON line). Only `data` content is ever rewritten; unknown keys pass
+ * through. `meta` is optional here although eve always stamps it: everything the filter rewrites
+ * lives in `data`, so a missing `meta` must not exempt an event from filtering.
+ */
+export const StreamEvent = z.looseObject({
+  type: z.string(),
+  data: z.record(z.string(), z.unknown()),
+  meta: z.record(z.string(), z.unknown()).optional(),
+})
+export type StreamEvent = z.infer<typeof StreamEvent>
 
 type Data = Record<string, unknown>
 
@@ -214,9 +220,14 @@ export function filterStream(body: ReadableStream<Uint8Array>, filter: (e: Strea
       if (done) return controller.close()
       if (value.trim() === '') return controller.enqueue(encoder.encode(`${value}\n`))
       const record: unknown = JSON.parse(value)
-      // Non-object lines carry no event, and `$eve` control records (lease ended) are transport: both pass verbatim.
-      if (typeof record !== 'object' || record === null || Array.isArray(record) || '$eve' in record) return controller.enqueue(encoder.encode(`${value}\n`))
-      controller.enqueue(encoder.encode(`${JSON.stringify(filter(record as unknown as StreamEvent))}\n`))
+      // `$eve` control records (lease ended) are transport and pass verbatim. So does any record
+      // that is not a stream event (non-objects, no string `type`, no `data` record): it is
+      // upstream data with nothing the filter could rewrite, so it is never dropped, and passing it
+      // keeps one line out per line in, as clients resume by absolute event index.
+      const isControl = typeof record === 'object' && record !== null && '$eve' in record
+      const event = isControl ? null : StreamEvent.safeParse(record)
+      if (!event?.success) return controller.enqueue(encoder.encode(`${value}\n`))
+      controller.enqueue(encoder.encode(`${JSON.stringify(filter(event.data))}\n`))
     },
     async cancel() {
       await lines.return(undefined)

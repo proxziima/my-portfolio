@@ -13,7 +13,7 @@ export type TwinItem = z.infer<typeof TwinItem>
 
 /** A restricted entry: only its topic leaves the CMS until the owner approves. */
 export const RestrictedStub = z.object({
-  sourceId: z.string().regex(/^knowledge:[\w-]+$|^[a-z-]+:[\w-]+$/),
+  sourceId: z.string().regex(/^[a-z-]+:[\w-]+$/),
   topic: z.string(),
   category: KnowledgeCategory.nullable(),
 })

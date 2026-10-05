@@ -1,6 +1,7 @@
 import { MockLanguageModelV4 } from 'ai/test'
 import { describe, expect, it, vi } from 'vitest'
-import { AbuseVerdict, CONTEXT_NOTE_PREFIX, classifyAbuse, closingContext, deflectionContext } from '../agent/lib/abuse'
+import { CONTEXT_NOTE_PREFIX } from '@repo/twin/contract'
+import { AbuseVerdict, classifyAbuse, closingContext, deflectionContext } from '../agent/lib/abuse'
 
 const mock = vi.hoisted(() => ({ model: null as unknown }))
 vi.mock('../agent/lib/models', () => ({ classifierModel: () => mock.model }))

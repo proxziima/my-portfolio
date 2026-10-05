@@ -249,6 +249,18 @@ describe('filterStream', () => {
     expect(text).toBe(`${JSON.stringify(ev('reasoning.appended', { ...step, reasoningDelta: '' }))}\n\n{"$eve":"stream.lease-ended","version":1}\n`)
   })
 
+  it('passes records that are not stream events through verbatim, one line each', async () => {
+    const odd = ['{"type":7,"data":{"messageDelta":"x"}}', '{ "type": "turn.completed", "data": "flat" }', '{"type":"x","data":{},"meta":[]}', '{"data":{"a":1}}']
+    const text = await new Response(filterStream(streamOf(odd.map((l) => `${l}\n`)), createEventFilter(rules, canary))).text()
+    expect(text).toBe(odd.map((l) => `${l}\n`).join(''))
+  })
+
+  it('filters a stream event whose meta is missing rather than letting it through', async () => {
+    const line = JSON.stringify({ type: 'reasoning.appended', data: { ...step, reasoningDelta: 'hm' } })
+    const text = await new Response(filterStream(streamOf([`${line}\n`]), createEventFilter(rules, canary))).text()
+    expect(JSON.parse(text)).toEqual({ type: 'reasoning.appended', data: { ...step, reasoningDelta: '' } })
+  })
+
   it('passes non-object JSON lines through unchanged', async () => {
     const text = await new Response(filterStream(streamOf(['null\n42\n"s"\n[1]\n']), createEventFilter(rules, canary))).text()
     expect(text).toBe('null\n42\n"s"\n[1]\n')
