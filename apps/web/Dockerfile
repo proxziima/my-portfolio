@@ -15,11 +15,13 @@ WORKDIR /app
 # Manifests first, so the install layer is reused until a package.json or the lockfile changes.
 FROM base AS build
 COPY package.json bun.lock .npmrc ./
+COPY apps/agents/package.json apps/agents/
 COPY apps/docs/package.json apps/docs/
 COPY apps/payload/package.json apps/payload/
 COPY apps/web/package.json apps/web/
 COPY packages/cms-types/package.json packages/cms-types/
 COPY packages/eslint-config/package.json packages/eslint-config/
+COPY packages/twin/package.json packages/twin/
 COPY packages/typescript-config/package.json packages/typescript-config/
 COPY packages/ui/package.json packages/ui/
 RUN bun install --frozen-lockfile
