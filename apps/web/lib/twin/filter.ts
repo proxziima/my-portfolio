@@ -67,9 +67,9 @@ export interface EventFilterHooks {
 /**
  * The output boundary (spec §10). Redacts never-tier terms, PII and the prompt canary from
  * assistant text, independent of what the model produced, and blanks reasoning, tool payloads,
- * failure details and token usage. Also blanks the model id on `step.started`: the boundaries forbid
- * revealing models or providers, and with routing it would reveal the tier. Never drops or adds events:
- * clients resume by absolute event index.
+ * failure details, token usage and model ids (`stripModel`: the boundaries forbid revealing models or
+ * providers, and with routing a model id would reveal the tier). Never drops or adds events: clients
+ * resume by absolute event index.
  */
 export function createEventFilter(rules: RedactionRules, canary: string, hooks: EventFilterHooks = {}): (e: StreamEvent) => StreamEvent {
   const withCanary: RedactionRules = { terms: [...rules.terms, canary], allow: rules.allow }
@@ -102,7 +102,7 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
     switch (e.type) {
       case 'step.started':
         started.add(keyOf(d))
-        return 'modelId' in d || 'model' in d ? rewrite(e, { ...d, ...('modelId' in d ? { modelId: undefined } : {}), ...('model' in d ? { model: undefined } : {}) }) : e
+        return e
       case 'message.appended': {
         if (typeof d.messageDelta !== 'string') return e
         const key = keyOf(d)
@@ -164,7 +164,7 @@ export function createEventFilter(rules: RedactionRules, canary: string, hooks: 
     // Only reachable by callers that skip `StreamEvent` parsing, which guarantees a `data` record.
     if (!isData(e.data)) return e
     const out = filterContent(e)
-    const data = stripUsage(out.data)
+    const data = stripUsage(stripModel(out.data))
     return data === out.data ? out : { ...out, data }
   }
 }
@@ -187,13 +187,23 @@ function stripUsage(d: Data): Data {
 }
 
 /**
+ * Model ids (`modelId` on `step.started`, `compaction.requested` and `compaction.completed`) name the
+ * provider and, with routing, the tier. Stripped from any event that has the key, not a fixed list of
+ * types, so an event type eve adds later cannot leak one. Only keys present on the original are touched.
+ */
+function stripModel(d: Data): Data {
+  if (!('modelId' in d) && !('model' in d)) return d
+  return { ...d, ...('modelId' in d ? { modelId: undefined } : {}), ...('model' in d ? { model: undefined } : {}) }
+}
+
+/**
  * A record without a string `type` is not an event eve's client can render, so it passes, keeping
  * one line out per line in (clients resume by absolute event index). Its `data` still loses what
- * needs no `type` to recognise: usage and spend, and `message` / `details` text.
+ * needs no `type` to recognise: usage and spend, model ids, and `message` / `details` text.
  */
 function filterUntyped(record: unknown): unknown {
   if (!isData(record) || !isData(record.data)) return record
-  return { ...record, data: stripUsage(blankFailure(record.data)) }
+  return { ...record, data: stripUsage(stripModel(blankFailure(record.data))) }
 }
 
 /** Splits a byte stream into NDJSON lines (including blank and `$eve` control lines). */
