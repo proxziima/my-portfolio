@@ -72,16 +72,21 @@ recorded here with its reason.
 8. **Disclosure.** Companies get the same `disclosure` tier and `disclosureRead` access as every
    other twin-readable collection. Without it, a company behind a `never` experience would become
    publicly listable at `/api/companies`, which today it is not. The tier rules:
-   - **Effective tier.** The tier of an experience or a project with a company is the *stricter*
-     of its own tier and its company's. A shared `stricterTier(a, b)` helper computes it.
+   - **Effective tier.** An experience *is* "a role at a company", so its tier is the *stricter* of
+     its own tier and its company's. A shared `stricterTier(a, b)` helper computes it. A project
+     keeps its own tier, because its name is public on the site whatever its company is. It names
+     its company only while that company is public.
    - **Website.** Anonymous REST only returns public companies, so an experience whose company
      the site can't read is dropped, and a project's company aside is omitted.
    - **Bios.** The relationship in `recordLink` has
      `filterOptions: { disclosure: { equals: 'public' } }`, so bios (always public prose) can only
      link public records. A record made non-public later disappears from the bio, which is the
      owner hiding it everywhere.
-   - **Twin.** The corpus applies the same rules: effective tiers for experiences and projects,
-     and bio links resolve only public names.
+   - **Twin.** The corpus applies the same rules: effective tiers for experiences, and bio links
+     resolve only public names. Restricted entries expose their title as a topic stub, so an
+     experience at a non-public company is titled "<role> (company undisclosed)". The company's
+     name is only in the body, which the twin reveals after the owner approves. Entries whose
+     effective tier is `never` are dropped when the corpus is loaded.
 9. **Web resolves references through a lookup, not deep population.** `getPortfolio` also fetches
    `companies` (depth 1, so `logo` and `favicon` are populated). It builds one lookup keyed by
    `relationTo:id` from companies and projects, and every reference (experience → company,
