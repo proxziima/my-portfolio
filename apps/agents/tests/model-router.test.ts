@@ -52,8 +52,8 @@ describe('tierSelection', () => {
     })
   })
 
-  it('carries the 200k window for light and 1M for the others by default', () => {
-    expect(tierSelection('light').modelContextWindowTokens).toBe(200_000)
+  it('carries a 1M window for every tier by default', () => {
+    expect(tierSelection('light').modelContextWindowTokens).toBe(1_000_000)
     expect(tierSelection('standard').modelContextWindowTokens).toBe(1_000_000)
     expect(tierSelection('deep').modelContextWindowTokens).toBe(1_000_000)
   })
