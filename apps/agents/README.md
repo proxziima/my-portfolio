@@ -29,7 +29,7 @@ What has been checked:
 What has **not** been verified:
 
 - **No Docker image has been built on the development machine**, which has no Docker. That covers `apps/agents/Dockerfile` and the compose stack (`docker-compose.yml`) with `postgres` and `agents`. CI builds the agent with `eve build` but not the image, so the first real image build happens in Easypanel or on a machine with Docker.
-- **The live evals (`evals/`) have not been run against a real model and the real CMS.**
+- **The live evals (`evals/`) have not been run against a real model yet.** CI's `live-evals` job runs them against a real model with a throwaway CMS and agent inside the runner (see [Testing](#testing)), but no run of it has been reviewed. It has never run against the production CMS content.
 - **None of the external integrations has run end to end against the real service:** Telegram approvals, Cal.com webhooks, Google free/busy, OpenRouter fallback routing, and the spend ledger with real OpenRouter cost metadata. Each one is covered by unit tests with mocked HTTP. Telegram and Payload MCP are also covered by local stubs in the offline evals.
 - **`experimental.workflow.retention: 0` is unverified on the Postgres world.** eve's docs warn that "Custom Worlds used with eve might not support this feature". Nobody has checked that `@workflow/world-postgres` deletes run data at 0. See [Retention and deletion](#retention-and-deletion).
 
@@ -283,7 +283,7 @@ The web BFF reads `webTwinEnvSchema`, from the same file:
 
 The webhook forwarder reads only `TWIN_AGENT_URL`, so a delivery never depends on the other BFF secrets.
 
-**Keep optional variables unset, not empty, outside compose.** `agent/lib/models.ts` reads `process.env` directly at build time. An empty `TWIN_MODEL_FALLBACKS` there produces an empty fallback list instead of the default.
+**An empty or blank optional variable counts as unset.** Compose renders `${VAR:-}` as `''`, so this matters in production. `parseEnv` and `agent/lib/models.ts` share `blankToUndefined` from `@repo/twin/env`. `models.ts` reads `process.env` at build time, outside the schema. An empty `TWIN_MODEL_FALLBACKS` therefore keeps the default fallback chain, and an empty `TWIN_MODEL_CONTEXT_TOKENS` keeps the default window.
 
 ## How to add a skill
 
@@ -642,7 +642,7 @@ cd apps/agents/fixtures/offline && cp .env.example .env && bun run eval   # eve 
 - per-skill suites: identity persona, answer depth, grounding, intake, 20 scripted jailbreaks and 20 cold sessions;
 - the acceptance path from "are you available?" to a booked call in at most four turns. That path posts a signed Cal.com webhook to `/webhooks/cal`.
 
-The agent is internal, so the evals must run where they can reach it: inside the compose network, for example from the `agents` container, which already has the secrets in its env.
+The agent is internal, so the evals must run where they can reach it. CI starts its own CMS and agent (below). Against the deployed stack, run them inside the compose network, for example from the `agents` container, which already has the secrets in its env.
 
 ```bash
 docker compose exec agents sh -c '
@@ -657,7 +657,7 @@ How it works:
 - The jailbreak suite needs `TWIN_PROMPT_CANARY`, and the booking acceptance needs `CAL_WEBHOOK_SECRET`. Both must match the target agent.
 - Live evals write real conversations, ledger rows and evaluations into the target's database, and they spend model credit.
 
-This command has not been run yet; see [Status](#status).
+This command has not been run against the deployed stack yet; see [Status](#status).
 
 **CI** (`.github/workflows/ci.yml`) has two jobs.
 
@@ -672,7 +672,16 @@ The `checks` job runs on every push to `main`/`develop` and on every PR:
 - twin migrations, world setup and the offline evals against a `postgres:17` service on 5433 (`twin_eval`);
 - a web build scanned for secrets and prompt fragments (`scripts/scan-client-bundle.ts`).
 
-`live-evals` runs on manual `workflow_dispatch` with a `live_url`. It mints the token from repository secrets and runs `eve eval --url "$LIVE_URL"`. **The URL must be reachable from GitHub's runners, and the production agent is deliberately not.** Point it at a separately exposed, authenticated test deployment, or run the live evals inside the compose network as shown above.
+`live-evals` runs on manual `workflow_dispatch` and on every push to `main`. It runs only when the `OPENROUTER_API_KEY` repository secret is set; `checks` exports that as a boolean output, because a job-level `if` can't read secrets. It never touches production. Everything runs inside the runner:
+
+1. **Secrets.** Random values are generated and masked for `PAYLOAD_SECRET`, `TWIN_REDACT_SECRET`, `TWIN_JWT_SECRET`, `TWIN_PROMPT_CANARY`, `CAL_WEBHOOK_SECRET` and the other agent secrets. Only `OPENROUTER_API_KEY` and `EXA_API_KEY` come from repository secrets. Without `EXA_API_KEY`, a placeholder keeps the env valid, since no live eval asserts on web search.
+2. **A throwaway Payload CMS** on SQLite (`file:./.tmp/live.db`) is built, then seeded with `NODE_ENV=production`. The first start applies the committed migrations (`prodMigrations`). The seed runs `src/seed/run.ts` (portfolio content) and then `src/seed/twin-ci.ts`.
+   - `twin-ci.ts` adds one public `availability` fact and one `voice` sample.
+   - It creates a CI user and an MCP API key with only `twinIdentity`, `twinSearch` and `twinDisclose` enabled. The key uses Payload's `useAPIKey` auth: the Local API sets `enableAPIKey` and `apiKey`, and Payload's field hooks store the key encrypted plus an HMAC index that the MCP endpoint looks up.
+   - The key is masked and written to `$GITHUB_ENV` as `PAYLOAD_MCP_API_KEY`.
+   - Then `next start` serves the CMS on `:3001`.
+3. **The agent** is built and runs `world:setup` and `db:migrate` against a `postgres:17` service (`twin_eval` on 5433), then starts on `:4100`. `CMS_URL` and `PAYLOAD_MCP_URL` point at the local CMS. Google and Telegram get harmless placeholders: the live suite has no approval or free/busy eval. If the model calls `check_availability` during the booking acceptance, that call fails, and the model has to go on without it.
+4. **The evals.** Once `/eve/v1/health` answers, the job mints the eval token and runs `bunx eve eval --url http://127.0.0.1:4100 --strict --junit .eve/junit.xml` from `apps/agents`.
 
 ## Where the code differs from the spec
 
