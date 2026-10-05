@@ -15,10 +15,21 @@ export type ApprovalStatus = z.infer<typeof ApprovalStatus>
 export const BookingStatus = z.enum(['none', 'confirmed', 'rescheduled', 'cancelled'])
 export type BookingStatus = z.infer<typeof BookingStatus>
 
+/**
+ * Visitor-volunteered text ends up in system-role prompt text (the state digest), so it is
+ * flattened to one line with no tag or code delimiters: it can never close or forge a block.
+ */
+const visitorText = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .transform((v) => v.replace(/[<>`]/g, '').replace(/\s+/g, ' ').trim())
+
 const Visitor = z.object({
-  name: z.string().min(1).max(80).optional(),
-  company: z.string().min(1).max(120).optional(),
-  role: z.string().min(1).max(120).optional(),
+  name: visitorText(80).optional(),
+  company: visitorText(120).optional(),
+  role: visitorText(120).optional(),
   kind: VisitorKind.optional(),
   technical: z.boolean().optional(),
 })
@@ -32,7 +43,7 @@ const Intent = z.object({
 const Booking = z.object({
   status: BookingStatus,
   uid: z.string().optional(),
-  startTime: z.string().optional(),
+  startTime: z.iso.datetime({ offset: true }).optional(),
 })
 
 const PendingApproval = z.object({
@@ -64,7 +75,8 @@ export const ConversationState = z.object({
   toolsUsed: z.array(z.string()).default([]),
   intent: Intent.default({ score: 0, tier: 'cold', lastEvaluationId: null }),
   widgetShown: z.boolean().default(false),
-  callOfferMade: z.boolean().default(false),
+  // The turn the warm offer was instructed on, so a replayed step of that turn re-issues it.
+  callOfferTurn: z.number().int().nonnegative().nullable().default(null),
   callOfferDeclined: z.boolean().default(false),
   booking: Booking.default({ status: 'none' }),
   pendingApprovals: z.array(PendingApproval).default([]),

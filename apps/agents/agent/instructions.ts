@@ -22,11 +22,11 @@ export default defineDynamic({
     },
     'turn.started': async (_event, ctx) => {
       const env = getEnv()
-      const state = await ensureConversation(ctx.session.id, ctx.session.auth.current as Principal | null)
-      // A warm offer is made at most once: it is marked as made on the turn it is instructed
-      // (idempotent across replays), while this turn's digest still shows the pre-update state.
-      if (state.intent.tier === 'warm' && !state.callOfferMade && !state.callOfferDeclined && !state.widgetShown) {
-        await updateConversation(db(), ctx.session.id, (s) => ({ ...s, callOfferMade: true }))
+      let state = await ensureConversation(ctx.session.id, ctx.session.auth.current as Principal | null)
+      // A warm offer is made at most once and keyed to its turn: a replayed step of that turn
+      // sees callOfferTurn === turnCount and re-issues the same directive without writing again.
+      if (state.intent.tier === 'warm' && state.callOfferTurn === null && !state.callOfferDeclined && !state.widgetShown) {
+        state = await updateConversation(db(), ctx.session.id, (s) => (s.callOfferTurn === null ? { ...s, callOfferTurn: s.turnCount } : s))
         if (state.intent.lastEvaluationId) await setEvaluationOutcome(db(), state.intent.lastEvaluationId, 'offered')
       }
       const content = [
