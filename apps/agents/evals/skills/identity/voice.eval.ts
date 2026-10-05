@@ -6,7 +6,8 @@ const EMOJI = /\p{Extended_Pictographic}/u
 const MARKDOWN = /^\s*([-*•]|\d+\.)\s|\*\*|^#+\s/m
 const EM_DASH = /—/
 const VC = /\bvc\b/i
-const PORTUGUESE = /\b(você|tudo|não|sim|pra|com|meu|minha|hoje|é)\b/i
+// JS `\b` is ASCII-only (`você`, `é` never match) and `com` would match ".com", hence the lookarounds.
+const PORTUGUESE = /(?<![\p{L}.])(você|tudo|não|sim|pra|com|meu|minha|hoje|é)(?!\p{L})/iu
 
 /** Every rule a reply in my voice keeps; returns the first one broken, or null. */
 function voiceViolation(m: string): string | null {
