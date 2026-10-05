@@ -24,6 +24,10 @@ export async function searchPortfolio(sessionId: string, query: string): Promise
 
 /** What the model reads: results as data, plus the rules for empty and restricted results. */
 export function searchForModel(r: TwinSearchResult, key: string): string {
+  if (r.overview && r.items.length > 0) {
+    const overview = r.items.map((i) => `[${i.sourceId}] ${i.title}: ${i.text}${i.url ? ` (${i.url})` : ''}`).join('\n')
+    return `${untrusted('portfolio', overview, key)}\nNothing matched the query directly; this is a general overview of me. Answer only what it covers, and for anything else say I don't have that detail to hand. Do not improvise.`
+  }
   if (r.items.length === 0 && r.restricted.length === 0) {
     return "No results. Say I don't have that detail to hand and offer to cover it on a call. Do not improvise."
   }

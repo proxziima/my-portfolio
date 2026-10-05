@@ -34,6 +34,33 @@ describe('twin corpus', () => {
     expect(JSON.stringify(r)).not.toContain('Thirty days')
   })
 
+  it('answers a query nothing matches with the public overview: profile, roles, then experience', () => {
+    const c: CorpusEntry[] = [
+      ...corpus,
+      { item: { sourceId: 'experiences:1', kind: 'experience', title: 'AI Engineer at Autodoc', text: 'AI Engineer at Autodoc, 2024–present' }, disclosure: 'public', category: null },
+      { item: { sourceId: 'experiences:2', kind: 'experience', title: 'Hidden role', text: 'x' }, disclosure: 'restricted', category: null },
+      { item: { sourceId: 'disciplines:1', kind: 'discipline', title: 'Role: AI Engineer', text: 'Builds agents' }, disclosure: 'public', category: null },
+      { item: { sourceId: 'profile:global', kind: 'profile', title: 'Profile: Vinicius', text: 'Vinicius · Brazil' }, disclosure: 'public', category: null },
+    ]
+    const r = rankCorpus(c, 'me fale sobre seu background técnico', 5)
+    expect(r.overview).toBe(true)
+    expect(r.items.map((i) => i.sourceId)).toEqual(['profile:global', 'disciplines:1', 'experiences:1'])
+    expect(r.restricted).toEqual([])
+    expect(rankCorpus(c, 'react', 5).overview).toBeUndefined()
+  })
+
+  it('matches whole words, not fragments: "mais" does not hit "mailto"', () => {
+    const c: CorpusEntry[] = [{ item: { sourceId: 'contact:global', kind: 'contact', title: 'Contact links', text: 'Send me a message: mailto:me@example.com' }, disclosure: 'public', category: null }]
+    expect(rankCorpus(c, 'mais', 5).overview).toBe(true)
+    expect(rankCorpus(c, 'message', 5).items.map((i) => i.sourceId)).toEqual(['contact:global'])
+  })
+
+  it('never surfaces a never-tier entry through the overview, even when only it matches', () => {
+    const r = rankCorpus(corpus, 'secret', 5)
+    expect(r.overview).toBe(true)
+    expect(r.items.map((i) => i.sourceId)).not.toContain('knowledge:6')
+  })
+
   it('flattens lexical bios', () => {
     const bio = { root: { children: [{ type: 'paragraph', children: [{ text: 'I build ' }, { text: 'tools.' }] }, { type: 'paragraph', children: [{ text: 'Second.' }] }] } }
     expect(lexicalText(bio)).toBe('I build tools.\nSecond.')

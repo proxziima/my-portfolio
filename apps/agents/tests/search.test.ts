@@ -19,6 +19,7 @@ describe('search_portfolio helpers', () => {
 
   it('tells the model to admit a gap when nothing matched', () => {
     expect(searchForModel({ items: [], restricted: [] }, key)).toMatch(/don't have that detail to hand/)
+    expect(searchForModel({ items: [], restricted: [], overview: true }, key)).toMatch(/^No results/)
   })
 
   it('records cited sources and kinds without duplicates', () => {
@@ -26,5 +27,12 @@ describe('search_portfolio helpers', () => {
     expect(s.citedSources).toEqual(['projects:1'])
     expect(s.topicsCited).toEqual(['project'])
     expect(s.toolsUsed).toEqual(['search_portfolio'])
+  })
+
+  it('labels an overview as one, so the model answers only what it covers', () => {
+    const out = searchForModel({ items: result.items, restricted: [], overview: true }, key)
+    expect(out).toContain('[projects:1] Project: Atlas: Design system')
+    expect(out).toMatch(/Nothing matched the query directly; this is a general overview of me/)
+    expect(out).not.toMatch(/request_disclosure/)
   })
 })

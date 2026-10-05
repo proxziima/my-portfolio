@@ -19,8 +19,15 @@ export const RestrictedStub = z.object({
 })
 export type RestrictedStub = z.infer<typeof RestrictedStub>
 
-/** What `twinSearch` returns over MCP. Never-tier entries are absent by construction. */
-export const TwinSearchResult = z.object({ items: z.array(TwinItem), restricted: z.array(RestrictedStub) })
+/**
+ * What `twinSearch` returns over MCP. Never-tier entries are absent by construction. `overview`
+ * marks a query nothing matched: the items are then a general overview of the owner, not hits.
+ */
+export const TwinSearchResult = z.object({
+  items: z.array(TwinItem),
+  restricted: z.array(RestrictedStub),
+  overview: z.boolean().optional(),
+})
 export type TwinSearchResult = z.infer<typeof TwinSearchResult>
 
 /** Grounding for the identity skill: who the owner is and how they write (public tier only). */
