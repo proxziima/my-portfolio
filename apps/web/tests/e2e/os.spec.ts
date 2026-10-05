@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
 import { collectErrors, test } from './support'
 
@@ -133,8 +135,43 @@ test('the Showcase lists projects as raised boxes, and those with a link open it
   }
 })
 
-test('Messenger lists the owner and chats with scripted replies', async ({ page }) => {
+/** The fixture's events, one per NDJSON line; eve's lease-ended control is appended per response. */
+const TWIN_EVENTS = readFileSync(fileURLToPath(new URL('./fixtures/twin-stream.ndjson', import.meta.url)), 'utf8')
+  .split('\n')
+  .filter(Boolean)
+const LEASE_ENDED = JSON.stringify({ $eve: 'stream.lease-ended', version: 1 })
+
+/**
+ * Stands in for the agent at the BFF: eve's session routes answer from the fixture, so the test
+ * needs neither the agents service nor a database. The stream honours `startIndex`, as the real
+ * one does, so a reconnect never replays events.
+ */
+async function mockTwin(page: Page): Promise<void> {
+  await page.route('**/api/twin/eve/v1/session', (route) =>
+    route.fulfill({
+      status: 202,
+      headers: { 'x-eve-session-id': 'wrun_e2e' },
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, sessionId: 'wrun_e2e', status: 'accepted' }),
+    }),
+  )
+  await page.route('**/api/twin/eve/v1/session/wrun_e2e', (route) => route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ ok: true }) }))
+  await page.route('**/api/twin/eve/v1/session/wrun_e2e/stream*', (route) => {
+    const from = Number(new URL(route.request().url()).searchParams.get('startIndex') ?? 0)
+    return route.fulfill({
+      status: 200,
+      headers: { 'x-eve-stream-version': '26', 'x-eve-stream-tail-index': String(TWIN_EVENTS.length - 1) },
+      contentType: 'application/x-ndjson',
+      body: [...TWIN_EVENTS.slice(from), LEASE_ENDED].join('\n') + '\n',
+    })
+  })
+  // The booking dialog loads Cal.com's embed script from the descriptor; nothing external may load.
+  await page.route('http://127.0.0.1:1/**', (route) => route.abort())
+}
+
+test('Messenger lists the owner and converses with the twin', async ({ page }) => {
   const errors = collectErrors(page)
+  await mockTwin(page)
   await openDesktop(page)
   await page.getByRole('button', { name: 'Messenger', exact: true }).dblclick()
   const messenger = page.getByRole('dialog', { name: 'Windows Live Messenger' })
@@ -153,16 +190,19 @@ test('Messenger lists the owner and chats with scripted replies', async ({ page 
   await expect(page.getByRole('navigation', { name: 'Taskbar' }).getByRole('button', { name: 'Vinicius Queiroz - Conversation' })).toBeVisible()
 
   const box = chat.getByRole('textbox', { name: 'Message Vinicius Queiroz' })
-  await box.fill('hello there')
+  await box.fill('hi')
   await box.press('Enter')
   const log = chat.getByRole('log')
-  await expect(log.getByText('hello there')).toBeVisible()
-  const typing = chat.getByText('Vinicius Queiroz is typing a message...')
-  await expect(typing).toBeVisible()
-  await expect(log.locator('li li')).toHaveCount(2, { timeout: 5_000 })
-  await expect(typing).toBeHidden()
-  await expect(box).toBeFocused()
-  expect(errors()).toEqual([])
+  await expect(log.getByText('hi', { exact: true })).toBeVisible()
+  // the contact's two-sentence reply, as the stream delivers it
+  await expect(log.getByText("Hey! I'm around. What are you working on?")).toBeVisible({ timeout: 10_000 })
+  // the schedule_call result opens the MSN-style booking dialog (title from the seeded labels)
+  await expect(chat.getByRole('region', { name: 'Schedule a call' })).toBeVisible()
+  // the privacy footer, with its erase control
+  await expect(chat.getByText(/This chat is with an AI version of me/)).toBeVisible()
+  await expect(chat.getByRole('button', { name: 'Delete my data' })).toBeVisible()
+  // the only expected console error is the blocked Cal.com embed script
+  expect(errors().filter((e) => !/127\.0\.0\.1:1|ERR_FAILED|Failed to load resource/i.test(e))).toEqual([])
 })
 
 test('the keyboard opens the conversation from the contact list', async ({ page }) => {

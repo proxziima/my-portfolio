@@ -1,0 +1,9 @@
+{"type":"session.started","data":{},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0001"}}
+{"type":"turn.started","data":{"sequence":1,"turnId":"turn_e2e"},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0002"}}
+{"type":"message.appended","data":{"messageDelta":"Hey! I'm around.","sequence":2,"stepIndex":0,"turnId":"turn_e2e"},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0003"}}
+{"type":"message.appended","data":{"messageDelta":" What are you working on?","sequence":3,"stepIndex":0,"turnId":"turn_e2e"},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0004"}}
+{"type":"message.completed","data":{"finishReason":"tool-calls","message":"Hey! I'm around. What are you working on?","sequence":4,"stepIndex":0,"turnId":"turn_e2e"},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0005"}}
+{"type":"actions.requested","data":{"actions":[{"callId":"call_e2e","kind":"tool-call","toolName":"schedule_call","input":{"trigger":"explicit_request"}}],"sequence":5,"stepIndex":0,"turnId":"turn_e2e"},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0006"}}
+{"type":"action.result","data":{"result":{"callId":"call_e2e","kind":"tool-result","toolName":"schedule_call","output":{"status":"rendered","calOrigin":"http://127.0.0.1:1","embedScriptUrl":"http://127.0.0.1:1/embed/embed.js","calLink":"owner/intro","bookingRef":"ref_e2e","ownerTimeZone":"America/Sao_Paulo","visitorTimeZone":"UTC"}},"sequence":6,"status":"completed","stepIndex":0,"turnId":"turn_e2e"},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0007"}}
+{"type":"turn.completed","data":{"sequence":7,"turnId":"turn_e2e"},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0008"}}
+{"type":"session.waiting","data":{"continuationToken":"wrun_e2e","wait":"next-user-message"},"meta":{"at":"2026-10-05T12:00:00.000Z","id":"evt_e2e_0009"}}
