@@ -18,6 +18,7 @@ import {
   getCachedSearch,
   putCachedSearch,
   setEvaluationOutcome,
+  setStableKeyHash,
 } from '../../src/db'
 
 let t: TestDb
@@ -114,5 +115,15 @@ describe('visitor history', () => {
     await createConversation(t.db, 'sess-2', visitorId)
     const h = await recallVisitorHistory(t.db, visitorId, 'sess-2')
     expect(h).toEqual({ visits: 1, name: 'Ana', company: 'Acme', role: undefined, kind: undefined, topics: ['projects'], booked: false, declinedCall: true })
+  })
+
+  it('only counts visits from other visitors sharing a volunteered key, never their details', async () => {
+    await setStableKeyHash(t.db, visitorId, 'h')
+    await updateConversation(t.db, 'sess-1', (s) => ({ ...s, visitor: { name: 'Ana', company: 'Acme' }, callOfferDeclined: true }))
+    const b = await createVisitor(t.db)
+    await setStableKeyHash(t.db, b, 'h')
+    await createConversation(t.db, 'sb', b)
+    const h = await recallVisitorHistory(t.db, b, 'sb')
+    expect(h).toEqual({ visits: 1, name: undefined, company: undefined, role: undefined, kind: undefined, topics: [], booked: false, declinedCall: false })
   })
 })

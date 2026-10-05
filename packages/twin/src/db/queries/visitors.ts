@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, ne, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, ne } from 'drizzle-orm'
 import { ConversationState, type VisitorKind } from '../../contract/state'
 import type { TwinDb } from '../client'
 import { conversations, visitors } from '../schema'
@@ -39,8 +39,12 @@ export interface VisitorHistory {
 }
 
 /**
- * Summarises previous sessions of this visitor and of any visitor sharing its stable key.
- * Derived on read so there is no second copy of conversation data to keep in sync.
+ * Summarises previous sessions for this visitor. Details (name, company, topics, booking...) come only
+ * from sessions of the same visitor id, i.e. the signed cookie. The stable key is an HMAC of an email
+ * the visitor typed and nobody verified, so anyone could type someone else's email: sessions of other
+ * visitors sharing the key only add to `visits` ("good to see you again") and never reveal anything.
+ * Each source is capped at 10 sessions, so `visits` tops out at 20. Derived on read so there is no
+ * second copy of conversation data to keep in sync.
  */
 export async function recallVisitorHistory(
   db: TwinDb,
@@ -49,20 +53,24 @@ export async function recallVisitorHistory(
 ): Promise<VisitorHistory | null> {
   const [self] = await db.select().from(visitors).where(eq(visitors.id, visitorId))
   if (!self) return null
-  const owners = self.stableKeyHash
-    ? or(eq(conversations.visitorId, visitorId), inArray(conversations.visitorId, db.select({ id: visitors.id }).from(visitors).where(eq(visitors.stableKeyHash, self.stableKeyHash))))
-    : eq(conversations.visitorId, visitorId)
   const rows = await db
     .select({ state: conversations.state })
     .from(conversations)
-    .where(and(owners, ne(conversations.sessionId, currentSessionId)))
+    .where(and(eq(conversations.visitorId, visitorId), ne(conversations.sessionId, currentSessionId)))
     .orderBy(desc(conversations.updatedAt))
     .limit(10)
-  if (rows.length === 0) return null
+  const linked = self.stableKeyHash
+    ? await db
+        .select({ sessionId: conversations.sessionId })
+        .from(conversations)
+        .where(and(ne(conversations.visitorId, visitorId), inArray(conversations.visitorId, db.select({ id: visitors.id }).from(visitors).where(eq(visitors.stableKeyHash, self.stableKeyHash)))))
+        .limit(10)
+    : []
+  if (rows.length === 0 && linked.length === 0) return null
   const states = rows.map((r) => ConversationState.parse(r.state))
   const pick = <K extends keyof ConversationState['visitor']>(k: K) => states.find((s) => s.visitor[k] !== undefined)?.visitor[k]
   return {
-    visits: states.length,
+    visits: states.length + linked.length,
     name: pick('name'),
     company: pick('company'),
     role: pick('role'),
