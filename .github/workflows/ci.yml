@@ -1,0 +1,85 @@
+name: ci
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      live_url:
+        description: 'Twin agent URL for live evals (blank = skip)'
+        required: false
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        # twin_eval on 5433 is what apps/agents/fixtures/offline/.env.example points at.
+        env: { POSTGRES_USER: twin, POSTGRES_PASSWORD: twin, POSTGRES_DB: twin_eval }
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U twin -d twin_eval" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TWIN_DATABASE_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
+      WORKFLOW_POSTGRES_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.3.10 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 }
+      - run: bun install --frozen-lockfile
+      - run: bunx turbo run check-types lint
+      - run: bun run --cwd packages/twin test
+      - run: bun run --cwd apps/agents test
+      - name: payload integration tests (throwaway SQLite, never payload.db)
+        env:
+          DATABASE_URL: file:./.tmp/ci.db
+          PAYLOAD_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
+        run: bun run --cwd apps/payload test:int
+      - run: bun run --cwd apps/web test
+      - run: bun test scripts/scan-client-bundle.test.ts
+      - name: agent builds and discovers every capability
+        run: bun run --cwd apps/agents info && bun run --cwd apps/agents build
+      - name: offline acceptance evals (scripted model, local stubs)
+        run: |
+          bun run --cwd packages/twin db:migrate
+          bun run --cwd apps/agents world:setup
+          cd apps/agents/fixtures/offline && cp .env.example .env && bun run eval
+      # Every web route that reads the CMS is force-dynamic, so `next build` never fetches it: CMS_URL
+      # only has to parse. Page data is real at request time and nothing is stubbed.
+      - name: client bundle carries no secrets or prompt fragments
+        env:
+          TWIN_JWT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-00
+          TWIN_COOKIE_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-11
+          TWIN_REDACT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-22
+          TWIN_STABLE_KEY_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
+          TWIN_BOOKING_REF_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-44
+          TELEGRAM_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-55
+          CAL_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-66
+          PAYLOAD_MCP_API_KEY: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-77
+          TWIN_PROMPT_CANARY: ci-canary-0123456789
+          CMS_URL: http://127.0.0.1:3001
+        run: bunx turbo run build --filter=web && bun scripts/scan-client-bundle.ts apps/web/.next/static
+
+  live-evals:
+    if: github.event_name == 'workflow_dispatch' && inputs.live_url != ''
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.3.10 }
+      - run: bun install --frozen-lockfile
+      - name: live evals per skill and acceptance
+        env:
+          TWIN_JWT_SECRET: ${{ secrets.TWIN_JWT_SECRET }}
+          TWIN_PROMPT_CANARY: ${{ secrets.TWIN_PROMPT_CANARY }}
+          CAL_WEBHOOK_SECRET: ${{ secrets.CAL_WEBHOOK_SECRET }}
+          TWIN_DATABASE_URL: ${{ secrets.TWIN_EVAL_DATABASE_URL }}
+          LIVE_URL: ${{ inputs.live_url }}
+        run: |
+          export EVE_EVAL_AUTH_TOKEN=$(bun apps/agents/scripts/mint-eval-token.ts)
+          bun run --cwd apps/agents skills
+          cd apps/agents && bunx eve eval --url "$LIVE_URL" --strict --junit .eve/junit.xml

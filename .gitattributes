@@ -1,0 +1,6 @@
+# Files that run on Linux (containers, CI, shell) must keep LF even when checked out on Windows with autocrlf.
+Dockerfile text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ndjson text eol=lf
