@@ -107,7 +107,7 @@ Both are created on the first deploy and kept across redeploys and rebuilds. Onl
 The twin starts with the stack, but it needs these external pieces before it can answer, approve and book. `<web>` is the site's public host, e.g. `example.com`.
 
 1. **Payload MCP key.** In the CMS admin, open **MCP → API Keys** and create a key for the twin. Enable **only** the custom tools `twinIdentity`, `twinSearch` and `twinDisclose`, and leave every collection and global capability off. The generic collection tools run as the key's user, which reads every disclosure tier, including `never`. Set the key as `PAYLOAD_MCP_API_KEY` and redeploy.
-2. **Twin knowledge.** Under **Twin → Twin knowledge**, add:
+2. **Knowledge base.** Under **Context → Knowledge base**, add:
    - the facts the portfolio doesn't cover (notice period, rates policy, relocation, work authorisation);
    - 3–5 `voice` entries with real samples of your writing, `public`;
    - for anything the twin must never say, a `never` entry with its exact strings under **Redact terms**.

@@ -18,7 +18,7 @@ export const portfolioMcp = mcpPlugin({
     },
     projects: { enabled: crud, description: 'Portfolio projects: name, favicon chip, url, one-line summary, disciplines.' },
     content: { enabled: crud, description: 'Content & community: articles, talks, podcasts, open-source and community work.' },
-    knowledge: { enabled: crud, description: 'Twin knowledge: facts and writing samples, each with a disclosure tier.' },
+    knowledge: { enabled: crud, description: 'Knowledge base: facts and writing samples, each with a disclosure tier.' },
     media: { enabled: { find: true }, description: 'Uploaded images (avatar, Open Graph image).' },
   },
   globals: {

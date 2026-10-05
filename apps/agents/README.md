@@ -598,13 +598,13 @@ How the agent handles a delivery:
 
 Put the key in `PAYLOAD_MCP_API_KEY`.
 
-**Disclosure tiers.** Every portfolio collection (`experiences`, `projects`, `content`, `disciplines`) and **Twin knowledge** (`knowledge`) has a `disclosure` field:
+**Disclosure tiers.** Every portfolio collection (`experiences`, `projects`, `content`, `disciplines`) and the **Knowledge base** (`knowledge`, under **Context** in the admin) has a `disclosure` field:
 
 - `public`: the twin may share it;
 - `restricted`: it needs the owner's approval in each conversation;
 - `never`: the twin never sees it.
 
-**Fill in Twin knowledge:**
+**Fill in the Knowledge base:**
 
 - **Facts that aren't portfolio entries:** notice period, rates policy, relocation, work authorisation, preferences. Use the categories `availability`, `compensation`, `logistics`, `background` or `other`, and write each answer in the first person. Restricted `availability` and `compensation` requests feed call intent.
 - **`voice` samples:** 3–5 real pieces of the owner's writing, `public`. Up to 5 `voice` entries, in `order`, ground the twin's tone.

@@ -13,8 +13,8 @@ export const KNOWLEDGE_CATEGORIES = ['availability', 'compensation', 'logistics'
  */
 export const Knowledge: CollectionConfig = {
   slug: 'knowledge',
-  labels: { singular: 'Knowledge entry', plural: 'Twin knowledge' },
-  admin: { useAsTitle: 'topic', defaultColumns: ['topic', 'category', 'disclosure'], group: 'Twin' },
+  labels: { singular: 'Knowledge entry', plural: 'Knowledge base' },
+  admin: { useAsTitle: 'topic', defaultColumns: ['topic', 'category', 'disclosure'], group: 'Context' },
   defaultSort: 'order',
   access: { ...publicContentAccess, read: disclosureRead },
   fields: [
