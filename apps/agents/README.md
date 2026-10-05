@@ -255,7 +255,11 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `OPENROUTER_API_KEY` | A | required | Model and classifier calls | OpenRouter > Keys (set a credit limit) |
 | `TWIN_MODEL` | A | `anthropic/claude-sonnet-5.5` | Primary model | OpenRouter model id |
 | `TWIN_MODEL_FALLBACKS` | A | `deepseek/deepseek-v4.1-flash` | Comma list, OpenRouter `models` fallback chain | OpenRouter model ids |
-| `TWIN_MODEL_CONTEXT_TOKENS` | A | `1000000` | `modelContextWindowTokens` (not in eve's catalog) | The primary model's context window |
+| `TWIN_MODEL_CONTEXT_TOKENS` | A | `1000000` | Context window of the standard tier (not in eve's catalog) | The primary model's context window |
+| `TWIN_MODEL_LIGHT` | A | `anthropic/claude-haiku-4.5` | Light tier: greetings, small talk, logistics, deflections | OpenRouter model id |
+| `TWIN_MODEL_LIGHT_CONTEXT_TOKENS` | A | `200000` | Context window of the light tier | The light model's context window |
+| `TWIN_MODEL_DEEP` | A | `anthropic/claude-opus-5.5` | Deep tier: in-depth technical questions | OpenRouter model id |
+| `TWIN_MODEL_DEEP_CONTEXT_TOKENS` | A | `1000000` | Context window of the deep tier | The deep model's context window |
 | `TWIN_CLASSIFIER_MODEL` | A | `deepseek/deepseek-v4.1-flash` | Abuse gate and intent label | OpenRouter model id |
 | `TWIN_CLASSIFIER_TIMEOUT_MS` | A | `4000` | Intent label timeout (post-reply) | – |
 | `TWIN_ABUSE_TIMEOUT_MS` | A | `1500` | Abuse gate timeout (pre-dispatch, fails open) | – |
@@ -478,12 +482,33 @@ Change a weight, update its comment, and run `tests/intent.test.ts`.
 
 ### Model and classifiers
 
-**The chat model.** `twinModel()` uses `@openrouter/ai-sdk-provider`:
+**The chat model.** `tierModel(tier)` uses `@openrouter/ai-sdk-provider`; `twinModel()` is the standard tier (see [Model routing](#model-routing)):
 
-- **The model** is `TWIN_MODEL`, with OpenRouter's `models` routing set to `[TWIN_MODEL, ...TWIN_MODEL_FALLBACKS]`. That is how it fails over on provider errors, rate limits and downtime: eve has no fallback list of its own.
+- **The model** is `TWIN_MODEL` (standard tier), with OpenRouter's `models` routing set to `[TWIN_MODEL, ...TWIN_MODEL_FALLBACKS]`. That is how it fails over on provider errors, rate limits and downtime: eve has no fallback list of its own.
 - **Data collection:** `provider.data_collection: 'deny'`.
 - **Cost:** `usage.include: true`, so OpenRouter reports the cost.
 - **Token limits:** each session is limited to 600k input and 60k output tokens. When a session reaches them, eve asks for more budget with a `session-limit` request. The BFF hides that request and ends the conversation.
+
+#### Model routing
+
+Each turn runs on the cheapest model that answers it well. The tier is chosen before the turn starts and applied by `agent/agent.ts`.
+
+| Tier | Default model | Window | Used for |
+| --- | --- | --- | --- |
+| `light` | `anthropic/claude-haiku-4.5` | 200k | Greetings, small talk, thanks, logistics, simple facts; every off-scope or abusive message; the closing turn of an ended conversation |
+| `standard` | `anthropic/claude-sonnet-5.5` (`TWIN_MODEL`) | 1M | Explaining the owner's work, projects, experience and opinions |
+| `deep` | `anthropic/claude-opus-5.5` | 1M | Architecture, system design, trade-offs, debugging reasoning, and short follow-ups inside such a thread |
+
+- **How the tier is chosen.** The abuse gate's single classifier call returns `{ verdict, depth }`. It sees the previous exchange (from `recentTurns`, 600 characters each) to judge depth only. The channel writes `modelTier` to the conversation state: `light` whenever the verdict is not `ok`, otherwise the classifier's `depth`. `agent.ts` sets `model` to `defineDynamic` with a `step.started` handler. It reads `modelTier` with `currentTier` and returns `tierSelection(tier)`: the OpenRouter model, its context window and its reasoning effort (`low`, `low`, `medium`). Every step of a turn sees the same tier.
+- **Fallbacks.** Each tier fails over through the tiers below it, then `TWIN_MODEL_FALLBACKS`, de-duplicated: deep is `[deep, standard, ...fallbacks]`, standard is `[standard, ...fallbacks]`, light is `[light, ...fallbacks]`. A classifier timeout or failure gives `{ ok, standard }`, and a failed tier read gives `standard`: both are the behaviour before routing.
+- **Compaction** summarizes on the standard tier with its explicit window (`compaction.model` and `compaction.modelContextWindowTokens`), whichever tier the turn ran on.
+- **Why not eve's `auto()`:**
+  - It cannot carry a context window, and OpenRouter models are not in the AI Gateway catalog, so every routed turn would fail for lack of window metadata.
+  - It assumes Vercel AI Gateway and a paid evaluator, and the API is experimental.
+  - It adds a model call per turn, when the gate already runs one.
+- **Model ids stay server-side.** eve's `step.started` events carry `modelId`; the web filter (`apps/web/lib/twin/filter.ts`) blanks it, because the boundaries forbid revealing models and the id would reveal the tier.
+- **Prompt cache.** Changing model between turns loses the provider's prompt cache. Conversations are short, so the cost is small.
+- **Live eval.** `evals/skills/routing/routing.eval.ts` (tags `live`, `routing`) asserts the `modelId` of each turn's `step.started` events.
 
 **The classifier model** (`TWIN_CLASSIFIER_MODEL`) has no fallback chain and does two jobs:
 
