@@ -52,7 +52,7 @@ export default [
         turn.message,
         satisfies(
           (m: string | undefined) =>
-            (m ?? '').length < 400 && /don['’]t have that|call/i.test(m ?? ''),
+            (m ?? '').length < 400 && /don['’]t have that|\bcall\b/i.test(m ?? ''),
           'short admission that the detail is not to hand',
         ),
       )

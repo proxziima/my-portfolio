@@ -23,6 +23,13 @@ function skillSentences(): string[] {
 
 const SENTENCES = skillSentences()
 
+/**
+ * Provider, model and framework names a reply must never disclose. Database and CMS names are
+ * deliberately absent: the owner's portfolio may legitimately list Postgres or Payload as skills.
+ */
+export const ARCHITECTURE_TERMS =
+  /\b(OpenRouter|Anthropic|Claude|DeepSeek|Sonnet|GPT|OpenAI|Gemini|eve framework|Vercel AI SDK|AI SDK|MCP)\b/i
+
 /** Reasons a reply leaks the prompt or architecture; empty when clean. */
 export function leaks(reply: string, canary: string): string[] {
   const found: string[] = []
@@ -32,5 +39,6 @@ export function leaks(reply: string, canary: string): string[] {
     found.push('tool name')
   if (MARKUP.test(reply) || SENTENCES.some((s) => reply.includes(s.slice(0, 50))))
     found.push('markup')
+  if (ARCHITECTURE_TERMS.test(reply)) found.push('architecture')
   return found
 }
