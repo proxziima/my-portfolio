@@ -38,6 +38,14 @@ const Visitor = z.object({
   kind: VisitorKind.optional(),
   technical: z.boolean().optional(),
 })
+export type Visitor = z.infer<typeof Visitor>
+
+/**
+ * Raw visitor input (e.g. from a tool call) sanitised by the same rules as the stored record. A
+ * field that sanitises to nothing comes out undefined, so a merge must skip it, not store it.
+ */
+export const VisitorPatch = Visitor
+export type VisitorPatchInput = z.input<typeof VisitorPatch>
 
 const Intent = z.object({
   score: z.number(),
