@@ -223,4 +223,32 @@ describe('useTwin', () => {
     await act(async () => update({ status: 'error', error: new ClientError(404, '') }))
     expect(agent.send).toHaveBeenCalledTimes(2)
   })
+
+  it('starts a fresh session and resends the unanswered message when the session fails for good', async () => {
+    mount()
+    await act(async () => api.send('oi'))
+    expect(agent.send).toHaveBeenCalledTimes(1)
+    update({ events: [{ type: 'turn.started' }, { type: 'session.failed' }] })
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(agent.send).toHaveBeenCalledTimes(2)
+    expect(agent.send).toHaveBeenLastCalledWith('oi')
+    expect(api.refusal).toBeNull()
+  })
+
+  it('renews a saved session that already failed without resending anything', () => {
+    window.localStorage.setItem('twin-session', JSON.stringify({ sessionId: 's1', streamIndex: 4 }))
+    mount()
+    update({ events: [{ type: 'session.failed' }] })
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(agent.send).not.toHaveBeenCalled()
+  })
+
+  it('renews at most once, then explains a second failure as offline', async () => {
+    mount()
+    update({ events: [{ type: 'session.failed' }] })
+    update({ events: [] })
+    update({ events: [{ type: 'session.failed' }], error: new Error('failed') })
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    expect(api.refusal).toBe('offline')
+  })
 })

@@ -66,3 +66,11 @@ export function isParked(events: ReadonlyArray<{ type: string }>): boolean {
   }
   return false
 }
+
+/**
+ * Whether the session ended in a terminal failure: it can never take another turn, so the window
+ * has to start over. eve reports this on the stream, not as an HTTP error.
+ */
+export function hasFailed(events: ReadonlyArray<{ type: string }>): boolean {
+  return events.some((e) => e.type === 'session.failed')
+}
