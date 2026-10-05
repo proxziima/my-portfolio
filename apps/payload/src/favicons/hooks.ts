@@ -10,8 +10,23 @@ const idOf = (ref: unknown): number | null => {
 
 const HTTP_URL = /^https?:\/\//i
 
-// Nested Local API calls below pass `req` (so they join its transaction) and set `req.file` on it. That is
-// harmless here: Companies and Projects are not upload collections.
+// Nested Local API calls below pass `req` so they share it (the SQLite adapter has no transactions, so
+// each write commits on its own) and set `req.file` on it. That is harmless here: Companies and Projects
+// are not upload collections.
+
+/**
+ * Runs a Local API call that passes `req`. `createLocalReq` reassigns `req.context` on the shared request,
+ * so the original context is put back afterwards: the outer save's later hooks must not see the flags set
+ * for the nested call.
+ */
+async function withOwnContext<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<T> {
+  const outerContext = req.context
+  try {
+    return await fn()
+  } finally {
+    req.context = outerContext
+  }
+}
 
 async function removeFavicon(req: PayloadRequest, id: number | null): Promise<void> {
   if (id === null) return
@@ -22,25 +37,39 @@ async function removeFavicon(req: PayloadRequest, id: number | null): Promise<vo
   }
 }
 
-/**
- * Writes the icon to the freshly saved owner. `createLocalReq` reassigns `req.context` on the shared
- * request, so the `skipFavicon`/`disableRevalidate` flags are put back afterwards: the outer save still
- * has to revalidate the web.
- */
-async function writeOwnerFavicon(req: PayloadRequest, collection: string, id: unknown, favicon: number | null): Promise<void> {
-  const outerContext = req.context
-  try {
-    await req.payload.update({
+/** Writes the icon to the freshly saved owner. The outer save still has to revalidate the web afterwards. */
+const writeOwnerFavicon = (req: PayloadRequest, collection: string, id: unknown, favicon: number | null): Promise<unknown> =>
+  withOwnContext(req, () =>
+    req.payload.update({
       collection: collection as CollectionSlug,
       id: id as number,
       data: { favicon } as never,
       req,
       context: { skipFavicon: true, disableRevalidate: true },
       depth: 0,
-    })
-  } finally {
-    req.context = outerContext
-  }
+    }),
+  )
+
+/**
+ * The saved `doc` is the afterRead result trimmed by the caller's `select` (the MCP update tool takes
+ * one), so a field missing from it is unknown, not empty. Read the stored values when any is missing.
+ */
+async function storedFields(
+  req: PayloadRequest,
+  collection: string,
+  doc: Record<string, unknown>,
+): Promise<{ name: unknown; url: unknown; favicon: unknown }> {
+  if ('name' in doc && 'url' in doc && 'favicon' in doc) return doc as { name: unknown; url: unknown; favicon: unknown }
+  return (await withOwnContext(req, () =>
+    req.payload.findByID({
+      collection: collection as CollectionSlug,
+      id: doc.id as number,
+      depth: 0,
+      req,
+      select: { name: true, url: true, favicon: true } as never,
+      overrideAccess: true,
+    }),
+  )) as { name: unknown; url: unknown; favicon: unknown }
 }
 
 /** Creates the favicon doc, or replaces the file of `current` in place. Never throws. */
@@ -77,8 +106,9 @@ async function storeFavicon(
 export const syncFavicon: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req, context, collection }) => {
   if (context.skipFavicon) return doc
   try {
-    const current = idOf(doc.favicon)
-    const url: string | null = typeof doc.url === 'string' ? doc.url : null
+    const owner = await storedFields(req, collection.slug, doc)
+    const current = idOf(owner.favicon)
+    const url: string | null = typeof owner.url === 'string' ? owner.url : null
     const clear = async () => {
       await removeFavicon(req, current)
       await writeOwnerFavicon(req, collection.slug, doc.id, null)
@@ -91,7 +121,7 @@ export const syncFavicon: CollectionAfterChangeHook = async ({ doc, previousDoc,
     if (!urlChanged && current !== null && !context.refreshFavicon) return doc
 
     const found = await discoverFavicon(url)
-    const stored = found ? await storeFavicon(req, found, String(doc.name ?? 'site'), current) : { id: null, currentLost: false }
+    const stored = found ? await storeFavicon(req, found, String(owner.name ?? 'site'), current) : { id: null, currentLost: false }
     if (stored.id === null) {
       req.payload.logger.warn(`no favicon stored for ${url}`)
       if (current !== null && stored.currentLost) {

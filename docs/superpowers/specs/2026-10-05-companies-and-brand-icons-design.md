@@ -58,6 +58,8 @@ recorded here with its reason.
       body under 512 KB. Store it with that MIME type and a filename derived from the owner.
    5. On any failure (fetch or store), log a warning and never fail the save. If the URL changed,
       the old favicon is removed. If an unchanged URL is being refreshed, the old favicon is kept.
+      One exception: when replacing the file in place fails, the old favicon is removed too,
+      because Payload deletes the old file before it writes the new one.
    6. Only raster icons (ICO, PNG, JPEG, GIF, WebP, AVIF) are accepted. SVG is excluded because a
       third-party SVG served from the CMS origin could run script if opened directly.
 

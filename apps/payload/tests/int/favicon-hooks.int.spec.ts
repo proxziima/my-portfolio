@@ -9,7 +9,7 @@ const ICON = { data: Buffer.from([0, 0, 1, 0]), mimetype: 'image/x-icon', ext: '
 const PARENT_CONTEXT = { skipFavicon: true, disableRevalidate: true }
 
 /** A fake request whose Local API calls reassign `req.context` the way Payload's createLocalReq does. */
-function fakeReq(context: Record<string, unknown> = {}) {
+function fakeReq(context: Record<string, unknown> = {}, stored: Record<string, unknown> = {}) {
   const req: { context: Record<string, unknown>; payload: Record<string, unknown> } = { context, payload: {} }
   const withContext = (args: { context?: Record<string, unknown> }) => {
     req.context = { ...req.context, ...args.context }
@@ -18,12 +18,13 @@ function fakeReq(context: Record<string, unknown> = {}) {
     create: vi.fn(async (args: { context?: Record<string, unknown> }) => (withContext(args), { id: 50 })),
     update: vi.fn(async (args: { id: number; context?: Record<string, unknown> }) => (withContext(args), { id: args.id })),
     delete: vi.fn(async () => ({})),
+    findByID: vi.fn(async (args: { context?: Record<string, unknown> }) => (withContext(args), stored)),
     logger: { warn: vi.fn() },
   }
   return req
 }
 type FakeReq = ReturnType<typeof fakeReq>
-const calls = (req: FakeReq, method: 'create' | 'update' | 'delete') =>
+const calls = (req: FakeReq, method: 'create' | 'update' | 'delete' | 'findByID') =>
   (req.payload[method] as ReturnType<typeof vi.fn>).mock.calls.map(([args]) => args as Record<string, unknown>)
 const parentWrites = (req: FakeReq) => calls(req, 'update').filter((args) => args.collection === 'companies')
 const faviconCalls = (req: FakeReq, method: 'create' | 'update' | 'delete') =>
@@ -168,6 +169,49 @@ describe('syncFavicon', () => {
     const { result } = run(doc, undefined, {}, req)
     expect(await result).toBe(doc)
     expect(faviconCalls(req, 'delete')).toEqual([expect.objectContaining({ id: 50 })])
+  })
+  describe('when the response was trimmed by `select`', () => {
+    const stored = { name: 'A', url: 'https://a.dev', favicon: 9 }
+    const previous = { id: 7, name: 'A', url: 'https://a.dev', favicon: 9 }
+    it('re-reads the record when the response has no url, and keeps the icon', async () => {
+      const req = fakeReq({}, stored)
+      const doc = { id: 7, favicon: 9 }
+      const { result } = run(doc, previous, {}, req)
+      expect(await result).toBe(doc)
+      expect(calls(req, 'findByID')).toEqual([
+        expect.objectContaining({ collection: 'companies', id: 7, depth: 0, select: { name: true, url: true, favicon: true } }),
+      ])
+      expect(calls(req, 'delete')).toEqual([])
+      expect(parentWrites(req)).toEqual([])
+      expect(discover).not.toHaveBeenCalled()
+      expect(req.context).toEqual({})
+    })
+    it('re-reads the record when the response has no favicon, and does not duplicate it', async () => {
+      const req = fakeReq({}, stored)
+      const doc = { id: 7, name: 'A', url: 'https://a.dev' }
+      const { result } = run(doc, previous, {}, req)
+      expect(await result).toBe(doc)
+      expect(calls(req, 'findByID')).toHaveLength(1)
+      expect(calls(req, 'create')).toEqual([])
+      expect(discover).not.toHaveBeenCalled()
+    })
+    it('does not re-read a complete response', async () => {
+      const req = fakeReq({}, stored)
+      const { result } = run({ ...previous }, previous, {}, req)
+      await result
+      expect(calls(req, 'findByID')).toEqual([])
+    })
+    it('leaves the record alone when the re-read fails', async () => {
+      const req = fakeReq({}, stored)
+      ;(req.payload.findByID as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        throw new Error('gone')
+      })
+      const doc = { id: 7, favicon: 9 }
+      const { result } = run(doc, previous, {}, req)
+      expect(await result).toBe(doc)
+      expect(calls(req, 'delete')).toEqual([])
+      expect(warned(req)).toHaveBeenCalled()
+    })
   })
   it('does nothing with skipFavicon', async () => {
     const doc = { id: 7, name: 'A', url: 'https://a.dev', favicon: null }
