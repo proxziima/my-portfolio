@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import type { TwinDb } from '../client'
+import { ApprovalStatus } from '../../contract/state'
 import { approvals } from '../schema'
 
 /** Persists a pending owner approval and returns its id (also the Telegram callback payload). */
@@ -56,5 +57,31 @@ export async function decideApproval(
     webhookUrl: row.webhookUrl,
     telegramMessageId: row.telegramMessageId,
     decidedAt: now,
+  }
+}
+
+/** An approval as stored, pending or settled. */
+export interface ApprovalRecord {
+  id: string
+  sessionId: string
+  sourceId: string
+  topic: string
+  status: ApprovalStatus
+  telegramMessageId: number | null
+  decidedAt: Date | null
+}
+
+/** Reads one approval, or null when the id is unknown. The status is validated, not trusted. */
+export async function getApproval(db: TwinDb, id: string): Promise<ApprovalRecord | null> {
+  const [row] = await db.select().from(approvals).where(eq(approvals.id, id))
+  if (!row) return null
+  return {
+    id: row.id,
+    sessionId: row.sessionId,
+    sourceId: row.sourceId,
+    topic: row.topic,
+    status: ApprovalStatus.parse(row.status),
+    telegramMessageId: row.telegramMessageId,
+    decidedAt: row.decidedAt,
   }
 }

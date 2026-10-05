@@ -5,6 +5,7 @@ import {
   createVisitor,
   decideApproval,
   createApproval,
+  getApproval,
   deleteVisitor,
   getConversation,
   hitRateLimit,
@@ -83,6 +84,14 @@ describe('approvals', () => {
     const second = await decideApproval(t.db, id, { status: 'expired', actor: 'system', reasoning: 'timeout' })
     expect(first?.status).toBe('approved')
     expect(second).toBeNull()
+  })
+
+  it('reads an approval back, pending or settled, and null for an unknown id', async () => {
+    const id = await createApproval(t.db, { sessionId: 'sess-1', sourceId: 'knowledge:7', topic: 'notice period', reason: 'asked' })
+    expect(await getApproval(t.db, id)).toMatchObject({ id, sessionId: 'sess-1', sourceId: 'knowledge:7', status: 'pending', decidedAt: null })
+    await decideApproval(t.db, id, { status: 'denied', actor: 'telegram:42', reasoning: 'no' }, new Date('2026-10-05T10:00:00Z'))
+    expect(await getApproval(t.db, id)).toMatchObject({ status: 'denied', decidedAt: new Date('2026-10-05T10:00:00Z') })
+    expect(await getApproval(t.db, '3f1c2b9e-8a7d-4c6b-9e5f-1a2b3c4d5e6f')).toBeNull()
   })
 })
 
