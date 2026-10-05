@@ -1,6 +1,6 @@
 import { MockLanguageModelV4 } from 'ai/test'
 import { describe, expect, it, vi } from 'vitest'
-import { initialConversationState, type ConversationState } from '@repo/twin/contract'
+import { initialConversationState, IntentClass, type ConversationState } from '@repo/twin/contract'
 import { INTENT_WEIGHTS } from '../agent/lib/intent/weights'
 import { signalsOf } from '../agent/lib/intent/signals'
 import { scoreIntent } from '../agent/lib/intent/score'
@@ -19,8 +19,37 @@ describe('intent scoring', () => {
     expect(r.reasons.length).toBeGreaterThan(0)
   })
 
-  it('an explicit request is always hot', () => {
-    expect(scoreIntent(signalsOf(s({})), 'requesting_call', s({})).tier).toBe('hot')
+  // The main model handles an explicit ask in the same reply (schedule_call, trigger explicit_request);
+  // the post-reply label is corroborating evidence only, so one misread can never force the widget.
+  it('no classification alone reaches hot', () => {
+    for (const label of IntentClass.options) {
+      expect(scoreIntent(signalsOf(s({})), label, s({})).tier).not.toBe('hot')
+      expect(INTENT_WEIGHTS.classification[label]).toBeLessThan(INTENT_WEIGHTS.thresholds.hotAt)
+    }
+  })
+
+  it('requesting_call goes through the thresholds like any label', () => {
+    const r = scoreIntent(signalsOf(s({})), 'requesting_call', s({}))
+    expect(r.score).toBe(INTENT_WEIGHTS.classification.requesting_call)
+    expect(r.tier).toBe('cold')
+    expect(r.reasons).toContain(`classified requesting_call (+${INTENT_WEIGHTS.classification.requesting_call})`)
+    expect(r.reasons.some((x) => x.includes('explicit request'))).toBe(false)
+  })
+
+  // Regression: "Sim, fala mais da Nexo Labs." was labelled requesting_call and the next turn's
+  // technical answer came with the booking widget on top. One misread now reaches warm at most.
+  it('a misread requesting_call on a deep returning conversation stays below hot', () => {
+    const st = s({ turnCount: 4, returningVisitor: true, citedSources: ['experiences:autodoc', 'experiences:nexo', 'projects:1'] })
+    const sig = signalsOf(st)
+    expect(sig).toMatchObject({ specificWorkCited: true, deepConversation: true, returningVisitor: true, turnCount: 4 })
+    const r = scoreIntent(sig, 'requesting_call', st)
+    expect(r.score).toBeLessThan(INTENT_WEIGHTS.thresholds.hotAt)
+    expect(r.tier).toBe('warm')
+  })
+
+  it('requesting_call with corroborating signals still reaches hot', () => {
+    const st = s({ turnCount: 5, toolsUsed: ['check_availability'], visitor: { name: 'Ana', kind: 'recruiter' } })
+    expect(scoreIntent(signalsOf(st), 'requesting_call', st).tier).toBe('hot')
   })
 
   it('accumulates conversation signals into warm and hot', () => {
@@ -30,12 +59,13 @@ describe('intent scoring', () => {
     expect(scoreIntent(signalsOf(hot), 'hiring_signal', hot).tier).toBe('hot')
   })
 
-  it('a decline caps the score below warm unless they ask explicitly', () => {
+  // An explicit ask after a decline is the main model's call (explicit_request), not the score's.
+  it('a decline caps the score below warm, whatever the label', () => {
     const declined = s({ callOfferDeclined: true, turnCount: 6, toolsUsed: ['check_availability'], visitor: { name: 'Ana', kind: 'recruiter' } })
     const r = scoreIntent(signalsOf(declined), 'hiring_signal', declined)
     expect(r.tier).toBe('cold')
     expect(r.reasons.some((x) => x.includes('declined'))).toBe(true)
-    expect(scoreIntent(signalsOf(declined), 'requesting_call', declined).tier).toBe('hot')
+    expect(scoreIntent(signalsOf(declined), 'requesting_call', declined).tier).toBe('cold')
   })
 
   it('scores from signals alone when the classifier timed out', () => {

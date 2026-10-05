@@ -238,7 +238,8 @@ Its result drives the **next** turn through the state digest. The consequences:
 
 - **Time-to-first-token is untouched.**
 - **An explicit request skips scoring.** The model calls `schedule_call({ trigger: "explicit_request" })`
-  in the same turn, and the evaluation records `requesting_call → hot` with reason `explicit request`.
+  in the same turn. The post-reply evaluation's `requesting_call` label is corroborating evidence only
+  (weight 3, below `hotAt`), so a misread label can reach `warm` at most and never forces the widget.
 - **The idempotency key is `(sessionId, assistantMessageId)`.** At-least-once hook delivery is
   deduplicated by a unique index.
 - **Budget:** the brief's 200 ms limit protected a *blocking* evaluation. This design never blocks, so
@@ -267,7 +268,7 @@ Its result drives the **next** turn through the state digest. The consequences:
   - Formula: `score = Σ weights(signals) + weights.intent[class]`.
   - Tiers: `cold < warmAt ≤ warm < hotAt ≤ hot`.
   - Floors:
-    - `requesting_call` forces hot.
+    - No classification forces a tier; every label goes through the thresholds.
     - `callOfferDeclined` caps the score at `warmAt - 1` for the session.
     - Once `widgetShown`, the tier stays where it is.
   - Output: `{ score, tier, reasons: string[] }`, with `reasons.length >= 1` enforced by zod **and** a

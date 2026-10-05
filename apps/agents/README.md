@@ -450,7 +450,7 @@ After each final reply, `agent/lib/intent/evaluate.ts` scores the conversation:
 The tiers:
 
 - `cold` is below `warmAt` (4); `warm` is from 4; `hot` is from `hotAt` (7).
-- `requesting_call` is always `hot`.
+- No label forces a tier. `requesting_call` weighs 3, below `hotAt`: an explicit ask is already handled in the same reply by the main model (the scheduling skill's explicit-request rule, `schedule_call` with trigger `explicit_request`), so the post-reply label only corroborates, and one misread reaches `warm` at most.
 - A declined offer caps the score just below warm.
 - Once the booking widget is shown, the tier stays where it was.
 
