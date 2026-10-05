@@ -101,20 +101,57 @@ async function ensureDatabases(kind: Backend): Promise<void> {
   if (code !== 0) fail('Could not create the twin role or databases (see the psql output above)')
 }
 
+/** Runs SQL as the superuser inside the backend and returns trimmed, unaligned output. */
+async function sql(kind: Backend, db: string, statement: string): Promise<{ code: number; text: string }> {
+  const psql =
+    kind === 'wsl'
+      ? wsl('postgres', 'psql', '-qtA', '-v', 'ON_ERROR_STOP=1', '-p', String(PORT), '-d', db)
+      : ['docker', 'compose', '-f', 'docker-compose.dev.yml', 'exec', '-T', 'postgres', 'psql', '-qtA', '-v', 'ON_ERROR_STOP=1', '-U', ROLE, '-d', db]
+  const result = await run(psql, { stdin: `${statement}\n`, quiet: true })
+  return { code: result.code, text: result.text.trim() }
+}
+
+/**
+ * Early development created the `twin` schema before migrations were tracked, so the migrator
+ * can't apply 0000 over it. Recreating it is lossless only when the migration journal is empty
+ * and every twin table is empty; anything else is left untouched for a person to decide.
+ */
+async function repairUntrackedSchema(kind: Backend, db: string): Promise<'repaired' | 'not-needed' | 'has-data'> {
+  const journal = await sql(
+    kind,
+    db,
+    `SELECT CASE WHEN to_regclass('twin_migrations.__drizzle_migrations') IS NULL THEN 0 ELSE (SELECT count(*) FROM twin_migrations.__drizzle_migrations) END;`,
+  )
+  const schema = await sql(kind, db, `SELECT count(*) FROM pg_namespace WHERE nspname = 'twin';`)
+  if (journal.code !== 0 || schema.code !== 0) fail(`Could not inspect ${db}:\n${journal.text}\n${schema.text}`)
+  if (journal.text !== '0' || schema.text !== '1') return 'not-needed'
+  const rows = await sql(
+    kind,
+    db,
+    `SELECT coalesce(sum((xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM twin.%I', tablename), false, true, '')))[1]::text::bigint), 0) FROM pg_tables WHERE schemaname = 'twin';`,
+  )
+  if (rows.code !== 0) fail(`Could not count rows in ${db}.twin:\n${rows.text}`)
+  if (rows.text !== '0') return 'has-data'
+  const drop = await sql(kind, db, `DROP SCHEMA twin CASCADE;`)
+  if (drop.code !== 0) fail(`Could not recreate the untracked twin schema in ${db}:\n${drop.text}`)
+  return 'repaired'
+}
+
 /** Applies the twin migrations and eve's Workflow world schema to one database. */
-async function prepare(db: string): Promise<boolean> {
+async function prepare(kind: Backend, db: string): Promise<boolean> {
   const url = `postgres://${ROLE}:${ROLE}@127.0.0.1:${PORT}/${db}`
-  console.log(`\n→ ${db}: twin migrations`)
-  const migrate = await run(['bun', 'run', '--cwd', 'packages/twin', 'db:migrate'], { env: { TWIN_DATABASE_URL: url } })
-  if (migrate.code !== 0) {
-    if (migrate.text.includes('already exists')) {
-      console.error(
-        `  ${db} holds a twin schema that predates migration tracking. Reset it (its tables hold no real data):\n` +
-          `  psql "${url}" -c "DROP SCHEMA twin CASCADE;"  then run \`bun run infra\` again.`,
-      )
-    }
+  const repair = await repairUntrackedSchema(kind, db)
+  if (repair === 'repaired') console.log(`\n→ ${db}: recreated an empty, untracked twin schema so migrations can apply`)
+  if (repair === 'has-data') {
+    console.error(
+      `\n✗ ${db}: the twin schema predates migration tracking and holds rows, so it was left untouched.\n` +
+        `  Back it up, then reset it yourself: psql "${url}" -c "DROP SCHEMA twin CASCADE;"`,
+    )
     return false
   }
+  console.log(`\n→ ${db}: twin migrations`)
+  const migrate = await run(['bun', 'run', '--cwd', 'packages/twin', 'db:migrate'], { env: { TWIN_DATABASE_URL: url } })
+  if (migrate.code !== 0) return false
   console.log(`→ ${db}: eve Workflow world`)
   const world = await run(['bun', 'run', '--cwd', 'apps/agents', 'world:setup'], { env: { WORKFLOW_POSTGRES_URL: url } })
   return world.code === 0
@@ -137,7 +174,7 @@ async function up(): Promise<void> {
   await waitReady(kind)
   await ensureDatabases(kind)
   const results = []
-  for (const db of DATABASES) results.push(await prepare(db))
+  for (const db of DATABASES) results.push(await prepare(kind, db))
   if (results.includes(false)) fail('Postgres is up, but not every database is ready (see above)')
   console.log(`\n✓ Postgres ready on 127.0.0.1:${PORT}: ${DATABASES.join(', ')} migrated with the Workflow world`)
 }
