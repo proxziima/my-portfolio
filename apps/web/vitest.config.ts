@@ -22,6 +22,9 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'json-summary'],
       reportsDirectory: './coverage',
+      // Every source file counts, including ones no test imports (content/ holds only Markdown).
+      include: ['{app,features,lib,shared}/**/*.{ts,tsx}'],
+      exclude: ['**/*.d.ts', 'next-env.d.ts', '.next/**'],
     },
   },
 })

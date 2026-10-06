@@ -23,6 +23,10 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'json-summary'],
       reportsDirectory: './coverage',
+      // Every source file counts (the `#*` and `#evals/*` import roots), including ones no test
+      // imports; the skills bundle is generated from skills/*/SKILL.md.
+      include: ['agent/**/*.ts', 'evals/lib/**/*.ts'],
+      exclude: ['agent/lib/skills/generated.ts'],
     },
   },
 })

@@ -14,6 +14,9 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'json-summary'],
       reportsDirectory: './coverage',
+      // Every source file counts, including ones no test imports; the test helpers aren't product code.
+      include: ['src/**/*.ts'],
+      exclude: ['src/testing/**'],
     },
   },
 })
