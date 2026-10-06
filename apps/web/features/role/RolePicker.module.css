@@ -12,7 +12,8 @@
   top: 50%;
   z-index: 30;
   display: block;
-  width: 300px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
   margin-top: -63px;
   padding: 0;
   border-radius: 12px;
@@ -111,6 +112,7 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-soft);
+  white-space: nowrap;
   opacity: 0;
   transition:
     opacity 0.2s ease,
@@ -147,7 +149,7 @@
 
 @media (max-width: 520px) {
   .wheel {
-    width: 260px;
+    width: 320px;
   }
 
   .name {
