@@ -38,7 +38,7 @@ yarn-error.log*
 *.pem
 
 # CI service logs (the throwaway CMS and agent)
-.ci-logs
+/ci-logs/
 
 # Payload SQLite database (and the throwaway ones under .tmp/)
 .tmp/

@@ -1,7 +1,7 @@
 name: throwaway cms
 description: >-
   Builds, migrates, seeds and starts the CMS on :3001 from an empty SQLite file (never payload.db).
-  Run after setup and secrets. The log is .ci-logs/cms.log in the workspace.
+  Run after setup and secrets. The log is ci-logs/cms.log in the workspace.
 inputs:
   twin-key:
     description: Also seed the twin's fact, voice sample and MCP key (exports PAYLOAD_MCP_API_KEY, masked).
@@ -42,11 +42,11 @@ runs:
         NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
         WEB_URL: ${{ inputs.web-url }}
       run: |
-        mkdir -p "$GITHUB_WORKSPACE/.ci-logs"
-        nohup bun run --cwd apps/payload start > "$GITHUB_WORKSPACE/.ci-logs/cms.log" 2>&1 &
+        mkdir -p "$GITHUB_WORKSPACE/ci-logs"
+        nohup bun run --cwd apps/payload start > "$GITHUB_WORKSPACE/ci-logs/cms.log" 2>&1 &
         for _ in $(seq 60); do
           curl -fsS http://127.0.0.1:3001/api/globals/profile > /dev/null && exit 0
           sleep 2
         done
-        tail -n 100 "$GITHUB_WORKSPACE/.ci-logs/cms.log"
+        tail -n 100 "$GITHUB_WORKSPACE/ci-logs/cms.log"
         exit 1

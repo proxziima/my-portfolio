@@ -252,7 +252,7 @@ jobs:
           path: |
             apps/web/playwright-report
             apps/web/test-results
-            .ci-logs/
+            ci-logs/
           retention-days: 7
 
   # Each affected production image builds (no push). Layers are cached per service.
@@ -387,13 +387,13 @@ jobs:
           bun run --cwd apps/agents build
           bun run --cwd apps/agents world:setup
           bun run --cwd packages/twin db:migrate
-          mkdir -p "$GITHUB_WORKSPACE/.ci-logs"
-          PORT=4100 nohup bun run --cwd apps/agents start > "$GITHUB_WORKSPACE/.ci-logs/agent.log" 2>&1 &
+          mkdir -p "$GITHUB_WORKSPACE/ci-logs"
+          PORT=4100 nohup bun run --cwd apps/agents start > "$GITHUB_WORKSPACE/ci-logs/agent.log" 2>&1 &
           for _ in $(seq 60); do
             curl -fsS http://127.0.0.1:4100/eve/v1/health > /dev/null && exit 0
             sleep 2
           done
-          tail -n 100 "$GITHUB_WORKSPACE/.ci-logs/agent.log"
+          tail -n 100 "$GITHUB_WORKSPACE/ci-logs/agent.log"
           exit 1
       - name: live evals per skill and acceptance
         run: |
@@ -408,7 +408,7 @@ jobs:
           name: live-evals
           path: |
             apps/agents/.eve/junit.xml
-            .ci-logs/
+            ci-logs/
           if-no-files-found: ignore
           retention-days: 14
 
