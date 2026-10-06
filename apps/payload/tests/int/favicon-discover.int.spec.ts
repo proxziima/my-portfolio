@@ -82,7 +82,8 @@ describe('iconLinks', () => {
   })
 })
 
-describe('discoverFavicon', () => {
+// Real render processes: each discovery is bounded by its total budget; allow twice that on a loaded machine.
+describe('discoverFavicon', { timeout: 2 * DEFAULT_LIMITS.totalTimeoutMs }, () => {
   it('returns the best declared icon', async () => {
     const fetchImpl = stub({
       'https://a.dev/': () => html('<link rel="icon" href="/icon.png" sizes="32x32">'),

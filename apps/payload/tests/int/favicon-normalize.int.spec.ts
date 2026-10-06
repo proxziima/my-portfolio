@@ -17,6 +17,11 @@ beforeEach(() => {
 })
 
 const CAPS = { timeoutMs: 10_000, memoryMb: 256 }
+/**
+ * Tests that start real render processes: up to two renders each, at CAPS.timeoutMs apiece, with
+ * room for a machine loaded by the rest of the suite. Timing bounds under test are asserted inside.
+ */
+const RENDERS = { timeout: 3 * CAPS.timeoutMs }
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 const NS = 'xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"'
 const svg = (body: string, size = 'width="16" height="16"') => Buffer.from(`<svg ${NS} ${size}>${body}</svg>`)
@@ -120,7 +125,7 @@ describe('normalizeIcon: ICO', () => {
   })
 })
 
-describe('normalizeIcon: content', () => {
+describe('normalizeIcon: content', RENDERS, () => {
   it('refuses gzip-compressed bytes without parsing them', async () => {
     await expectRefusedUpFront(gzipSync(RED_SVG))
   })
@@ -183,7 +188,7 @@ describe('normalizeIcon: content', () => {
   })
 })
 
-describe('normalizeIcon: SVG pre-check', () => {
+describe('normalizeIcon: SVG pre-check', RENDERS, () => {
   it('refuses a <use> fan-out', async () => {
     await expectRefusedUpFront(fanOut(16))
   })
@@ -281,7 +286,7 @@ describe('normalizeIcon: SVG pre-check', () => {
   })
 })
 
-describe('normalizeIcon: render process', () => {
+describe('normalizeIcon: render process', RENDERS, () => {
   it('kills the render process when time runs out, leaving none behind', async () => {
     expect(await normalizeIcon(SLOW_SVG, CAPS)).not.toBeNull()
     spawned.mockClear()

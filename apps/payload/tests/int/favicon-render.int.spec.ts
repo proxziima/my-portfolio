@@ -43,10 +43,13 @@ function chain(tag: string, attr: string, width: number, levels: number): Buffer
   return svg(`${defs}<rect width="64" height="64" fill="red" ${attr}="url(#x${levels})"/>`)
 }
 
+/** Real render processes, capped at 10 s each in these tests, on a machine the rest of the suite may be loading. */
+const RENDERS = { timeout: 30_000 }
+
 const lastChild = () => spawned.mock.results.at(-1)!.value as ChildProcess
 const childEnv = () => (spawned.mock.calls.at(-1)![2] as { env: Record<string, string> }).env
 
-describe('renderInChild', () => {
+describe('renderInChild', RENDERS, () => {
   it('draws an SVG as a PNG', async () => {
     const png = await renderInChild(RED_SVG, 'svg', { timeoutMs: 10_000, memoryMb: 256 })
     expect(png?.subarray(0, 4).toString('latin1')).toBe('\x89PNG')
@@ -66,7 +69,7 @@ describe('renderInChild', () => {
     // A mask chain keeps drawing for tens of seconds within the memory cap.
     expect(await renderInChild(chain('mask', 'mask', 10, 8), 'svg', { timeoutMs: 200, memoryMb: 4096 })).toBeNull()
     expect(Date.now() - started).toBeLessThan(3000)
-  }, 10_000)
+  })
 
   it('refuses output that is not a PNG, even on a clean exit', async () => {
     control.program = "process.stdout.write('<svg onload=alert(1)>', () => process.exit(0))"
@@ -90,7 +93,7 @@ describe('renderInChild', () => {
     },
   )
 
-  describe('environment', () => {
+  describe('environment', RENDERS, () => {
     const secret = process.env.PAYLOAD_SECRET
     afterEach(() => {
       if (secret === undefined) Reflect.deleteProperty(process.env, 'PAYLOAD_SECRET')
@@ -106,7 +109,7 @@ describe('renderInChild', () => {
     })
   })
 
-  describe('runtime', () => {
+  describe('runtime', RENDERS, () => {
     afterEach(() => {
       delete (process.versions as Partial<Record<string, string>>).bun
     })

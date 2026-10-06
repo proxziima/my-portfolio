@@ -47,7 +47,8 @@ describe('isBoundedSvg runs in linear time', () => {
   })
 })
 
-describe('normalizeIcon reaches a verdict or a render in linear time', () => {
+// Inputs that pass the pre-check start a real render process (killed at once); allow for a loaded machine.
+describe('normalizeIcon reaches a verdict or a render in linear time', { timeout: 10_000 }, () => {
   it.each(cases)('on %s', async (_, doc) => {
     timing.spawnedAt = 0
     const started = performance.now()
