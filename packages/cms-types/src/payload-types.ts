@@ -251,11 +251,11 @@ export interface Company {
   chip: string;
   url?: string | null;
   /**
-   * Shown instead of the favicon and the chip.
+   * Shown instead of the favicon and the chip. Media uploads are public; don't upload a logo for a company you keep hidden.
    */
   logo?: (number | null) | Media;
   /**
-   * Fetched from the URL on save. Used when there is no logo; the chip is the last fallback.
+   * Fetched from the URL on save. Used when there is no logo; the chip is the last fallback. If the site has no usable icon, it is retried on each save (up to ~15 s).
    */
   favicon?: (number | null) | Favicon;
   disclosure: 'public' | 'restricted' | 'never';
@@ -335,11 +335,11 @@ export interface Project {
   chip: string;
   url?: string | null;
   /**
-   * Shown instead of the favicon and the chip.
+   * Shown instead of the favicon and the chip. Media uploads are public; don't upload a logo for a company you keep hidden.
    */
   logo?: (number | null) | Media;
   /**
-   * Fetched from the URL on save. Used when there is no logo; the chip is the last fallback.
+   * Fetched from the URL on save. Used when there is no logo; the chip is the last fallback. If the site has no usable icon, it is retried on each save (up to ~15 s).
    */
   favicon?: (number | null) | Favicon;
   summary: string;

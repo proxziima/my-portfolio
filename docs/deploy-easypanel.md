@@ -9,7 +9,7 @@ Production runs as one Easypanel **Compose** service built from this repository'
 | `postgres` | `postgres:17-alpine` | 5432 | none (internal) | volume `twin-pg` |
 | `agents` | `apps/agents/Dockerfile`: the portfolio twin (eve), `eve start` | 3000 | none (internal) | none (state is in `postgres`) |
 
-The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload.db`) and the uploads (`/data/media`, `/data/scenes`). The `twin-pg` volume holds the portfolio twin's Postgres database `twin`. That database contains both the twin's own tables (schema `twin`) and eve's durable Workflow runtime (schemas `workflow` and `graphile_worker`). Every image is built from the repository root, and every setting is read at runtime, so nothing environment-specific is baked into an image.
+The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload.db`) and the uploads (`/data/media`, `/data/scenes`, `/data/favicons`). The `twin-pg` volume holds the portfolio twin's Postgres database `twin`. That database contains both the twin's own tables (schema `twin`) and eve's durable Workflow runtime (schemas `workflow` and `graphile_worker`). Every image is built from the repository root, and every setting is read at runtime, so nothing environment-specific is baked into an image.
 
 **`agents` must never get a domain.** It serves eve's Workflow routes (`/.well-known/workflow/v1/*`), which are unauthenticated: anyone who can reach them can forge or replay workflow steps. Only `web` talks to it, over the compose network (`http://agents:3000`). That covers the visitor BFF and the two webhook forwarders `https://<web>/api/twin/hooks/cal` and `https://<web>/api/twin/hooks/telegram`. How the twin works: [apps/agents/README.md](../apps/agents/README.md).
 
@@ -66,7 +66,7 @@ The portfolio twin adds the variables below. Each one is described in [`.env.dep
 
 Generate each secret with `openssl rand -hex 32`. Don't reuse the development values. Origins are `https://`, with no trailing slash and no path.
 
-The image already sets `NODE_ENV=production`, `DATABASE_URL=file:/data/payload.db`, `MEDIA_DIR=/data/media` and `SCENES_DIR=/data/scenes`. Don't override them.
+The image already sets `NODE_ENV=production`, `DATABASE_URL=file:/data/payload.db`, `MEDIA_DIR=/data/media`, `SCENES_DIR=/data/scenes` and `FAVICONS_DIR=/data/favicons`. Don't override them.
 
 ## 3. Add the domains
 
@@ -95,7 +95,7 @@ Both are created on the first deploy and kept across redeploys and rebuilds. Onl
 3. `agents` starts once both are healthy. Before it listens, its command creates the Workflow world's schema (`world:setup`) and applies the twin migrations (`db:migrate`). Both are idempotent and run on every start. Its healthcheck requests `/eve/v1/health`. `web` starts once `cms`, `postgres` and `agents` are healthy.
 4. **Create the admin user right away** at `https://cms.example.com/admin`. Until the first user exists, anyone who opens the admin can create it.
 5. Add the content, either way:
-   - **Seed** the portfolio content (disciplines, experiences, projects, content, globals). In Easypanel, open the `cms` container's console (or run `docker compose exec cms …` on the server) and run:
+   - **Seed** the portfolio content (companies, disciplines, experiences, projects, content, globals). In Easypanel, open the `cms` container's console (or run `docker compose exec cms …` on the server) and run:
      ```bash
      bun run seed
      ```
@@ -148,6 +148,14 @@ Retention runs inside `agents`. Every day at 03:00 it purges visitors not seen f
 
 Push to the deployed branch, then click **Deploy** (or enable Easypanel's auto-deploy for the service). The images are rebuilt from the new commit and the containers are replaced; the `cms-data` and `twin-pg` volumes stay. On start, `agents` applies any new twin migration. When the new `cms` handles its first request, it runs any migration that isn't in `payload_migrations` yet.
 
+**Deploying the companies version** (the first with `companies` and `favicons`): its migration runs on start and carries the experiences' companies over, but it fetches no favicons (migrations have no network). Once it is up, run this once in the `cms` console to fetch them:
+
+```bash
+bun run favicons:refresh
+```
+
+It re-saves every company and project that has a URL, logs what it stored for each, and exits non-zero if any record failed. It is safe to re-run to refresh stale icons.
+
 **Schema changes need a migration.** Development pushes the schema automatically; production never does. After changing a collection, global or field, create a migration before you deploy and commit it:
 
 ```bash
@@ -168,14 +176,14 @@ bun run payload migrate          # run pending migrations by hand (the server do
 
 ## Backups
 
-Everything is in `/data` in the `cms` container: `payload.db`, `media/` and `scenes/`.
+Everything is in `/data` in the `cms` container: `payload.db`, `media/`, `scenes/` and `favicons/`.
 
 - **Database, consistent while running.** In the `cms` console:
   ```bash
   node -e "new (require('node:sqlite').DatabaseSync)('/data/payload.db').exec(\"VACUUM INTO '/data/backup.db'\")"
   ```
   Then download `/data/backup.db` and delete it from the volume. A plain copy of `payload.db` is only safe while nothing is writing, e.g. with `cms` stopped.
-- **Uploads.** Copy `/data/media` and `/data/scenes`.
+- **Uploads.** Copy `/data/media`, `/data/scenes` and `/data/favicons`. Favicons can also be fetched again with `bun run favicons:refresh`.
 - **Whole volume, on the server.** Stop `cms`, then archive the volume (find its name with `docker volume ls | grep cms-data`):
   ```bash
   docker run --rm -v <volume>:/data -v "$PWD":/backup busybox tar czf /backup/cms-data-$(date +%F).tar.gz -C /data .

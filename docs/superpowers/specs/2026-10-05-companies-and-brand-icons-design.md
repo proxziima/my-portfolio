@@ -32,7 +32,10 @@ recorded here with its reason.
    `chip, url, logo, favicon` to both Companies and Projects, so the rule is written once:
    - `logo`: optional upload to `media`. It always wins when set.
    - `favicon`: upload to a new hidden `favicons` collection. It is read-only in the admin and
-     filled by a hook from `url`.
+     filled by a hook from `url`. The collection refuses every API write (the hooks write through
+     the Local API with `overrideAccess`). Logged-in users read every favicon; anonymous readers
+     only those of public companies and projects (`faviconRead` returns a Where on their ids, which
+     Payload's static file handler, `checkFileAccess`, also applies to `/api/favicons/file/*`).
    - `chip`: stays required, because it is the guaranteed fallback.
 6. **Favicons are fetched on save and self-hosted.** They are not hotlinked or fetched at render
    time. An `afterChange` hook resolves the site's icon when `url` changes or no favicon is stored
@@ -56,8 +59,9 @@ recorded here with its reason.
    3. Fall back to `<origin>/favicon.ico`.
    4. Take the first candidate that returns `200` with a non-empty body under 512 KB whose
       *content* normalizes to an icon (see point 6). The declared content type is never trusted.
-      Store it with the normalized type (`image/png` or `image/x-icon`) and a filename derived
-      from the owner.
+      Store it with the normalized type (`image/png` or `image/x-icon`) and the neutral filename
+      `<collection>-<id>-favicon.<ext>` (e.g. `companies-3-favicon.png`): the file URL is public,
+      so it must not name a hidden record.
    5. On any failure (fetch or store), log a warning and never fail the save. If the URL changed,
       the old favicon is removed. If an unchanged URL is being refreshed, the old favicon is kept.
       One exception: when replacing the file in place fails, the old favicon is removed too,
@@ -130,11 +134,16 @@ recorded here with its reason.
     (`*_companies.ts`, generated with `migrate:create` and then hand-edited) does the following:
     - Creates `companies` and `favicons`, plus the logo/favicon columns on `projects`.
     - Inserts one company per distinct experience `company` name, taking the chip and URL from
-      that name's first row by `order`.
+      that name's first row by `order` (the URL falls back to the bio's chip link). The company's
+      tier is the most visible tier among its experiences; an unknown tier counts as `never`.
     - Points `experiences.company_id` at that company, then rebuilds `experiences` without the
       old `company`/`chip`/`url` columns.
     - Rewrites every discipline bio. A `chipLink` whose label equals a company or project name
-      becomes a `recordLink` to that record; any other chip link stays as it is.
+      becomes a `recordLink` to that record, but only when the record is public (the block only
+      accepts public records); any other chip link stays as it is. A project without a URL takes
+      the URL of the bio chip link that became its record link.
+    - Runs atomically: each direction works out all its writes first, then applies them in one
+      transaction, so a failure leaves the DB as it was. It uses only `db`, never `payload`.
     - `down` reverses the schema and turns `recordLink` back into `chipLink` with the record's
       label, chip and URL.
 
@@ -159,9 +168,14 @@ recorded here with its reason.
 |---|---|---|
 | `stricterTier` | `apps/payload/src/fields/disclosure.ts` | Combines two tiers |
 | `brandFields()` | `apps/payload/src/fields/brand.ts` | chip, url, logo, favicon fields |
-| `discoverFavicon(url, fetchImpl?)` | `apps/payload/src/favicons/discover.ts` | Pure network lookup → `{ data, mimetype, filename } \| null` |
-| `faviconHooks` | `apps/payload/src/favicons/hooks.ts` | afterChange/afterDelete keeping the favicon doc in step with `url` |
-| `Favicons` | `apps/payload/src/collections/Favicons.ts` | Hidden upload collection (`FAVICONS_DIR` / `public/favicons`), public read, `focalPoint:false`, `crop:false` |
+| `discoverFavicon(url, fetchImpl?, limits?)` | `apps/payload/src/favicons/discover.ts` | Network lookup with time and size bounds → `{ data, mimetype, ext } \| null` |
+| `normalizeIcon` | `apps/payload/src/favicons/normalize.ts` | Judges a candidate by its content: keeps a well-formed ICO, redraws anything else as a PNG |
+| `renderInChild` | `apps/payload/src/favicons/render.ts` | Runs sharp in a child process killed at its time or memory cap |
+| `isBoundedSvg` | `apps/payload/src/favicons/svg-check.ts` | Linear-time pre-check refusing hostile SVG shapes before any process starts |
+| `withFaviconHooks` | `apps/payload/src/favicons/hooks.ts` | afterChange/afterDelete keeping the favicon doc in step with `url` |
+| `Favicons` | `apps/payload/src/collections/Favicons.ts` | Hidden upload collection (`FAVICONS_DIR` / `public/favicons`), no API writes, `focalPoint:false`, `crop:false` |
+| `faviconRead` | `apps/payload/src/access/favicon-read.ts` | Anonymous readers get only public records' favicons |
+| link guards | `apps/payload/src/hooks/guard-linked-record.ts` | Refuse hiding or deleting a record a bio links |
 | `Companies` | `apps/payload/src/collections/Companies.ts` | The new collection |
 | `RecordLinkBlock` | `apps/payload/src/blocks/record-link.ts` | Polymorphic bio link |
 | migration | `apps/payload/src/migrations/*_companies.ts` | Schema + data |
@@ -196,15 +210,22 @@ recorded here with its reason.
 
 ## Rollout to the owner's DB
 
-The owner's dev CMS (port 3001) runs from the main checkout in push mode. To keep the push from
-prompting, or dropping `experiences.company` before the data is carried over:
+The owner's dev CMS (port 3001) runs from the main checkout in push mode: `payload_migrations`
+holds only the `dev` row (batch -1), so `payload migrate` is wrong there (Payload warns that
+migrating a pushed DB loses data). The push itself would prompt, or drop `experiences.company`
+before the data is carried over. Instead:
 
-1. Back up `apps/payload/payload.db` to a timestamped `.bak`.
-2. Run the migration against it from the worktree (`payload migrate`), so that the schema matches
-   the new config before the code lands.
-3. Fast-forward `feat/portfolio-twin-agent` to `feat/companies`. The dev server's push then finds
-   no diff.
-4. Run `favicons:refresh`.
+1. Stop the CMS dev server and back up `apps/payload/payload.db` to a timestamped `.bak`.
+2. From `apps/payload`, apply the companies migration's `up` directly to that DB with the
+   one-off helper `apply-companies.tmp.ts` (`bun apply-companies.tmp.ts up`; not committed). The
+   migration uses only `db` and runs inside its own transaction.
+3. Fast-forward `feat/portfolio-twin-agent` (the main checkout's branch) to `feat/companies`.
+   The dev server's push then finds no diff.
+4. Run `bun run --cwd apps/payload favicons:refresh`.
+5. Delete the helper.
+
+**Production** runs the migration through `prodMigrations` when the CMS starts. Then run
+`bun run favicons:refresh` once in the `cms` container (see `docs/deploy-easypanel.md`).
 
 ## Out of scope
 

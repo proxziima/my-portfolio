@@ -21,7 +21,7 @@ services:
       # Shared with web and agents: authenticates the twin's redact-terms endpoint.
       TWIN_REDACT_SECRET: ${TWIN_REDACT_SECRET:?set TWIN_REDACT_SECRET}
     volumes:
-      # SQLite database (/data/payload.db) and uploads (/data/media, /data/scenes).
+      # SQLite database (/data/payload.db) and uploads (/data/media, /data/scenes, /data/favicons).
       - cms-data:/data
     # A public global: 200 once Payload has started and applied its migrations.
     healthcheck:
