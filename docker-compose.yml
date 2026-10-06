@@ -1,11 +1,13 @@
-# Production stack for an Easypanel "Compose" service (docs/deploy-easypanel.md).
+# Production stack for an Easypanel "Compose" service (docs/deploy-easypanel.md, docs/ci-cd.md).
+# - Images come from GHCR, built and pushed by CI from a green main. IMAGE_TAG picks the release
+#   (`latest`, or `sha-<short commit>` to pin or roll back). To build from source instead, add
+#   docker-compose.build.yml: docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
 # - No host ports: Easypanel routes each domain to a service's container port (web -> 3000, cms -> 3001).
 # - No secrets here: every ${VAR} comes from the service's Environment tab (template: .env.deploy.example).
 services:
   cms:
-    build:
-      context: .
-      dockerfile: apps/payload/Dockerfile
+    image: ${IMAGE_REGISTRY:-ghcr.io/proxziima}/my-portfolio-cms:${IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     expose:
       - "3001"
@@ -36,9 +38,8 @@ services:
       start_period: 60s
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+    image: ${IMAGE_REGISTRY:-ghcr.io/proxziima}/my-portfolio-web:${IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     expose:
       - "3000"
@@ -82,9 +83,8 @@ services:
   # Portfolio twin agent (eve). Internal only: no domain in Easypanel. Only `web` reaches it (BFF and
   # webhook forwarders), because the Workflow routes it serves are unauthenticated.
   agents:
-    build:
-      context: .
-      dockerfile: apps/agents/Dockerfile
+    image: ${IMAGE_REGISTRY:-ghcr.io/proxziima}/my-portfolio-agents:${IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     expose:
       - "3000"
