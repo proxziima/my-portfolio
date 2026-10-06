@@ -2,6 +2,10 @@
  * A cheap first filter on SVG markup, run before any parser sees it. The guarantee against a hostile
  * SVG is the sandboxed render (render.ts); this refuses the known-expensive or nested-document shapes
  * up front, so they cost no process at all.
+ *
+ * It runs in the CMS process, so everything here is linear in the input: markup is walked by one
+ * forward scanner (tokenize), and the remaining regexes have no ambiguous adjacent quantifiers and no
+ * class that can run past the next `<` or closing quote and be rescanned.
  */
 
 const MAX_ELEMENTS = 5000
@@ -36,77 +40,141 @@ const decodeCss = (text: string) =>
   )
 
 /** A URL as the URL parser reads it: leading and trailing C0 controls and spaces trimmed, tabs and newlines dropped. */
-const asUrl = (value: string) => value.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '')
-
-/** Raw values of every `href` and `src` attribute, any namespace prefix, in elements and processing instructions. */
-const urlAttributes = (markup: string) =>
-  [...markup.matchAll(/\s(?:[\w.-]+:)?(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)].map((m) => decodeXml(m[1] ?? m[2]!))
+function asUrl(value: string): string {
+  let start = 0
+  let end = value.length
+  while (start < end && value.charCodeAt(start) <= 0x20) start++
+  while (end > start && value.charCodeAt(end - 1) <= 0x20) end--
+  return value.slice(start, end).replace(/[\t\n\r]/g, '')
+}
 
 /**
- * `#id`s of linear and radial gradients, when nothing else in the markup carries the same id (a
- * duplicate could make a reference that looks like a gradient's land on a mask or pattern instead).
- * An attribute value cannot contain `<`, so the last `<` before an id attribute opens its element.
+ * Values (XML-decoded) of every `name` attribute (`href`/`src`, or `id`), any namespace prefix, in
+ * elements and processing instructions. A value never holds `<`, so no scan runs past the next one.
  */
-function gradientIds(markup: string): Set<string> {
-  const counts = new Map<string, number>()
-  const gradients: string[] = []
-  for (const m of markup.matchAll(/\s(?:[\w.-]+:)?id\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
-    const id = `#${decodeXml(m[1] ?? m[2]!)}`
-    counts.set(id, (counts.get(id) ?? 0) + 1)
-    const tag = markup.slice(markup.lastIndexOf('<', m.index), m.index)
-    if (/^<(?:[\w.-]+:)?(?:linear|radial)Gradient(?:\s|$)/.test(tag)) gradients.push(id)
-  }
-  return new Set(gradients.filter((id) => counts.get(id) === 1))
-}
+const attributeValues = (markup: string, name: 'href|src' | 'id') =>
+  [...markup.matchAll(new RegExp(`\\s(?:[\\w.-]+:)?(?:${name})\\s*=\\s*(?:"([^"<]*)"|'([^'<]*)')`, 'gi'))].map((m) =>
+    decodeXml(m[1] ?? m[2]!),
+  )
 
 /** `#id` references in a piece of markup: CSS `url(#…)` (after XML and CSS decoding) and `href`/`src` values. */
 const references = (text: string) => [
-  ...[...decodeCss(decodeXml(text)).matchAll(/url\(\s*['"]?\s*(#[^'")\s]*)/gi)].map((m) => m[1]!),
-  ...urlAttributes(text).map(asUrl).filter((url) => url.startsWith('#')),
+  ...[...decodeCss(decodeXml(text)).matchAll(/url\(\s*(?:['"]\s*)?(#[^'")\s]*)/gi)].map((m) => m[1]!),
+  ...attributeValues(text, 'href|src').map(asUrl).filter((url) => url.startsWith('#')),
 ]
 
 /** Elements whose content is drawn wherever they are referenced, so references inside them multiply. */
 const CONTAINERS = new Set(['mask', 'pattern', 'clipPath', 'marker', 'filter', 'symbol'])
+const GRADIENTS = new Set(['linearGradient', 'radialGradient'])
+
+type Token =
+  /** Text between tags, comments, CDATA sections, processing instructions and DOCTYPEs. */
+  | { kind: 'text'; text: string }
+  | { kind: 'start'; name: string; text: string; selfClosing: boolean }
+  | { kind: 'end'; name: string }
+
+const isNameStart = (code: number) =>
+  (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a) || code === 0x5f || code === 0x3a || code >= 0x80
 
 /**
- * Markup tokens, leftmost first: comments, CDATA sections, processing instructions and the DOCTYPE
- * (each opaque, so markup-like text inside them is not mistaken for tags), then end and start tags
- * (attribute values may hold `>` but never `<`). Anything between tokens is text.
+ * The markup as tokens, in one forward pass: every search either finds its terminator, and the scan
+ * moves past it, or runs to the end of the input, which ends the scan. Comments, CDATA sections,
+ * processing instructions and DOCTYPEs (internal subset included) are opaque text, so markup-like
+ * text inside them is not mistaken for tags; a tag ends at the first `>` outside a quoted value. A `<`
+ * that opens nothing stays part of the surrounding text.
  */
-const TOKENS =
-  /<!--[\s\S]*?(?:-->|$)|<!\[CDATA\[[\s\S]*?(?:\]\]>|$)|<\?[\s\S]*?(?:\?>|$)|<!DOCTYPE[^[>]*(?:\[[\s\S]*?\])?\s*>|<\/([^\s>]+)\s*>|<([A-Za-z_:\x80-\xff][^\s/>]*)((?:[^<>"']|"[^"]*"|'[^']*')*?)(\/?)>/g
-
-/**
- * The `#id` references that can multiply what is drawn: those made inside a container (CONTAINERS, or
- * any element a `href` points at, as `<use>` and `<feImage>` do), whose content is drawn once per
- * reference to it; and every reference in a stylesheet or other text, whose rules can apply inside any
- * container. A plain reference from the drawing itself (a path's clip-path, a top-level `<use>`) only
- * draws its target once, so it costs nothing here.
- */
-function chainedReferences(markup: string): string[] {
-  const hrefTargets = new Set(urlAttributes(markup).map(asUrl).filter((url) => url.startsWith('#')))
-  const open: { name: string; inside: boolean }[] = []
-  const found: string[] = []
+function* tokenize(markup: string): Generator<Token> {
+  const length = markup.length
+  const past = (terminator: string, from: number) => {
+    const at = markup.indexOf(terminator, from)
+    return at < 0 ? length : at + terminator.length
+  }
   let textStart = 0
-  for (const token of markup.matchAll(TOKENS)) {
-    found.push(...references(markup.slice(textStart, token.index)))
-    textStart = token.index + token[0].length
-    const [whole, endName, startName, attributes, selfClosing] = token
-    if (endName !== undefined) {
-      const at = open.map((element) => element.name).lastIndexOf(endName)
-      if (at >= 0) open.length = at
-    } else if (startName !== undefined) {
-      const ids = [...attributes!.matchAll(/\s(?:[\w.-]+:)?id\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map((m) => `#${decodeXml(m[1] ?? m[2]!)}`)
-      const inside =
-        (open.at(-1)?.inside ?? false) || CONTAINERS.has(startName.replace(/^[^:]*:/, '')) || ids.some((id) => hrefTargets.has(id))
-      if (inside) found.push(...references(whole))
-      if (!selfClosing) open.push({ name: startName, inside })
+  let at = 0
+  while (at < length) {
+    const open = markup.indexOf('<', at)
+    if (open < 0) break
+    let end: number
+    let token: Token | null = null
+    if (markup.startsWith('<!--', open)) end = past('-->', open + 4)
+    else if (markup.startsWith('<![CDATA[', open)) end = past(']]>', open + 9)
+    else if (markup.startsWith('<?', open)) end = past('?>', open + 2)
+    else if (markup.startsWith('<!', open)) {
+      // A DOCTYPE; an internal subset in brackets may hold `>`.
+      const close = past('>', open + 2)
+      const bracket = markup.slice(open, close).indexOf('[')
+      end = bracket < 0 ? close : past('>', past(']', open + bracket + 1))
+    } else if (markup.startsWith('</', open)) {
+      end = past('>', open + 2)
+      token = { kind: 'end', name: markup.slice(open + 2, end - 1).trim() }
+    } else if (isNameStart(markup.charCodeAt(open + 1))) {
+      end = length
+      for (let i = open + 1; i < length; i++) {
+        const code = markup.charCodeAt(i)
+        if (code === 0x3e) {
+          end = i + 1
+          break
+        }
+        if (code === 0x22 || code === 0x27) {
+          const quote = markup.indexOf(markup[i]!, i + 1)
+          if (quote < 0) break
+          i = quote
+        }
+      }
+      const text = markup.slice(open, end)
+      token = { kind: 'start', name: /^<([^\s/>]*)/.exec(text)![1]!, text, selfClosing: text.endsWith('/>') }
     } else {
-      found.push(...references(whole))
+      at = open + 1
+      continue
+    }
+    if (open > textStart) yield { kind: 'text', text: markup.slice(textStart, open) }
+    yield token ?? { kind: 'text', text: markup.slice(open, end) }
+    textStart = at = end
+  }
+  if (textStart < length) yield { kind: 'text', text: markup.slice(textStart) }
+}
+
+/**
+ * The `#id` references that can multiply what is drawn, minus those to gradients (a gradient only
+ * paints): references made inside a container (CONTAINERS, or any element a `href` points at, as
+ * `<use>` and `<feImage>` do), whose content is drawn once per reference to it; and every reference in
+ * a stylesheet or other text, whose rules can apply inside any container. A plain reference from the
+ * drawing itself (a path's clip-path, a top-level `<use>`) only draws its target once, so it costs
+ * nothing here. A gradient's id is exempt only when no other element carries it: a duplicate could
+ * make a reference that looks like a gradient's land on a mask or pattern instead.
+ */
+function chainedReferences(markup: string): number {
+  const hrefTargets = new Set(attributeValues(markup, 'href|src').map(asUrl).filter((url) => url.startsWith('#')))
+  const open: { name: string; inside: boolean }[] = []
+  const openNames = new Map<string, number>()
+  const idCounts = new Map<string, number>()
+  const gradients: string[] = []
+  const counted: string[] = []
+  for (const token of tokenize(markup)) {
+    if (token.kind === 'text') {
+      counted.push(token.text)
+    } else if (token.kind === 'end') {
+      if (!openNames.get(token.name)) continue
+      for (let element = open.pop(); element; element = open.pop()) {
+        openNames.set(element.name, openNames.get(element.name)! - 1)
+        if (element.name === token.name) break
+      }
+    } else {
+      const ids = attributeValues(token.text, 'id').map((id) => `#${id}`)
+      for (const id of ids) idCounts.set(id, (idCounts.get(id) ?? 0) + 1)
+      const local = token.name.slice(token.name.indexOf(':') + 1)
+      if (GRADIENTS.has(local)) gradients.push(...ids)
+      const inside = (open.at(-1)?.inside ?? false) || CONTAINERS.has(local) || ids.some((id) => hrefTargets.has(id))
+      if (inside) counted.push(token.text)
+      if (!token.selfClosing) {
+        open.push({ name: token.name, inside })
+        openNames.set(token.name, (openNames.get(token.name) ?? 0) + 1)
+      }
     }
   }
-  found.push(...references(markup.slice(textStart)))
-  return found
+  const exempt = new Set(gradients.filter((id) => idCounts.get(id) === 1))
+  // Joined with `<`, which no reference or attribute value can span.
+  return references(counted.join('<')).filter((url) => !exempt.has(url)).length
 }
 
 /**
@@ -123,13 +191,19 @@ function chainedReferences(markup: string): string[] {
  *   to gradients are not counted: a gradient only paints.
  * This is a filter, not the bound: a stylesheet rule applying one reference to many elements, or
  * expensive filters, are left to the render process's time and memory caps (render.ts).
+ *
+ * Cheapest checks first: bytes and encoding, DTD declarations, the element count, then URLs, then
+ * the reference analysis.
  */
 export function isBoundedSvg(data: Buffer): boolean {
   if (data.includes(0)) return false
   const markup = data.toString('latin1')
-  const encoding = /^(?:\xef\xbb\xbf)?<\?xml[^>]*?\bencoding\s*=\s*["']([^"']*)/.exec(markup)?.[1]
+  const prolog = /^(?:\xef\xbb\xbf)?<\?xml[^<>]*/.exec(markup)?.[0] ?? ''
+  const encoding = /\sencoding\s*=\s*["']([^"'<>]*)/.exec(prolog)?.[1]
   if (encoding !== undefined && !/^(?:utf-?8|(?:us-)?ascii|iso-8859-\d+|latin-?1)$/i.test(encoding)) return false
   if (/<!(?:ENTITY|ATTLIST|ELEMENT|NOTATION)/i.test(markup)) return false
+  const elements = count(markup, /<[A-Za-z_:\x80-\xff]/g)
+  if (elements > MAX_ELEMENTS) return false
 
   const decoded = decodeCss(decodeXml(markup))
   const asUrls = decoded.replace(/[\t\n\r]/g, '')
@@ -141,13 +215,10 @@ export function isBoundedSvg(data: Buffer): boolean {
     if (!INLINE_IMAGE.test(asUrls)) return false
   }
 
-  const cssRefs = [...decoded.matchAll(/url\(\s*(['"]?)\s*([^'")\s]*)/gi)].map((m) => m[2]!)
-  const attrRefs = urlAttributes(markup).map(asUrl)
+  const cssRefs = [...decoded.matchAll(/url\(\s*(?:['"]\s*)?([^'")\s]*)/gi)].map((m) => m[1]!)
   if (!cssRefs.every((url) => url.startsWith('#'))) return false
+  const attrRefs = attributeValues(markup, 'href|src').map(asUrl)
   if (!attrRefs.every((url) => url.startsWith('#') || INLINE_IMAGE_VALUE.test(url))) return false
 
-  const gradients = gradientIds(markup)
-  const refs = chainedReferences(markup).filter((url) => !gradients.has(url)).length
-  const elements = count(markup, /<[A-Za-z_:\x80-\xff]/g)
-  return elements <= MAX_ELEMENTS && elements * 3 ** (refs / 3) <= MAX_INSTANCES
+  return elements * 3 ** (chainedReferences(markup) / 3) <= MAX_INSTANCES
 }
