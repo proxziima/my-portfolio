@@ -7,8 +7,11 @@ import type { IntentClass } from '@repo/twin/contract'
  */
 export const INTENT_WEIGHTS = {
   classification: {
-    // Always hot: the visitor asked. Scoring is skipped in effect (spec: explicit skips scoring).
-    requesting_call: 100,
+    // Corroborating evidence only. A genuine ask is answered in the same reply by the main model
+    // (scheduling skill's explicit-request rule, schedule_call trigger explicit_request); this label
+    // comes from a cheap post-reply classifier and can misread "tell me more" as "let's talk", so on
+    // its own it must never force the widget. Kept below hotAt: one misread reaches warm at most.
+    requesting_call: 3,
     // Talking about a role, hiring or a project for me is the strongest implicit signal.
     hiring_signal: 4,
     // Assessing fit (comparing, probing depth) is interest but not yet intent.

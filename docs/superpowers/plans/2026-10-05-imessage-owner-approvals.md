@@ -1,5 +1,7 @@
 # Owner Approvals over iMessage (Sendblue) Implementation Plan
 
+> Superseded on 2026-10-05 by [2026-10-05-photon-owner-approvals.md](2026-10-05-photon-owner-approvals.md): the transport is Photon, not Sendblue. Kept as the record of the Sendblue tasks that preceded it on this branch.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the Telegram owner-approval transport with iMessage through Sendblue. The owner gets a text with a 4-character reply code and answers `YES <code>` or `NO <code>`.

@@ -14,5 +14,9 @@ export default defineConfig({
     environment: 'node',
     // Any un-mocked real network call fails the test (see the guard for how stubs interact).
     setupFiles: [require.resolve('@repo/twin/testing/network-guard')],
+    // Database tests boot PGlite (Postgres compiled to WebAssembly) per test, about 1.5 s each on a
+    // CI runner, and several tests drive real queries through it: vitest's 5 s
+    // default is sized for plain unit tests, not these.
+    testTimeout: 30_000,
   },
 })

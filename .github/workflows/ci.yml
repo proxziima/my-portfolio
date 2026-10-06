@@ -56,7 +56,8 @@ jobs:
           TWIN_REDACT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-22
           TWIN_STABLE_KEY_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
           TWIN_BOOKING_REF_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-44
-          TELEGRAM_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-55
+          IMESSAGE_PROJECT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-55
+          IMESSAGE_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-88
           CAL_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-66
           PAYLOAD_MCP_API_KEY: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-77
           TWIN_PROMPT_CANARY: ci-canary-0123456789
@@ -80,8 +81,8 @@ jobs:
           --health-cmd "pg_isready -U twin -d twin_eval" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       # The agent's env (agentsEnvSchema). Secrets shared with the CMS and the eval runner are
-      # generated in the first step. Google and Telegram are stubbed: the live suite runs no approval
-      # and no free/busy eval, and nothing listens on the Telegram base.
+      # generated in the first step. Google is stubbed; iMessage is left unconfigured (it is optional), so
+      # restricted entries are never offered and no approval runs.
       TWIN_DATABASE_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
       WORKFLOW_POSTGRES_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -93,9 +94,6 @@ jobs:
       GOOGLE_CALENDAR_ID: ci@example.com
       OWNER_TIMEZONE: America/Sao_Paulo
       CAL_LINK: ci/intro
-      TELEGRAM_API_BASE: http://127.0.0.1:9
-      TELEGRAM_BOT_TOKEN: '1:ci'
-      TELEGRAM_OWNER_USER_ID: '1'
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
@@ -105,7 +103,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: generate throwaway secrets
         run: |
-          for name in PAYLOAD_SECRET TWIN_REDACT_SECRET TWIN_JWT_SECRET TWIN_STABLE_KEY_SECRET CAL_WEBHOOK_SECRET TWIN_BOOKING_REF_SECRET TELEGRAM_WEBHOOK_SECRET; do
+          for name in PAYLOAD_SECRET TWIN_REDACT_SECRET TWIN_JWT_SECRET TWIN_STABLE_KEY_SECRET CAL_WEBHOOK_SECRET TWIN_BOOKING_REF_SECRET; do
             value=$(openssl rand -hex 32)
             echo "::add-mask::$value"
             echo "$name=$value" >> "$GITHUB_ENV"

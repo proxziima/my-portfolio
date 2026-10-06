@@ -25,7 +25,8 @@ export function scoreIntent(sig: IntentSignals, classification: IntentClass | nu
   if (sig.returningVisitor) add(W.signals.returningVisitor, 'returning visitor')
   add(Math.min(W.signals.perTurnCap, Math.max(0, sig.turnCount - 3) * W.signals.perTurnAfterThird), `turn ${sig.turnCount}`)
 
-  if (classification === 'requesting_call') return { score, tier: 'hot', reasons: ['explicit request to talk', ...reasons] }
+  // No label short-circuits the tiers: an explicit ask is handled in the same reply by the main model,
+  // so the classifier's requesting_call is one weighted input like the others.
   if (s.callOfferDeclined && score >= W.thresholds.warmAt) {
     score = W.thresholds.warmAt - 1
     reasons.push(`call offer declined earlier: capped at ${score}`)

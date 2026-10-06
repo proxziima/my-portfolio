@@ -1,5 +1,7 @@
 # Portfolio Twin Agent — Design
 
+> Owner-approval transport superseded on 2026-10-05: Telegram mentions below are historical; see [2026-10-05-imessage-owner-approvals-design.md](2026-10-05-imessage-owner-approvals-design.md).
+
 Date: 2026-10-04 · Branch: `feat/portfolio-twin-agent` · Status: decided (owner asked for no question gates)
 
 ## 0. Summary
@@ -208,6 +210,7 @@ All tools share these rules:
   - `kind` is one of `recruiter | hiring_manager | client | engineer | other`.
   - Writes `conversation.visitor` and links the long-term visitor record.
 - **`request_disclosure({ sourceId, reason })`**
+  > Transport superseded on 2026-10-05: owner approvals use iMessage via Photon. See [2026-10-05-imessage-owner-approvals-design.md](2026-10-05-imessage-owner-approvals-design.md).
   - A workflow `task`:
     1. A step persists a pending approval and sets `pendingApproval` in state.
     2. `createWebhook()` creates the callback URL.
@@ -238,7 +241,8 @@ Its result drives the **next** turn through the state digest. The consequences:
 
 - **Time-to-first-token is untouched.**
 - **An explicit request skips scoring.** The model calls `schedule_call({ trigger: "explicit_request" })`
-  in the same turn, and the evaluation records `requesting_call → hot` with reason `explicit request`.
+  in the same turn. The post-reply evaluation's `requesting_call` label is corroborating evidence only
+  (weight 3, below `hotAt`), so a misread label can reach `warm` at most and never forces the widget.
 - **The idempotency key is `(sessionId, assistantMessageId)`.** At-least-once hook delivery is
   deduplicated by a unique index.
 - **Budget:** the brief's 200 ms limit protected a *blocking* evaluation. This design never blocks, so
@@ -252,7 +256,7 @@ Its result drives the **next** turn through the state digest. The consequences:
 
 - **`classify.ts`:** AI SDK `generateText` with `Output.choice` over the stable enum
   `requesting_call | hiring_signal | evaluating | browsing | unrelated`. It reads the last 6 messages and
-  runs on `TWIN_CLASSIFIER_MODEL` (cheap model, OpenRouter).
+  runs on `TWIN_INTENT_MODEL` (cheap model, OpenRouter, chosen by the intent-label benchmark).
 - **`signals.ts`:** deterministic, from state only:
   - turn count
   - distinct topics cited
@@ -267,7 +271,7 @@ Its result drives the **next** turn through the state digest. The consequences:
   - Formula: `score = Σ weights(signals) + weights.intent[class]`.
   - Tiers: `cold < warmAt ≤ warm < hotAt ≤ hot`.
   - Floors:
-    - `requesting_call` forces hot.
+    - No classification forces a tier; every label goes through the thresholds.
     - `callOfferDeclined` caps the score at `warmAt - 1` for the session.
     - Once `widgetShown`, the tier stays where it is.
   - Output: `{ score, tier, reasons: string[] }`, with `reasons.length >= 1` enforced by zod **and** a
@@ -480,8 +484,10 @@ The Cal.com route verifies `X-Cal-Signature-256`, verifies the signed `metadata.
 
 - **Primary:** `anthropic/claude-sonnet-5.5`, chosen for persona fidelity and injection resistance.
 - **Fallback:** `deepseek/deepseek-v4.1-flash`, through OpenRouter `models`.
-- **Classifier (intent, abuse and depth):** `google/gemini-2.5-flash-lite`, falling back to `mistralai/ministral-8b-2512` (changed from `deepseek/deepseek-v4.1-flash`; see the model-routing spec).
-- All are env-configurable (`TWIN_MODEL`, `TWIN_MODEL_FALLBACKS`, `TWIN_CLASSIFIER_MODEL`).
+- **Classifier (abuse and depth):** `openai/gpt-4.1-mini`, falling back to `anthropic/claude-haiku-4.5`, chosen by benchmark (see the model-routing spec and the README).
+- **Intent label:** `anthropic/claude-haiku-4.5`, falling back to `deepseek/deepseek-v4.1-flash`, chosen by its own benchmark (the gate's model read the twin's call offer as the visitor asking).
+- Only Anthropic, DeepSeek and OpenAI models are used (owner policy, 2026-10-05).
+- All are env-configurable (`TWIN_MODEL`, `TWIN_MODEL_FALLBACKS`, `TWIN_CLASSIFIER_MODEL`, `TWIN_INTENT_MODEL`).
 - `provider: { data_collection: "deny" }`.
 - The OpenRouter key also carries a spend limit, as documented in the README operations section.
 

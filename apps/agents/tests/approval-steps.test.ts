@@ -6,23 +6,19 @@ import {
   getApproval,
   getConversation,
   putCachedSearch,
-  setApprovalTelegramMessage,
+  setApprovalNotified,
 } from '@repo/twin/db'
 import { createTestDb, type TestDb } from '@repo/twin/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({
   db: null as unknown,
-  sendApprovalRequest: vi.fn(async () => 501),
-  markDecided: vi.fn(async () => {}),
+  sendToOwner: vi.fn(async (): Promise<string | null> => 'h-1'),
 }))
 vi.mock('../agent/lib/db', () => ({ db: () => m.db }))
 vi.mock('../agent/lib/env', () => ({ getEnv: () => ({ TWIN_APPROVAL_TIMEOUT: '15m' }) }))
 vi.mock('../agent/lib/payload-mcp', () => ({ callPayloadTool: vi.fn() }))
-vi.mock('../agent/lib/telegram', () => ({
-  sendApprovalRequest: m.sendApprovalRequest,
-  markDecided: m.markDecided,
-}))
+vi.mock('../agent/lib/imessage', () => ({ sendToOwner: m.sendToOwner }))
 
 const { finalizeApproval, notifyOwner, openApproval } = await import('../agent/lib/approvals')
 
@@ -38,8 +34,7 @@ let t: TestDb
 beforeEach(async () => {
   t = await createTestDb()
   m.db = t.db
-  m.sendApprovalRequest.mockReset().mockResolvedValue(501)
-  m.markDecided.mockReset().mockResolvedValue(undefined)
+  m.sendToOwner.mockReset().mockResolvedValue('h-1')
   await createConversation(t.db, SESSION, await createVisitor(t.db))
   await putCachedSearch(t.db, SESSION, 'offered', { items: [], restricted: OFFERED })
 })
@@ -59,7 +54,7 @@ describe('openApproval', () => {
     const again = await opened('call-1')
     expect(again).toBe(first)
     expect((await state()).pendingApprovals).toEqual([{ approvalId: first, sourceId: 'knowledge:5', topic: 'CMS topic 5' }])
-    expect(await getApproval(t.db, first)).toMatchObject({ webhookUrl: HOOK, telegramMessageId: null })
+    expect(await getApproval(t.db, first)).toMatchObject({ webhookUrl: HOOK, notifiedAt: null })
   })
 
   it('reuses a pending approval for the same source instead of asking the owner again', async () => {
@@ -67,7 +62,7 @@ describe('openApproval', () => {
     expect(await opened('call-2')).toBe(first)
     await notifyOwner(first)
     await notifyOwner(first)
-    expect(m.sendApprovalRequest).toHaveBeenCalledTimes(1)
+    expect(m.sendToOwner).toHaveBeenCalledTimes(1)
     expect((await state()).pendingApprovals).toHaveLength(1)
   })
 
@@ -81,7 +76,7 @@ describe('openApproval', () => {
 
   it('returns the outcome of an already decided approval for the same source', async () => {
     const first = await opened('call-1')
-    await decideApproval(t.db, first, { status: 'denied', actor: 'telegram:42', reasoning: 'no' })
+    await decideApproval(t.db, first, { status: 'denied', actor: 'imessage:owner', reasoning: 'no' })
     expect(await openApproval(SESSION, 'call-2', HOOK_2, input)).toEqual({ kind: 'alreadyDecided', approvalId: first, status: 'denied' })
     // A decided approval keeps the webhook its decision was delivered to.
     expect(await getApproval(t.db, first)).toMatchObject({ webhookUrl: HOOK })
@@ -114,50 +109,74 @@ describe('openApproval', () => {
 })
 
 describe('notifyOwner', () => {
-  it('sends once and stores the message id; a retry after the send does not resend', async () => {
+  it('texts once and stamps notified_at; a repeat on a notified approval sends nothing', async () => {
     const id = await opened('call-1')
     await notifyOwner(id)
-    expect(await getApproval(t.db, id)).toMatchObject({ telegramMessageId: 501, webhookUrl: HOOK })
+    expect(await getApproval(t.db, id)).toMatchObject({ notifiedAt: expect.any(Date), webhookUrl: HOOK })
     await notifyOwner(id)
-    expect(m.sendApprovalRequest).toHaveBeenCalledTimes(1)
+    expect(m.sendToOwner).toHaveBeenCalledTimes(1)
   })
 
-  it('shows the owner the CMS topic and item, never the visitor-steerable reason', async () => {
+  it('does not text an approval that is already notified', async () => {
+    const id = await opened('call-1')
+    await setApprovalNotified(t.db, id)
+    await notifyOwner(id)
+    expect(m.sendToOwner).not.toHaveBeenCalled()
+  })
+
+  it('leaves notified_at unset when the send fails, so a retry texts again', async () => {
+    const id = await opened('call-1')
+    m.sendToOwner.mockRejectedValueOnce(new Error('photon down'))
+    await expect(notifyOwner(id)).rejects.toThrow('photon down')
+    expect(await getApproval(t.db, id)).toMatchObject({ notifiedAt: null })
+    await notifyOwner(id)
+    expect(m.sendToOwner).toHaveBeenCalledTimes(2)
+  })
+
+  it('texts the request with its reply code, built from the CMS topic and item, never the visitor-steerable reason', async () => {
     const id = await opened('call-1')
     await notifyOwner(id)
-    const [, text] = m.sendApprovalRequest.mock.calls[0] as unknown as [string, string]
-    expect(text).toContain('CMS topic 5')
-    expect(text).toContain('knowledge:5')
+    const row = (await getApproval(t.db, id))!
+    expect(row.replyCode).toMatch(/^[A-Z0-9]{4}$/)
+    expect(m.sendToOwner).toHaveBeenCalledTimes(1)
+    expect(m.sendToOwner).toHaveBeenCalledWith(
+      `Twin approval request\nTopic: CMS topic 5\nItem: knowledge:5\nReply YES ${row.replyCode} to share or NO ${row.replyCode} to decline. Auto-denies after 15m.`,
+    )
+    const [text] = m.sendToOwner.mock.calls[0] as unknown as [string]
     expect(text).not.toContain(input.reason)
+  })
+
+  it('sends nothing for an approval that was decided before it was notified', async () => {
+    const id = await opened('call-1')
+    await decideApproval(t.db, id, { status: 'approved', actor: 'imessage:owner', reasoning: 'yes' })
+    await notifyOwner(id)
+    expect(m.sendToOwner).not.toHaveBeenCalled()
+    expect(await getApproval(t.db, id)).toMatchObject({ notifiedAt: null })
   })
 })
 
 describe('finalizeApproval', () => {
   it('keeps the owner’s recorded decision', async () => {
     const id = await opened('call-1')
-    await decideApproval(t.db, id, { status: 'approved', actor: 'telegram:42', reasoning: 'yes' })
+    await decideApproval(t.db, id, { status: 'approved', actor: 'imessage:owner', reasoning: 'yes' })
     expect(await finalizeApproval(SESSION, id)).toBe('approved')
-    expect(m.markDecided).not.toHaveBeenCalled()
     const s = await state()
     expect(s.pendingApprovals).toEqual([])
     expect(s.approvalDecisions).toMatchObject([{ approvalId: id, status: 'approved' }])
   })
 
-  it('fails closed: a stray callback or the deadline with no decision expires it', async () => {
+  it('fails closed: a stray POST or the deadline with no decision expires it, without texting the owner', async () => {
     const id = await opened('call-1')
-    await setApprovalTelegramMessage(t.db, id, 501)
+    await setApprovalNotified(t.db, id)
     expect(await finalizeApproval(SESSION, id)).toBe('expired')
     expect(await getApproval(t.db, id)).toMatchObject({ status: 'expired', actor: 'system' })
-    expect(m.markDecided).toHaveBeenCalledWith(501, expect.stringMatching(/expired/i))
+    expect(m.sendToOwner).not.toHaveBeenCalled()
   })
 
-  it('records one decision however often it runs, and retries the message edit from the row', async () => {
+  it('records one decision however often it runs', async () => {
     const id = await opened('call-1')
-    await setApprovalTelegramMessage(t.db, id, 501)
-    m.markDecided.mockRejectedValueOnce(new Error('Telegram editMessageText failed: HTTP 502'))
     expect(await finalizeApproval(SESSION, id)).toBe('expired')
     expect(await finalizeApproval(SESSION, id)).toBe('expired')
-    expect(m.markDecided).toHaveBeenCalledTimes(2)
     expect((await state()).approvalDecisions).toHaveLength(1)
   })
 })

@@ -18,7 +18,12 @@ vi.mock('@repo/twin/db', () => ({
 const { toolGranted } = await import('../agent/lib/tool-gate')
 const { searchPortfolio } = await import('../agent/lib/search')
 
-const telegram = { TELEGRAM_BOT_TOKEN: '1:a', TELEGRAM_WEBHOOK_SECRET: 'tg_secret_value_1234', TELEGRAM_OWNER_USER_ID: '42' }
+const imessage = {
+  IMESSAGE_PROJECT_ID: 'photon-project-1',
+  IMESSAGE_PROJECT_SECRET: 'photon-secret-VALUE',
+  IMESSAGE_WEBHOOK_SECRET: 'photon-webhook-VALUE',
+  OWNER_PHONE_NUMBER: '+5511999998888',
+}
 
 beforeEach(() => {
   env.current = {}
@@ -59,8 +64,8 @@ describe('optional integrations', () => {
     expect(mocks.putCachedSearch).toHaveBeenCalledWith({}, 's1', expect.any(String), result)
   })
 
-  it('keeps restricted entries when Telegram is configured', async () => {
-    env.current = telegram
+  it('keeps restricted entries when iMessage is configured', async () => {
+    env.current = imessage
     expect((await searchPortfolio('s1', 'salary')).restricted).toHaveLength(1)
   })
 })

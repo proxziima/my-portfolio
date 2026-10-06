@@ -11,7 +11,7 @@ Production runs as one Easypanel **Compose** service built from this repository'
 
 The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload.db`) and the uploads (`/data/media`, `/data/scenes`, `/data/favicons`). The `twin-pg` volume holds the portfolio twin's Postgres database `twin`. That database contains both the twin's own tables (schema `twin`) and eve's durable Workflow runtime (schemas `workflow` and `graphile_worker`). Every image is built from the repository root, and every setting is read at runtime, so nothing environment-specific is baked into an image.
 
-**`agents` must never get a domain.** It serves eve's Workflow routes (`/.well-known/workflow/v1/*`), which are unauthenticated: anyone who can reach them can forge or replay workflow steps. Only `web` talks to it, over the compose network (`http://agents:3000`). That covers the visitor BFF and the two webhook forwarders `https://<web>/api/twin/hooks/cal` and `https://<web>/api/twin/hooks/telegram`. How the twin works: [apps/agents/README.md](../apps/agents/README.md).
+**`agents` must never get a domain.** It serves eve's Workflow routes (`/.well-known/workflow/v1/*`), which are unauthenticated: anyone who can reach them can forge or replay workflow steps. Only `web` talks to it, over the compose network (`http://agents:3000`). That covers the visitor BFF and the two webhook forwarders `https://<web>/api/twin/hooks/cal` and `https://<web>/api/twin/hooks/photon`. How the twin works: [apps/agents/README.md](../apps/agents/README.md).
 
 ## Before you start
 
@@ -59,10 +59,10 @@ The portfolio twin adds the variables below. Each one is described in [`.env.dep
 | `TWIN_REDACT_SECRET` | cms, web, agents | Random. Authenticates `GET /api/twin/redact-terms` on the CMS. |
 | `TWIN_DAILY_SPEND_USD` | web | Daily model spend cap in USD (default 5). Past it, the twin answers "offline" until 00:00 UTC. |
 | `PAYLOAD_MCP_API_KEY` | agents | The twin's Payload MCP key ([step 6](#6-set-up-the-portfolio-twin)). |
-| `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_CALENDAR_ID`, `OWNER_TIMEZONE` | agents | Free/busy access ([step 6](#6-set-up-the-portfolio-twin)) and the owner's IANA zone. |
-| `CAL_LINK`, `CAL_WEBHOOK_SECRET`, `TWIN_BOOKING_REF_SECRET` | agents | Cal.com event (`<user>/<event-slug>`), the webhook secret you set in Cal.com, and a random key for booking references. `CAL_ORIGIN` and `CAL_EMBED_SCRIPT_URL` are only for self-hosted Cal. |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_OWNER_USER_ID` | agents | Owner approvals ([step 6](#6-set-up-the-portfolio-twin)). `TELEGRAM_API_BASE` stays empty. |
-| `EXA_API_KEY` | agents | Exa key for the twin's narrow web search. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_CALENDAR_ID`, `OWNER_TIMEZONE` | agents | Optional (all of the group or none; `OWNER_TIMEZONE` stands apart): free/busy access ([step 6](#6-set-up-the-portfolio-twin)) and the owner's IANA zone. |
+| `CAL_LINK`, `CAL_WEBHOOK_SECRET`, `TWIN_BOOKING_REF_SECRET` | agents | Optional (all of the group or none): Cal.com event (`<user>/<event-slug>`), the webhook secret you set in Cal.com, and a random key for booking references. `CAL_ORIGIN` and `CAL_EMBED_SCRIPT_URL` are only for self-hosted Cal. |
+| `IMESSAGE_PROJECT_ID`, `IMESSAGE_PROJECT_SECRET`, `IMESSAGE_WEBHOOK_SECRET`, `OWNER_PHONE_NUMBER` | agents | Optional (all of the group or none): owner approvals over iMessage through Photon ([step 6](#6-set-up-the-portfolio-twin)). The first two come from your Photon project, the webhook secret is the one Photon shows once when you create the webhook, and the number is yours in E.164 (`+15550000001`). |
+| `EXA_API_KEY` | agents | Optional (a group of one): Exa key for the twin's narrow web search. |
 
 Generate each secret with `openssl rand -hex 32`. Don't reuse the development values. Origins are `https://`, with no trailing slash and no path.
 
@@ -115,18 +115,14 @@ The twin starts with the stack, but it needs these external pieces before it can
    - for anything the twin must never say, a `never` entry with its exact strings under **Redact terms**.
 
    Set each portfolio entry's **Disclosure** in its sidebar (`public`, `restricted` or `never`).
-3. **Telegram approvals.**
-   1. Create a bot with **@BotFather** (`/newbot`); its token is `TELEGRAM_BOT_TOKEN`.
-   2. Get your numeric user id from **@userinfobot**; that is `TELEGRAM_OWNER_USER_ID`.
-   3. **Send `/start` to your bot once.** Telegram refuses to message a user who never started the bot, and every approval would then expire.
-   4. Once the stack is deployed with the variables set, register the webhook on the **web** domain:
-      ```bash
-      curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
-        -H 'content-type: application/json' \
-        -d "{\"url\":\"https://<web>/api/twin/hooks/telegram\",\"secret_token\":\"${TELEGRAM_WEBHOOK_SECRET}\",\"allowed_updates\":[\"callback_query\"]}"
-      curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"   # check url and last_error_message
-      ```
-      Run it again if the domain or `TELEGRAM_WEBHOOK_SECRET` changes.
+3. **iMessage approvals.**
+   1. Create a Photon project at app.photon.codes (the free tier works). Copy the project id and secret into `IMESSAGE_PROJECT_ID` and `IMESSAGE_PROJECT_SECRET`.
+   2. In the project, create a webhook for `https://<web>/api/twin/hooks/photon` (event `messages`). Copy its signing secret, which Photon shows once, into `IMESSAGE_WEBHOOK_SECRET`. Update the webhook if the domain changes.
+   3. Set your own phone number, in E.164, as `OWNER_PHONE_NUMBER`. Only replies from it decide approvals. Redeploy with the four variables set.
+   4. **Text the Photon line once from your iPhone.** The free tier is a shared line, and a shared line can only message a number after that number has texted it first.
+   5. On the iPhone, set **Settings > Messages > Send & Receive > Start New Conversations From** to your phone number. An Apple ID email address can't match `OWNER_PHONE_NUMBER`.
+
+   An approval arrives as a text with a four-character code. Reply `YES <code>` to share or `NO <code>` to decline. Only a reply with the code decides: a bare `YES` or `NO` gets a help text listing what is waiting.
 4. **Cal.com.**
    1. Create the event type the twin offers and set `CAL_LINK=<user>/<event-slug>`.
    2. Under **Settings → Developer → Webhooks**, add a webhook:
@@ -252,11 +248,14 @@ Possible causes:
 
 `web` logs the cause as `[twin] … failed`.
 
-### Telegram approvals always expire
+### iMessage approvals always expire
 
-- Check that you sent `/start` to the bot from the account in `TELEGRAM_OWNER_USER_ID`.
-- Check that `getWebhookInfo` shows `https://<web>/api/twin/hooks/telegram` with no `last_error_message`.
-- Check that the webhook's `secret_token` equals `TELEGRAM_WEBHOOK_SECRET`. A mismatch answers 401.
+- Check that `OWNER_PHONE_NUMBER` is your number in E.164 (`+`, country code, digits). Replies from any other number are ignored without an answer.
+- Check that the Photon webhook points at `https://<web>/api/twin/hooks/photon` and that its signing secret equals `IMESSAGE_WEBHOOK_SECRET`. A mismatch is rejected and the reply never reaches the approval.
+- Look in the `agents` logs for `Photon send failed`: the approval text never reached you. Check `IMESSAGE_PROJECT_ID` and `IMESSAGE_PROJECT_SECRET`, and that you texted the Photon line once from your phone (a shared line can only message numbers that texted it first).
+- If your iPhone starts conversations from an Apple ID email address, the reply doesn't match `OWNER_PHONE_NUMBER` and is ignored. Set iPhone **Settings > Messages > Send & Receive > Start New Conversations From** to your phone number.
+- Reply with the code, e.g. `YES K7Q2`. A bare `YES` or `NO` only returns the help text, because Photon's webhook has no service field (iMessage vs SMS), so a real answer can't be told from a spoofed SMS. SMS replies count only if Photon delivers them, and they need the code too.
+- If `/webhooks/photon` returns 500 after a Photon or network outage, restart the `agents` service: the channel's adapter initialises on the first webhook after boot, and a failed first initialisation stays cached until restart.
 
 ### `cms` stays unhealthy, so `web` never starts
 

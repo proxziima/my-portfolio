@@ -1,6 +1,5 @@
 import { sql } from 'drizzle-orm'
 import {
-  bigint,
   bigserial,
   check,
   index,
@@ -88,7 +87,10 @@ export const approvals = twin.table(
     reason: text('reason').notNull(),
     status: text('status').notNull().default('pending'),
     webhookUrl: text('webhook_url'),
-    telegramMessageId: bigint('telegram_message_id', { mode: 'number' }),
+    // What the owner types back ("YES K7Q2"); unique among pending approvals only.
+    replyCode: text('reply_code').notNull(),
+    // Set once the owner has been texted; the notify step's idempotency marker.
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
     requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     actor: text('actor'),
@@ -97,6 +99,7 @@ export const approvals = twin.table(
   (t) => [
     uniqueIndex('approvals_session_call_uq').on(t.sessionId, t.callId),
     index('approvals_session_source_idx').on(t.sessionId, t.sourceId),
+    uniqueIndex('approvals_pending_code_uq').on(t.replyCode).where(sql`${t.status} = 'pending'`),
   ],
 )
 

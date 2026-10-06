@@ -17,6 +17,36 @@ describe('callDirective', () => {
   })
 })
 
+describe('the hot directive', () => {
+  const hot = callDirective(s({ intent: tier('hot') }))
+
+  // A hot tier once made the model open the dialog before answering a technical question.
+  it('answers the visitor first and makes schedule_call the last action of the reply', () => {
+    expect(hot).toMatch(/^hot: answer the visitor's message first/)
+    expect(hot).toMatch(/then call schedule_call \(trigger hot_tier\) as the last action of this reply/)
+    expect(hot.indexOf('answer')).toBeLessThan(hot.indexOf('schedule_call'))
+  })
+
+  it('introduces the dialog in one short line, never instead of the answer', () => {
+    expect(hot).toMatch(/introduce it in one short line/)
+    expect(hot).toMatch(/never instead of the answer/)
+  })
+
+  it('fits the 600-character digest with every other field at its maximum', () => {
+    const state = ConversationState.parse({
+      turnCount: 99_999,
+      returningVisitor: true,
+      visitor: { name: 'n'.repeat(80), company: 'c'.repeat(120), role: 'r'.repeat(120), kind: 'hiring_manager', technical: false },
+      intent: { score: 99, tier: 'hot', lastEvaluationId: null },
+      pendingApprovals: Array.from({ length: 999 }, (_, i) => ({ approvalId: `a${i}`, sourceId: `knowledge:${i}`, topic: 't' })),
+      citedSources: Array.from({ length: 50 }, (_, i) => `${'x'.repeat(200)}:${i}`),
+    })
+    const d = stateDigest(state)
+    expect(d).toContain(`call: ${hot}`)
+    expect(d.length).toBeLessThanOrEqual(600)
+  })
+})
+
 describe('stateDigest', () => {
   it('is compact and never leaks raw history', () => {
     const d = stateDigest(s({ turnCount: 5, visitor: { name: 'Ana', company: 'Acme', kind: 'recruiter', technical: false }, citedSources: ['projects:1'] }))

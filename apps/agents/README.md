@@ -2,7 +2,7 @@
 
 ## What it is
 
-A first-person "twin" of the portfolio owner that answers recruiters and clients in the Messenger window on `/os`, using only what the Payload CMS says about the owner. It offers a call when the conversation warrants it, asks the owner on Telegram before it shares anything restricted, and shows the Cal.com booker inline. It is an [eve](https://eve.dev) 0.71 agent on OpenRouter with a Postgres-backed durable runtime, designed in [the spec](../../docs/superpowers/specs/2026-10-04-portfolio-twin-agent-design.md); this README describes the code as it is now, and [Where the code differs from the spec](#where-the-code-differs-from-the-spec) lists where the two disagree.
+A first-person "twin" of the portfolio owner that answers recruiters and clients in the Messenger window on `/os`, using only what the Payload CMS says about the owner. It offers a call when the conversation warrants it, asks the owner over iMessage (Photon) before it shares anything restricted, and shows the Cal.com booker inline. It is an [eve](https://eve.dev) 0.71 agent on OpenRouter with a Postgres-backed durable runtime, designed in [the spec](../../docs/superpowers/specs/2026-10-04-portfolio-twin-agent-design.md); this README describes the code as it is now, and [Where the code differs from the spec](#where-the-code-differs-from-the-spec) lists where the two disagree.
 
 ## Contents
 
@@ -32,7 +32,7 @@ What has **not** been verified:
 - **No Docker image has been built on the development machine**, which has no Docker. That covers `apps/agents/Dockerfile` and the compose stack (`docker-compose.yml`) with `postgres` and `agents`. CI builds the agent with `eve build` but not the image, so the first real image build happens in Easypanel or on a machine with Docker.
 - **The live evals (`evals/`) have not been run against a real model yet.** CI's `live-evals` job runs them against a real model with a throwaway CMS and agent inside the runner (see [Testing](#testing)), but no run of it has been reviewed. It has never run against the production CMS content.
 - **Grounding (acceptance criterion 1) is only partly checked:** it is live-eval checked for search-before-text and URL provenance; claim-level grounding relies on the `portfolio-recall` skill. There is no judge check (see [Where the code differs from the spec](#where-the-code-differs-from-the-spec)).
-- **None of the external integrations has run end to end against the real service:** Telegram approvals, Cal.com webhooks, Google free/busy, OpenRouter fallback routing, and the spend ledger with real OpenRouter cost metadata. Each one is covered by unit tests with mocked HTTP. Telegram and Payload MCP are also covered by local stubs in the offline evals.
+- **None of the external integrations has run end to end against the real service:** Photon approvals, Cal.com webhooks, Google free/busy, OpenRouter fallback routing, and the spend ledger with real OpenRouter cost metadata. Each one is covered by unit tests with mocked HTTP (Photon's adapter is mocked). Payload MCP is also covered by a local stub in the offline evals; Photon has none, so the offline evals leave iMessage unconfigured.
 - **`experimental.workflow.retention: 0` has not been verified at runtime on the Postgres world.** eve's docs warn that "Custom Worlds used with eve might not support this feature". The installed `@workflow/world-postgres` implements it (`dist/retention.js` clears the payload columns and stamps `expired_at` for runs started with `$retention: 0`), but no run has been inspected to confirm that the data is gone. See [Retention and deletion](#retention-and-deletion).
 
 ## Architecture
@@ -43,8 +43,8 @@ What has **not** been verified:
 browser ── /os Messenger (eve/react, host /api/twin) ──► web: /api/twin/eve/v1/* (BFF) ──(internal net, 60 s JWT)──► agents: eve start (/eve/v1/*)
                                                          │ signed cookie → visitor, session ownership,               │ OpenRouter (model + classifier)
                                                          │ rate limits and caps, spend cap, output filter            │ Payload MCP (twinIdentity/twinSearch/twinDisclose)
-Cal.com ── webhook ──► web /api/twin/hooks/cal ──────────(raw body + signature header)──► agents /webhooks/cal      │ Google freeBusy, Exa, Telegram Bot API
-Telegram ─ webhook ──► web /api/twin/hooks/telegram ─────(raw body + secret header)────► agents /webhooks/telegram  │
+Cal.com ── webhook ──► web /api/twin/hooks/cal ──────────(raw body + signature header)──► agents /webhooks/cal      │ Google freeBusy, Exa, Photon (iMessage)
+Photon ─ webhook ──► web /api/twin/hooks/photon ──(raw body + x-spectrum-*)──► agents /webhooks/photon (eve photon channel)   │
                                                          └──────────── Postgres: schema `twin` + the Workflow world ───┘
 ```
 
@@ -70,7 +70,7 @@ Telegram ─ webhook ──► web /api/twin/hooks/telegram ─────(raw 
   - **Fail closed:** without redaction rules, nothing streams.
   - **Forged context notes:** visitor text has `[context` neutralised (`lib/twin/neutralise.ts`), so it can't forge the agent's `[context, not from the visitor]` notes.
 
-**Webhooks** enter through `apps/web/app/api/twin/hooks/[provider]/route.ts`. That route accepts `cal` and `telegram` only. It forwards the raw body plus the provider's signature headers to `agents /webhooks/<provider>`, and the agent verifies the signature next to the secret (`agent/channels/webhooks.ts`).
+**Webhooks** enter through `apps/web/app/api/twin/hooks/[provider]/route.ts`. That route accepts `cal` and `photon` only. It forwards the raw body plus the headers the provider needs (the signature and event metadata) to `agents /webhooks/<provider>`, and the agent verifies the signature next to the secret: `agent/channels/webhooks.ts` for Cal.com, eve's Photon channel (`agent/channels/photon.ts`) for Photon.
 
 **Visitor deletion:** `DELETE /api/twin/me` (`apps/web/app/api/twin/me/route.ts`). See [Retention and deletion](#retention-and-deletion).
 
@@ -112,7 +112,8 @@ agent/
   instructions.ts           per-turn system prompt (defineDynamic on turn.started), fail-closed fallback
   sandbox.ts                pinned just-bash sandbox (no Docker dependency at build)
   channels/eve.ts           visitor channel: JWT auth, abuse gate, steer policy, uploads disabled
-  channels/webhooks.ts      POST /webhooks/telegram and /webhooks/cal (signature checks, idempotent)
+  channels/webhooks.ts      POST /webhooks/cal (signature check, idempotent)
+  channels/photon.ts        eve's photonIMessageChannel at /webhooks/photon: the owner's approval replies, never an agent turn
   hooks/conversation.ts     turn bookkeeping, transcript, post-reply intent evaluation
   memory/visitor.ts         returning-visitor recall from Postgres
   instrumentation/spend.ts  spend ledger rows from eve events
@@ -128,7 +129,7 @@ agent/
     tool-gate.ts            toolGranted(sessionId, tool)
     prompt.ts, state-digest.ts, grounding.ts, conversation.ts
     payload-mcp.ts          callPayloadTool: official MCP SDK client over Streamable HTTP, 5 s timeouts
-    search.ts, disclosure.ts, approvals.ts (workflow steps), telegram.ts, telegram-decision.ts
+    search.ts, disclosure.ts, approvals.ts (workflow steps), imessage.ts, imessage-reply.ts, photon-inbound.ts, owner-decision.ts, phone.ts
     google-freebusy.ts, availability.ts, scheduling.ts, booking-ref.ts, booking-transition.ts, cal-webhook.ts
     intent/                 signals.ts, classify.ts, score.ts, weights.ts (INTENT_WEIGHTS), evaluate.ts
     untrusted.ts            <untrusted nonce> wrapping for CMS, web and memory content
@@ -136,7 +137,7 @@ agent/
 skills/<name>/              SKILL.md (frontmatter description + metadata.version, then prose) and skill.ts
 evals/                      live suite: evals/skills/<skill>/*.eval.ts, evals/acceptance/*, evals/lib/*
 fixtures/offline/           offline eval app: scripted mockModel, re-exported real channels and tools,
-                            Payload MCP and Telegram stubs (stubs/), evals/*.eval.ts, .env.example
+                            Payload MCP stub (stubs/), evals/*.eval.ts, .env.example
 scripts/bundle-skills.ts    SKILL.md → agent/lib/skills/generated.ts (run by every package script)
 scripts/mint-eval-token.ts  JWT for live evals (EVE_EVAL_AUTH_TOKEN)
 tests/                      vitest unit tests (pglite, no network)
@@ -215,7 +216,7 @@ bun run --cwd apps/agents dev                # bun run skills && eve dev --port 
 
 `--no-default-extensions` keeps eve's bundled dev extensions off. The main one, self-modification, adds a `self-modification__agent` subagent that edits files under `agent/` on request. Visitors reach this same dev server through the Messenger, so the extension would let a chat message rewrite the twin's source. Never remove the flag.
 
-eve's TUI talks to the agent as the `local-dev` principal, which maps to the fixed visitor `00000000-0000-4000-8000-000000000001` (`DEV_VISITOR_ID`), created on demand. Every configured capability runs for real: OpenRouter, the CMS, and whichever of Google, Exa, Cal.com and Telegram are set.
+eve's TUI talks to the agent as the `local-dev` principal, which maps to the fixed visitor `00000000-0000-4000-8000-000000000001` (`DEV_VISITOR_ID`), created on demand. Every configured capability runs for real: OpenRouter, the CMS, and whichever of Google, Exa, Cal.com and iMessage are set.
 
 ### 4b. Behind the web BFF
 
@@ -260,7 +261,8 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `TWIN_MODEL_LIGHT_CONTEXT_TOKENS` | A | `1000000` | Context window of the light tier | The light model's context window |
 | `TWIN_MODEL_DEEP` | A | `anthropic/claude-opus-5.5` | Deep tier: in-depth technical questions | OpenRouter model id |
 | `TWIN_MODEL_DEEP_CONTEXT_TOKENS` | A | `1000000` | Context window of the deep tier | The deep model's context window |
-| `TWIN_CLASSIFIER_MODEL` | A | `google/gemini-2.5-flash-lite` (falls back to `mistralai/ministral-8b-2512`) | Pre-turn gate (abuse, scope, depth) and intent label; pick a model that answers in well under the gate timeout | OpenRouter model id |
+| `TWIN_CLASSIFIER_MODEL` | A | `openai/gpt-4.1-mini` (falls back to `anthropic/claude-haiku-4.5`) | Pre-turn gate (abuse, scope, depth); pick a model that answers in well under the gate timeout | OpenRouter model id |
+| `TWIN_INTENT_MODEL` | A | `anthropic/claude-haiku-4.5` (falls back to `deepseek/deepseek-v4.1-flash`) | Post-reply call-intent label; re-run the intent-label eval before changing it | OpenRouter model id |
 | `TWIN_CLASSIFIER_TIMEOUT_MS` | A | `4000` | Intent label timeout (post-reply) | – |
 | `TWIN_ABUSE_TIMEOUT_MS` | A | `2500` | Pre-turn gate timeout (fails open to `ok`/`standard`) | – |
 | `TWIN_JWT_SECRET` | A, W | required, ≥ 32 chars | HS256 key of the 60 s visitor JWT | `openssl rand -hex 32` |
@@ -278,10 +280,10 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 | `CAL_EMBED_SCRIPT_URL` | A | `https://app.cal.com/embed/embed.js` | Embed loader (self-hosted only) | – |
 | `CAL_WEBHOOK_SECRET` | A | cal integration, ≥ 32 chars | Verifies `X-Cal-Signature-256` | Set on the Cal.com webhook |
 | `TWIN_BOOKING_REF_SECRET` | A | cal integration, ≥ 32 chars | Signs the `bookingRef` metadata | `openssl rand -hex 32` |
-| `TELEGRAM_API_BASE` | A | `https://api.telegram.org` | Bot API base (stubbed in offline evals) | – |
-| `TELEGRAM_BOT_TOKEN` | A | telegram integration, `<digits>:<token>` | Sends approvals, edits them, answers taps | @BotFather |
-| `TELEGRAM_WEBHOOK_SECRET` | A | telegram integration, 16–256 of `[A-Za-z0-9_-]` | Verifies `X-Telegram-Bot-Api-Secret-Token` | Chosen by you, passed to `setWebhook` |
-| `TELEGRAM_OWNER_USER_ID` | A | telegram integration, digits | Owner's chat id; only this user's taps count | @userinfobot |
+| `IMESSAGE_PROJECT_ID` | A | imessage integration | Photon project id: sends the approval texts and starts the channel's adapter | app.photon.codes > your project |
+| `IMESSAGE_PROJECT_SECRET` | A | imessage integration | Photon project secret | app.photon.codes > your project |
+| `IMESSAGE_WEBHOOK_SECRET` | A | imessage integration | Verifies `X-Spectrum-Signature` on `/webhooks/photon` | Shown once when you create the Photon webhook |
+| `OWNER_PHONE_NUMBER` | A | imessage integration, E.164 | The only number whose replies decide approvals | Your own phone |
 | `TWIN_APPROVAL_TIMEOUT` | A | `15m` (`<n>s/m/h`) | Approval deadline before auto-deny | – |
 | `EXA_API_KEY` | A | exa integration | `web_search` | exa.ai dashboard |
 
@@ -291,7 +293,7 @@ The Apps column says which services read each variable: **A** = agents, **W** = 
 |---|---|
 | `google` | `check_availability` is never offered |
 | `cal` | `schedule_call` is never offered; `/webhooks/cal` answers 404 |
-| `telegram` | searches drop restricted entries before caching, so nothing restricted is offered and `request_disclosure` refuses without contacting anyone; `/webhooks/telegram` answers 404 |
+| `imessage` | searches drop restricted entries before caching, so nothing restricted is offered and `request_disclosure` refuses without contacting anyone; `/webhooks/photon` deliveries fail (with iMessage off the channel's adapter can't initialise, so the route answers an error) |
 | `exa` | `web_search` is never offered |
 
 The web BFF reads `webTwinEnvSchema`, from the same file:
@@ -450,7 +452,7 @@ After each final reply, `agent/lib/intent/evaluate.ts` scores the conversation:
 The tiers:
 
 - `cold` is below `warmAt` (4); `warm` is from 4; `hot` is from `hotAt` (7).
-- `requesting_call` is always `hot`.
+- No label forces a tier. `requesting_call` weighs 3, below `hotAt`: an explicit ask is already handled in the same reply by the main model (the scheduling skill's explicit-request rule, `schedule_call` with trigger `explicit_request`), so the post-reply label only corroborates, and one misread reaches `warm` at most.
 - A declined offer caps the score just below warm.
 - Once the booking widget is shown, the tier stays where it was.
 
@@ -510,14 +512,16 @@ Each turn runs on the cheapest model that answers it well. The tier is chosen be
 - **Prompt cache.** Changing model between turns loses the provider's prompt cache. Conversations are short, so the cost is small.
 - **Live eval.** `evals/skills/routing/routing.eval.ts` (tags `live`, `routing`) asserts the `modelId` of each turn's `step.started` events.
 
-**The classifier model** (`TWIN_CLASSIFIER_MODEL`) has one fallback, `mistralai/ministral-8b-2512`, through OpenRouter `models`, for a provider outage. It does two jobs:
+**Two classifier models**, one per job, each with one fallback through OpenRouter `models` for a provider outage. Only Anthropic, DeepSeek and OpenAI models are used (owner policy). The gate (`TWIN_CLASSIFIER_MODEL`, `openai/gpt-4.1-mini`) falls back to `anthropic/claude-haiku-4.5`; the intent label (`TWIN_INTENT_MODEL`, `anthropic/claude-haiku-4.5`) falls back to `deepseek/deepseek-v4.1-flash`. They are separate because they were benchmarked on different tasks: the gate's model is the faster one, and it misread the twin's own call offer as the visitor asking:
 
 - **The abuse gate** runs in `onMessage`, before dispatch, with `TWIN_ABUSE_TIMEOUT_MS` (2.5 s). **It fails open:**
   - A timeout yields `ok` on the `standard` tier, silently.
   - Any other failure yields `ok` on the `standard` tier and logs `[twin] abuse classifier failed`. eve turns an `onMessage` throw into HTTP 500 for every visitor, so the gate must not throw.
   - A non-`ok` verdict adds a context note that makes the model deflect once, in character. The conversation ends after 3 violations.
   - `prompt_attack` is counted, not blocked: `boundaries` handles it.
-- **The intent label** runs after the reply (`TWIN_CLASSIFIER_TIMEOUT_MS`, 4 s), so it never adds time-to-first-token. Its failures leave the label `null`.
+- **The intent label** runs after the reply (`TWIN_CLASSIFIER_TIMEOUT_MS`, 4 s), so it never adds time-to-first-token. Its failures leave the label `null`. Its prompt (`INTENT_SYSTEM` in `agent/lib/intent/classify.ts`) keeps `requesting_call` for a live conversation: asking the owner to tell or talk about something ("fala mais", "tell me more") is information, and the twin's own call offer never counts as the visitor asking.
+- **Choosing the intent model.** `evals/skills/scheduling/intent-label.eval.ts` (tags `live`, `scheduling`) calls `classifyIntent` directly on the multi-turn PT/EN regression set in `intent-label.json`, so it checks the model and prompt without the agent. Re-run it (`bunx eve eval skills/scheduling/intent-label`) before changing `TWIN_INTENT_MODEL` or the prompt, and add every misread from production to the set. The default was picked on 2026-10-05 among Anthropic, DeepSeek and OpenAI models (the owner allows no others): the most accurate model with p90 under 3 s, the cheaper on a tie. `anthropic/claude-haiku-4.5` was the only one with no miss (150/150 over two runs of 3, p50 1.2 s, p90 1.5 s); the OpenAI models labelled the warm-offer case `requesting_call`.
+- **Choosing the gate model.** Same method on 15 single messages (greeting, own work, a deep technical question, five unseen leads that must be `ok`, four off-scope requests, a prompt attack, harassment): the most accurate model whose p90 leaves margin under `TWIN_ABUSE_TIMEOUT_MS` (2.5 s). `openai/gpt-4.1-mini` and `openai/gpt-4o-mini` were both 90/90 over two runs of 3; gpt-4.1-mini was kept for its lower latency (p90 1.5-1.6 s against 1.8-2.0 s), since the gate's latency is time-to-first-token and the price gap is a fraction of a cent per thousand messages.
 
 ### Spend
 
@@ -551,7 +555,7 @@ group by 1 order by usd desc limit 20;
 
 Cost rows carry `model_id = 'openrouter'`, and token rows carry the requested model id.
 
-### Telegram approvals
+### iMessage approvals
 
 **How an approval runs.** When a search returns a restricted stub the visitor needs, the model calls `request_disclosure`. That is a durable workflow **task**, so the conversation goes on. Here is what happens next:
 
@@ -559,33 +563,59 @@ Cost rows carry `model_id = 'openrouter'`, and token rows carry the requested mo
    - It is idempotent per tool call (`call_id`), and the same item is never asked about twice in a session.
    - It is capped at 3 per session; past the cap, the request is denied silently.
    - It only opens for a `sourceId` that one of this session's cached searches listed as restricted. Anything else is `notOffered`, denied without notifying anyone. The row's topic is the CMS stub's topic, never the model's words.
+   - It draws a 4-character **reply code** from `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (no 0/O or 1/I/L), unique among pending approvals; a collision redraws up to 5 times.
    - It stores the workflow's webhook URL. The newest webhook wins, so a re-dispatched run is still the one that gets woken.
-2. **Notify.** `notifyOwner` sends the Approve/Deny message once; the stored message id prevents a resend. If notification fails, the approval expires. The message holds the CMS topic and the item id only: the model's `reason` is visitor-steerable, so it is kept on the row for audit and never shown next to the Approve button.
+2. **Notify.** `notifyOwner` texts the owner once through Photon, then sets `notified_at`, so a retry never texts twice. If notification fails for good, the approval expires. The text holds the CMS topic, the item id and the code only: the model's `reason` is visitor-steerable, so it is kept on the row for audit and never shown next to the question.
+
+   ```
+   Twin approval request
+   Topic: Notice period
+   Item: knowledge:5
+   Reply YES K7Q2 to share or NO K7Q2 to decline. Auto-denies after 15m.
+   ```
 3. **Wait.** The body races the webhook against `sleep(TWIN_APPROVAL_TIMEOUT)`.
-4. **The owner taps a button.** Telegram posts to `https://<web>/api/twin/hooks/telegram`, the BFF forwards it, and the agent:
-   - checks the secret header;
-   - accepts taps from `TELEGRAM_OWNER_USER_ID` only;
+4. **The owner replies.** Photon posts to `https://<web>/api/twin/hooks/photon`, the BFF forwards it, and eve's Photon channel verifies `X-Spectrum-Signature`. Its `onMessage` (`agent/lib/photon-inbound.ts`):
+   - accepts messages from `OWNER_PHONE_NUMBER` only, in a direct chat (after E.164 normalisation);
+   - parses the text with a fixed grammar, no model involved;
    - **commits the decision to the database first**, then wakes the workflow;
-   - edits the Telegram message.
+   - answers on the same thread with a short confirmation, best effort;
+   - returns `null`, so no agent turn ever starts on this channel.
 5. **Settle.** `finalizeApproval` trusts only the database. Anything without a recorded owner decision becomes `expired`. That covers the deadline, a stray POST and a failed notification, so **the flow fails closed**. Only `approved` releases the item, through `twinDisclose`; a failed release reads as denied.
+
+**Replies.** The text is trimmed, upper-cased and stripped of trailing `.`, `!` and `?`.
+
+| Owner sends | Result |
+| --- | --- |
+| `YES K7Q2`, `Y K7Q2`, `APPROVE K7Q2`, `OK K7Q2` | Approves K7Q2: "Approved K7Q2: Notice period." |
+| `NO K7Q2`, `N K7Q2`, `DENY K7Q2` | Denies K7Q2: "Denied K7Q2: Notice period. Nothing was shared." |
+| a code that settled in the last 24 hours | "K7Q2 already expired; nothing was shared." or "K7Q2 was already approved." |
+| a code that matches nothing | "No approval ZZZZ is waiting." |
+| a bare `YES` or `NO`, or anything else | "Reply YES <code> or NO <code>. Waiting: K7Q2 (Notice period)." (up to 3 codes), or "Nothing is waiting for approval." |
+
+**Only coded replies decide.** A bare `YES` or `NO` never approves or denies, even with a single approval pending: the owner gets the help text, which lists only the codes already texted. Photon's webhook payload has no service field (iMessage vs SMS or RCS), so sender authenticity can't be established and a bare reply can't be told from an SMS spoof. The code reached nobody but the owner.
+
+**Who counts.** Only `OWNER_PHONE_NUMBER`. A message from any other number, a group chat, a bot or an echo of our own text is ignored: strangers are never answered, because a reply confirms the line is live, and the number is not logged. Photon is answered 200 before any of this runs, so nothing is redelivered.
+
+**Late replies.** After the deadline the approval is `expired` and stays closed: a reply cannot revive it, and a coded reply gets "already expired; nothing was shared." The prompt states the deadline, and no "expired" text is sent.
+
+**When recording fails.** If the database write fails, the owner is asked "That reply could not be recorded. Send it again." (best effort), and the owner resends the code. A resent coded decision is delivered to the workflow and confirmed again.
 
 Setup:
 
-1. **Create the bot.** In Telegram, message **@BotFather**, send `/newbot`, and copy the token into `TELEGRAM_BOT_TOKEN`.
-2. **Find your user id** with **@userinfobot**, and put it in `TELEGRAM_OWNER_USER_ID`.
-3. **Send `/start` to your bot once.** Telegram refuses messages to a user who never started the bot (403), and every approval would expire.
-4. **Pick a secret** of 16–256 characters from `A-Z a-z 0-9 _ -`, for example `openssl rand -hex 32`, and put it in `TELEGRAM_WEBHOOK_SECRET`.
-5. **Register the webhook** against the **web** domain (the agent is not public):
+1. **Create a Photon project** at app.photon.codes (the free tier works) and copy the project id and secret into `IMESSAGE_PROJECT_ID` and `IMESSAGE_PROJECT_SECRET`.
+2. **Create a webhook** for `https://<web>/api/twin/hooks/photon` (event `messages`) against the **web** domain, since the agent is not public. Copy the signing secret Photon shows once into `IMESSAGE_WEBHOOK_SECRET`. The BFF forwards the raw body plus `content-type`, `x-spectrum-signature`, `x-spectrum-timestamp`, `x-spectrum-event` and `x-spectrum-webhook-id`. Update the webhook whenever the domain changes.
+3. **Set your own number** in E.164 as `OWNER_PHONE_NUMBER`. All four variables are required together.
+4. **Text the Photon line once from your iPhone.** The free tier is a shared line (up to 10 users), and a shared line can only message a number after that number has texted the line first.
+5. **On the iPhone, set Settings > Messages > Send & Receive > "Start New Conversations From"** to your phone number. An Apple ID email address can't match `OWNER_PHONE_NUMBER`, so those replies would be ignored.
 
-   ```bash
-   curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
-     -H 'content-type: application/json' \
-     -d "{\"url\":\"https://<web>/api/twin/hooks/telegram\",\"secret_token\":\"${TELEGRAM_WEBHOOK_SECRET}\",\"allowed_updates\":[\"callback_query\"]}"
-   # Verify: url, pending_update_count, last_error_message
-   curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
-   ```
+**Why it is built this way.**
 
-   `allowed_updates: ["callback_query"]` means only button taps are delivered. Run it again whenever the domain or the secret changes.
+- **Inbound is eve's Photon channel**, as in the personal-agent-template reference and eve's "Other hosts" example (lazy credentials, `route: '/webhooks/photon'`). The one difference is `onMessage`: the owner is answering about *another* session (the visitor's), and eve's human-in-the-loop resumes the *requesting* session through *its* channel, which is the visitor's Messenger window. So `onMessage` decides the approval itself and returns `null` instead of dispatching a turn.
+- **Outbound is the provider API**, per eve's durable cross-channel notifications pattern: `agent/lib/imessage.ts` calls `openDM(owner)` and `postMessage` on `@photon-ai/chat-adapter-imessage` 3.2.0, the adapter eve bundles, so the owner needn't have a live session. An unconfigured integration is a `FatalError` (no retry). The adapter exposes no permanent-error classification, so its failures stay retryable (`Photon send failed`) and the workflow step retries them.
+- **Bare replies don't decide** because Photon's payload has no service field, so the agent can't tell a real iMessage from a spoofed SMS (see above); the code is the proof.
+- **The decision is in** [the iMessage spec](../../docs/superpowers/specs/2026-10-05-imessage-owner-approvals-design.md).
+
+**Restart after a failed first initialisation.** The channel's adapter initialises on the first webhook after boot, issuing Photon tokens, *before* the signature is verified. If that first initialisation fails (a Photon or network outage), Chat SDK caches the failure and `/webhooks/photon` keeps answering 500 until the agents service restarts. After an outage, restart `agents`.
 
 ### Cal.com
 
@@ -662,13 +692,13 @@ Put the key in `PAYLOAD_MCP_API_KEY`.
 | Offline evals | see below | Real channels, tools and Postgres world, scripted model, local stubs |
 | Live evals | see below | Real model, CMS and integrations, deterministic assertions |
 
-**Unit tests (zero network).** Vitest runs against **pglite**, an in-process Postgres migrated with the real migrations (`@repo/twin/testing`). Every HTTP call is mocked (OpenRouter, MCP, Telegram, Google, Exa). A setup file (`@repo/twin/testing/network-guard`, in both `packages/twin` and `apps/agents`) replaces global `fetch` with a guard: an un-mocked call rejects and fails the test in `afterEach`, even if the code under test swallowed the error. `vi.stubGlobal('fetch', ...)` replaces the guard and unstubbing restores it. `vitest.config.ts` aliases `workflow` to eve's vendored Workflow SDK, as eve does at build time.
+**Unit tests (zero network).** Vitest runs against **pglite**, an in-process Postgres migrated with the real migrations (`@repo/twin/testing`). Every HTTP call is mocked (OpenRouter, MCP, Google, Exa), and Photon's adapter is mocked. A setup file (`@repo/twin/testing/network-guard`, in both `packages/twin` and `apps/agents`) replaces global `fetch` with a guard: an un-mocked call rejects and fails the test in `afterEach`, even if the code under test swallowed the error. `vi.stubGlobal('fetch', ...)` replaces the guard and unstubbing restores it. `vitest.config.ts` aliases `workflow` to eve's vendored Workflow SDK, as eve does at build time.
 
 **Offline evals** (`fixtures/offline/`). This is a separate eve app:
 
 - **The model** is a scripted `mockModel` with keyword-driven paths (`BOOK`, `PUSH`, `NO`, `FACT`), one per routing tier, picked per step by the real `currentTier` through `defineDynamic`.
 - **The channels and tools** re-export the real ones from `agent/`.
-- **Stubs** for Payload MCP (`:4310`) and Telegram (`:4312`) start in the eval setup.
+- **A stub** for Payload MCP (`:4310`) starts in the eval setup. Photon has none (it is gRPC, with no HTTP stub), so the fixture leaves iMessage unconfigured: restricted entries are never offered there.
 - **The database** is the real Postgres world on `twin_eval`.
 
 The evals cover widget guards, decline, portfolio search, the Cal.com booking webhook and the dynamic model resolver (the fixture's gate times out by design, so every step must start on the standard mock). **`request_disclosure` is not in the fixture**, because eve compiles workflow directives only under the app root. Its body is proven by `tests/request-disclosure-body.test.ts` instead, which runs it uncompiled with `workflow` mocked: approved, denied, deadline to expired, notification failure, failed release and an item the session was never offered.
@@ -722,11 +752,12 @@ The `checks` job runs on every push to `main`/`develop` and on every PR:
    - It creates a CI user and an MCP API key with only `twinIdentity`, `twinSearch` and `twinDisclose` enabled. The key uses Payload's `useAPIKey` auth: the Local API sets `enableAPIKey` and `apiKey`, and Payload's field hooks store the key encrypted plus an HMAC index that the MCP endpoint looks up.
    - The key is masked and written to `$GITHUB_ENV` as `PAYLOAD_MCP_API_KEY`.
    - Then `next start` serves the CMS on `:3001`.
-3. **The agent** is built and runs `world:setup` and `db:migrate` against a `postgres:17` service (`twin_eval` on 5433), then starts on `:4100`. `CMS_URL` and `PAYLOAD_MCP_URL` point at the local CMS. Google and Telegram get harmless placeholders: the live suite has no approval or free/busy eval. If the model calls `check_availability` during the booking acceptance, that call fails, and the model has to go on without it.
+3. **The agent** is built and runs `world:setup` and `db:migrate` against a `postgres:17` service (`twin_eval` on 5433), then starts on `:4100`. `CMS_URL` and `PAYLOAD_MCP_URL` point at the local CMS. Google gets harmless placeholders; iMessage is left unconfigured, so nothing restricted is offered and no approval runs. The live suite has no free/busy eval either. If the model calls `check_availability` during the booking acceptance, that call fails, and the model has to go on without it.
 4. **The evals.** Once `/eve/v1/health` answers, the job mints the eval token and runs `bunx eve eval --url http://127.0.0.1:4100 --strict --junit .eve/junit.xml` from `apps/agents`.
 
 ## Where the code differs from the spec
 
+- **The owner-approval transport** is iMessage via Photon, not Telegram. [The 2026-10-05 spec](../../docs/superpowers/specs/2026-10-05-imessage-owner-approvals-design.md) supersedes the Telegram transport of the 2026-10-04 spec (`request_disclosure`, §6); the rest of the approval design is unchanged.
 - **The BFF route** is `apps/web/app/api/twin/eve/v1/[...path]/route.ts`, not `apps/web/app/api/twin/[...path]/route.ts`.
 - **Payload MCP** is called with the official `@modelcontextprotocol/sdk` client (`agent/lib/payload-mcp.ts`), not `@ai-sdk/mcp`'s `createMCPClient`.
 - **Skill activation:**

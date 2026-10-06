@@ -14,7 +14,8 @@ export const GateDecision = z.object({ verdict: AbuseVerdict, depth: ModelTier }
 /** One gate decision. */
 export type GateDecision = z.infer<typeof GateDecision>
 
-const SYSTEM = `Classify one chat message sent to a professional portfolio chatbot that speaks as its owner, a software and AI engineer.
+/** The gate's instructions; exported so model benchmarks run exactly what the gate runs. */
+export const GATE_SYSTEM = `Classify one chat message sent to a professional portfolio chatbot that speaks as its owner, a software and AI engineer.
 harassment: insults, threats or demeaning language aimed at the owner or anyone.
 sexual: sexual content or advances.
 hate: hateful content about protected groups.
@@ -46,7 +47,7 @@ function fenced(tag: 'message' | 'previous', text: string): string {
 }
 
 /** The classifier prompt: the previous exchange (when there is one) as context for depth, then the message, both fenced as data. */
-function gatePrompt(text: string, previous: ReadonlyArray<{ role: 'visitor' | 'twin'; text: string }>): string {
+export function gatePrompt(text: string, previous: ReadonlyArray<{ role: 'visitor' | 'twin'; text: string }>): string {
   const message = fenced('message', text.slice(0, 2000))
   if (previous.length === 0) return message
   const exchange = previous.map((t) => `${t.role}: ${t.text.slice(0, 600)}`).join('\n')
@@ -68,7 +69,7 @@ export async function classifyMessage(
   try {
     const { output } = await generateText({
       model: classifierModel(),
-      instructions: SYSTEM,
+      instructions: GATE_SYSTEM,
       prompt: gatePrompt(text, previous),
       output: Output.object({ schema: GateDecision }),
       abortSignal: signal,

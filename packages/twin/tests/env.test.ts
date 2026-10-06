@@ -4,6 +4,7 @@ import {
   blankToUndefined,
   INTEGRATIONS,
   integrationConfig,
+  MODEL_DEFAULTS,
   parseEnv,
   requireIntegration,
   webTwinEnvSchema,
@@ -29,9 +30,10 @@ const agents = {
   CAL_LINK: 'vinicius/intro',
   CAL_WEBHOOK_SECRET: secret,
   TWIN_BOOKING_REF_SECRET: secret,
-  TELEGRAM_BOT_TOKEN: '123:abc',
-  TELEGRAM_WEBHOOK_SECRET: 'tg_secret_value_1234',
-  TELEGRAM_OWNER_USER_ID: '42',
+  IMESSAGE_PROJECT_ID: 'photon-project-1',
+  IMESSAGE_PROJECT_SECRET: 'photon-project-secret',
+  IMESSAGE_WEBHOOK_SECRET: 'photon-webhook-secret',
+  OWNER_PHONE_NUMBER: '+5511999998888',
   EXA_API_KEY: 'exa',
 }
 
@@ -77,6 +79,26 @@ describe('env', () => {
     expect([custom.TWIN_MODEL_LIGHT, custom.TWIN_MODEL_LIGHT_CONTEXT_TOKENS, custom.TWIN_MODEL_DEEP, custom.TWIN_MODEL_DEEP_CONTEXT_TOKENS]).toEqual(['a/light', 64_000, 'a/deep', 500_000])
   })
 
+  // Owner policy (2026-10-05): models come from Anthropic, DeepSeek or OpenAI only.
+  it('defaults every model to an allowed provider, each classifier failing over to another provider', () => {
+    const ids = Object.values(MODEL_DEFAULTS)
+      .flat()
+      .filter((v) => typeof v === 'string')
+    expect(ids.length).toBeGreaterThan(0)
+    for (const id of ids) expect(id).toMatch(/^(anthropic|deepseek|openai)\//)
+    const provider = (id: string) => id.split('/')[0]
+    expect(provider(MODEL_DEFAULTS.classifierFallback)).not.toBe(provider(MODEL_DEFAULTS.classifier))
+    expect(provider(MODEL_DEFAULTS.intentFallback)).not.toBe(provider(MODEL_DEFAULTS.intent))
+  })
+
+  it('defaults the intent model apart from the gate classifier, blank meaning unset', () => {
+    const env = parseEnv(agentsEnvSchema, agents)
+    expect(env.TWIN_INTENT_MODEL).toBe('anthropic/claude-haiku-4.5')
+    expect(env.TWIN_CLASSIFIER_MODEL).toBe('openai/gpt-4.1-mini')
+    expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_INTENT_MODEL: ' ' }).TWIN_INTENT_MODEL).toBe('anthropic/claude-haiku-4.5')
+    expect(parseEnv(agentsEnvSchema, { ...agents, TWIN_INTENT_MODEL: 'a/intent' }).TWIN_INTENT_MODEL).toBe('a/intent')
+  })
+
   it('treats blank tier variables as unset so the tier defaults apply', () => {
     const env = parseEnv(agentsEnvSchema, { ...agents, TWIN_MODEL_LIGHT: '', TWIN_MODEL_DEEP_CONTEXT_TOKENS: ' ' })
     expect(env.TWIN_MODEL_LIGHT).toBe('deepseek/deepseek-v4.1-flash')
@@ -96,7 +118,7 @@ describe('env', () => {
       Object.entries(agents).filter(([k]) => !Object.values(INTEGRATIONS).flat().some((i) => i === k)),
     )
     const env = parseEnv(agentsEnvSchema, core)
-    for (const name of ['google', 'cal', 'telegram', 'exa'] as const) {
+    for (const name of ['google', 'cal', 'imessage', 'exa'] as const) {
       expect(integrationConfig(env, name)).toBeNull()
       expect(() => requireIntegration(env, name)).toThrow(`The ${name} integration is not configured`)
     }
@@ -109,9 +131,13 @@ describe('env', () => {
   })
 
   it('rejects a half-configured integration, naming what is missing', () => {
-    expect(() => parseEnv(agentsEnvSchema, { ...agents, TELEGRAM_OWNER_USER_ID: '' })).toThrow(
-      /TELEGRAM_OWNER_USER_ID: required by the telegram integration because TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET is set/,
+    expect(() => parseEnv(agentsEnvSchema, { ...agents, OWNER_PHONE_NUMBER: '' })).toThrow(
+      /OWNER_PHONE_NUMBER: required by the imessage integration because IMESSAGE_PROJECT_ID, IMESSAGE_PROJECT_SECRET, IMESSAGE_WEBHOOK_SECRET is set/,
     )
+  })
+
+  it('requires E.164 phone numbers', () => {
+    expect(() => parseEnv(agentsEnvSchema, { ...agents, OWNER_PHONE_NUMBER: '11 99999-8888' })).toThrow(/OWNER_PHONE_NUMBER: must be E.164/)
   })
 
   it('parses the web BFF env', () => {

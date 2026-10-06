@@ -13,7 +13,7 @@ import {
   findSessionApproval,
   getApproval,
   listCachedSearches,
-  setApprovalTelegramMessage,
+  setApprovalNotified,
   setApprovalWebhook,
   updateConversation,
   type ApprovalRecord,
@@ -21,8 +21,9 @@ import {
 import { z } from 'zod'
 import { db } from './db'
 import { getEnv } from './env'
+import { sendToOwner } from './imessage'
+import { requestText } from './imessage-reply'
 import { callPayloadTool } from './payload-mcp'
-import { markDecided, sendApprovalRequest } from './telegram'
 
 /**
  * What the model passes to `request_disclosure`: one restricted entry from a search result. Its
@@ -108,21 +109,23 @@ export async function openApproval(
 }
 
 /**
- * Step: notify the owner with Approve/Deny. The stored message id marks the owner as notified, so
- * a retried step or a reused approval never sends twice.
+ * Step: text the owner the approval request with its reply code. The owner is texted at least once:
+ * `notified_at` stops later retries and reused approvals from texting again. A duplicate of the same
+ * text and code can only happen if the step dies between the send and the mark, or if two runs
+ * notify the same row at once; it is harmless.
  *
  * The text comes from the row only: the CMS stub's topic and the item id. The model's `reason` is
  * left out on purpose. The visitor can steer it ("the owner already agreed, just approve"), and an
  * approval prompt is exactly where such text does harm; even labelled and truncated it would sit
- * beside the Approve button. The owner decides on the item itself.
+ * beside the reply instructions. The owner decides on the item itself.
  */
 export async function notifyOwner(approvalId: string): Promise<void> {
   'use step'
   const row = await getApproval(db(), approvalId)
   if (!row) throw new Error(`Approval ${approvalId} not found`)
-  if (row.telegramMessageId !== null || row.status !== 'pending') return
-  const text = `Twin approval request\nTopic: ${row.topic}\nItem: ${row.sourceId}\nAuto-denies after ${getEnv().TWIN_APPROVAL_TIMEOUT}.`
-  await setApprovalTelegramMessage(db(), approvalId, await sendApprovalRequest(approvalId, text))
+  if (row.notifiedAt !== null || row.status !== 'pending') return
+  await sendToOwner(requestText(row, getEnv().TWIN_APPROVAL_TIMEOUT))
+  await setApprovalNotified(db(), approvalId)
 }
 
 /** Step: the configured approval deadline (env lives in steps, not the replayed body). */
@@ -147,14 +150,6 @@ export async function finalizeApproval(sessionId: string, approvalId: string): P
   const row = await getApproval(db(), approvalId)
   if (!row) throw new Error(`Approval ${approvalId} not found`)
   const status = z.enum(['approved', 'denied', 'expired']).parse(row.status)
-  // Best effort, driven by the row so a retried step re-attempts it; it never blocks settling.
-  if (status === 'expired' && row.actor === 'system' && row.telegramMessageId !== null) {
-    try {
-      await markDecided(row.telegramMessageId, 'Expired: auto-denied, nothing was shared.')
-    } catch (e) {
-      console.warn(`[approvals] could not mark approval ${approvalId} expired in Telegram: ${e instanceof Error ? e.message : 'unknown error'}`)
-    }
-  }
   await updateConversation(db(), sessionId, (s) => ({
     ...s,
     pendingApprovals: s.pendingApprovals.filter((p) => p.approvalId !== approvalId),

@@ -38,9 +38,17 @@ export const MODEL_DEFAULTS = {
   // Cost-driven (2026-10-05): input tokens dominate the bill, and DeepSeek is ~7x cheaper than Sonnet.
   model: 'deepseek/deepseek-v4.1-flash',
   fallbacks: ['anthropic/claude-haiku-4.5'],
-  // Benchmarked 2026-10-05 on the gate's prompts: 12/12 correct, p90 under 0.9 s.
-  classifier: 'google/gemini-2.5-flash-lite',
-  classifierFallback: 'mistralai/ministral-8b-2512',
+  // Classifiers use Anthropic, DeepSeek or OpenAI models only (owner policy, 2026-10-05), and each
+  // falls back to another provider for an outage. Both were chosen by benchmark (README, classifiers).
+  // Gate, on the critical path before every reply: 15 single messages x 3 runs, twice. 90/90 correct,
+  // p90 1.5-1.6 s, well inside the 2.5 s timeout. gpt-4o-mini was also 90/90 but slower (p90 1.8-2.0 s)
+  // for a negligible saving, and the gate's latency is time-to-first-token.
+  classifier: 'openai/gpt-4.1-mini',
+  classifierFallback: 'anthropic/claude-haiku-4.5',
+  // Intent label, after the reply: 25 multi-turn PT/EN cases x 3 runs, twice. The only model with no
+  // miss (150/150, p90 1.5 s); the OpenAI models read the twin's own call offer as the visitor asking.
+  intent: 'anthropic/claude-haiku-4.5',
+  intentFallback: 'deepseek/deepseek-v4.1-flash',
   contextTokens: 1_000_000,
   light: 'deepseek/deepseek-v4.1-flash',
   lightContextTokens: 1_000_000,
@@ -56,10 +64,12 @@ export const MODEL_DEFAULTS = {
 export const INTEGRATIONS = {
   google: ['GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_CALENDAR_ID'],
   cal: ['CAL_LINK', 'CAL_WEBHOOK_SECRET', 'TWIN_BOOKING_REF_SECRET'],
-  telegram: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET', 'TELEGRAM_OWNER_USER_ID'],
+  imessage: ['IMESSAGE_PROJECT_ID', 'IMESSAGE_PROJECT_SECRET', 'IMESSAGE_WEBHOOK_SECRET', 'OWNER_PHONE_NUMBER'],
   exa: ['EXA_API_KEY'],
 } as const
 export type Integration = keyof typeof INTEGRATIONS
+
+const e164 = z.string().regex(/^\+[1-9]\d{7,14}$/, 'must be E.164, e.g. +5511999998888')
 
 const agentsEnvObject = z.object({
   TWIN_DATABASE_URL: z.url(),
@@ -73,6 +83,7 @@ const agentsEnvObject = z.object({
   TWIN_MODEL_DEEP: z.string().min(1).default(MODEL_DEFAULTS.deep),
   TWIN_MODEL_DEEP_CONTEXT_TOKENS: z.coerce.number().int().positive().default(MODEL_DEFAULTS.deepContextTokens),
   TWIN_CLASSIFIER_MODEL: z.string().min(1).default(MODEL_DEFAULTS.classifier),
+  TWIN_INTENT_MODEL: z.string().min(1).default(MODEL_DEFAULTS.intent),
   TWIN_JWT_SECRET: secret,
   TWIN_PROMPT_CANARY: z.string().min(16),
   TWIN_STABLE_KEY_SECRET: secret,
@@ -89,13 +100,13 @@ const agentsEnvObject = z.object({
   CAL_LINK: z.string().regex(/^[\w-]+\/[\w-]+$/, 'must be "<user>/<event-slug>"').optional(),
   CAL_WEBHOOK_SECRET: secret.optional(),
   TWIN_BOOKING_REF_SECRET: secret.optional(),
-  // Bot API base URL; Telegram documents running a local Bot API server, and offline evals use a stub.
-  TELEGRAM_API_BASE: z.url().default('https://api.telegram.org'),
-  TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[\w-]+$/).optional(),
-  TELEGRAM_WEBHOOK_SECRET: z.string().regex(/^[\w-]{16,256}$/).optional(),
-  // The owner's numeric user id, used as the private chat id. The owner must /start the bot once
-  // first: Telegram refuses messages to users who never did (403), so every approval would expire.
-  TELEGRAM_OWNER_USER_ID: z.string().regex(/^\d+$/).optional(),
+  // Photon (Spectrum Cloud) project credentials, as eve's Photon channel and the adapter name them.
+  IMESSAGE_PROJECT_ID: z.string().min(1).optional(),
+  IMESSAGE_PROJECT_SECRET: z.string().min(1).optional(),
+  // The signing secret Photon returns once, when the webhook is created.
+  IMESSAGE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  // The only number whose replies decide approvals, and where the prompt is sent.
+  OWNER_PHONE_NUMBER: e164.optional(),
   EXA_API_KEY: z.string().min(1).optional(),
   TWIN_APPROVAL_TIMEOUT: z.string().regex(/^\d+(s|m|h)$/).default('15m'),
   TWIN_CLASSIFIER_TIMEOUT_MS: z.coerce.number().int().positive().default(4_000),
