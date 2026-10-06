@@ -59,6 +59,56 @@ function gradientIds(markup: string): Set<string> {
   return new Set(gradients.filter((id) => counts.get(id) === 1))
 }
 
+/** `#id` references in a piece of markup: CSS `url(#…)` (after XML and CSS decoding) and `href`/`src` values. */
+const references = (text: string) => [
+  ...[...decodeCss(decodeXml(text)).matchAll(/url\(\s*['"]?\s*(#[^'")\s]*)/gi)].map((m) => m[1]!),
+  ...urlAttributes(text).map(asUrl).filter((url) => url.startsWith('#')),
+]
+
+/** Elements whose content is drawn wherever they are referenced, so references inside them multiply. */
+const CONTAINERS = new Set(['mask', 'pattern', 'clipPath', 'marker', 'filter', 'symbol'])
+
+/**
+ * Markup tokens, leftmost first: comments, CDATA sections, processing instructions and the DOCTYPE
+ * (each opaque, so markup-like text inside them is not mistaken for tags), then end and start tags
+ * (attribute values may hold `>` but never `<`). Anything between tokens is text.
+ */
+const TOKENS =
+  /<!--[\s\S]*?(?:-->|$)|<!\[CDATA\[[\s\S]*?(?:\]\]>|$)|<\?[\s\S]*?(?:\?>|$)|<!DOCTYPE[^[>]*(?:\[[\s\S]*?\])?\s*>|<\/([^\s>]+)\s*>|<([A-Za-z_:\x80-\xff][^\s/>]*)((?:[^<>"']|"[^"]*"|'[^']*')*?)(\/?)>/g
+
+/**
+ * The `#id` references that can multiply what is drawn: those made inside a container (CONTAINERS, or
+ * any element a `href` points at, as `<use>` and `<feImage>` do), whose content is drawn once per
+ * reference to it; and every reference in a stylesheet or other text, whose rules can apply inside any
+ * container. A plain reference from the drawing itself (a path's clip-path, a top-level `<use>`) only
+ * draws its target once, so it costs nothing here.
+ */
+function chainedReferences(markup: string): string[] {
+  const hrefTargets = new Set(urlAttributes(markup).map(asUrl).filter((url) => url.startsWith('#')))
+  const open: { name: string; inside: boolean }[] = []
+  const found: string[] = []
+  let textStart = 0
+  for (const token of markup.matchAll(TOKENS)) {
+    found.push(...references(markup.slice(textStart, token.index)))
+    textStart = token.index + token[0].length
+    const [whole, endName, startName, attributes, selfClosing] = token
+    if (endName !== undefined) {
+      const at = open.map((element) => element.name).lastIndexOf(endName)
+      if (at >= 0) open.length = at
+    } else if (startName !== undefined) {
+      const ids = [...attributes!.matchAll(/\s(?:[\w.-]+:)?id\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map((m) => `#${decodeXml(m[1] ?? m[2]!)}`)
+      const inside =
+        (open.at(-1)?.inside ?? false) || CONTAINERS.has(startName.replace(/^[^:]*:/, '')) || ids.some((id) => hrefTargets.has(id))
+      if (inside) found.push(...references(whole))
+      if (!selfClosing) open.push({ name: startName, inside })
+    } else {
+      found.push(...references(whole))
+    }
+  }
+  found.push(...references(markup.slice(textStart)))
+  return found
+}
+
 /**
  * Whether the SVG markup passes the pre-check:
  * - readable as ASCII-compatible text, so the checks below see its markup: no NUL bytes (UTF-16/32)
@@ -68,10 +118,11 @@ function gradientIds(markup: string): Set<string> {
  *   base64 PNG, JPEG, GIF or WebP `data:` URL, every CSS `url(…)` is `url(#id)`, there is no
  *   `@import`, and every `data:` anywhere (after XML and CSS decoding) is such an image, at most
  *   MAX_INLINE_IMAGES of them; so no nested document (SVG, stylesheet, gzip or not) is ever loaded;
- * - at most MAX_ELEMENTS elements and MAX_INSTANCES worst-case instances: each `#id` reference (a
- *   `<use>`, mask, clip-path, pattern, marker, filter, feImage…) can draw its target again, and with
- *   `refs` of them nesting multiplies copies by at most 3^(refs/3). References to gradients are not
- *   counted: a gradient only paints.
+ * - at most MAX_ELEMENTS elements and MAX_INSTANCES worst-case instances: with `refs` chained
+ *   references (see chainedReferences), nesting multiplies copies by at most 3^(refs/3). References
+ *   to gradients are not counted: a gradient only paints.
+ * This is a filter, not the bound: a stylesheet rule applying one reference to many elements, or
+ * expensive filters, are left to the render process's time and memory caps (render.ts).
  */
 export function isBoundedSvg(data: Buffer): boolean {
   if (data.includes(0)) return false
@@ -96,7 +147,7 @@ export function isBoundedSvg(data: Buffer): boolean {
   if (!attrRefs.every((url) => url.startsWith('#') || INLINE_IMAGE_VALUE.test(url))) return false
 
   const gradients = gradientIds(markup)
-  const refs = [...cssRefs, ...attrRefs].filter((url) => url.startsWith('#') && !gradients.has(url)).length
+  const refs = chainedReferences(markup).filter((url) => !gradients.has(url)).length
   const elements = count(markup, /<[A-Za-z_:\x80-\xff]/g)
   return elements <= MAX_ELEMENTS && elements * 3 ** (refs / 3) <= MAX_INSTANCES
 }

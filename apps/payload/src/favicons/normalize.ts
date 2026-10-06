@@ -24,7 +24,8 @@ const isGzip = (data: Buffer) => startsWith(data, [0x1f, 0x8b])
 /**
  * Whether the bytes are a well-formed ICO: the ICONDIR header (reserved 0, type 1, at least one
  * image), and every directory entry's image inside the file, after the directory, starting as a PNG
- * or a BMP info header. Four magic bytes alone would let any body ride along unchanged.
+ * or a BMP info header. Four magic bytes alone would let any body ride along unchanged. Bytes
+ * after or between the images are left alone: served as `image/x-icon`, nothing in an ICO runs.
  */
 function isIco(data: Buffer): boolean {
   if (data.length < 6 || data.readUInt16LE(0) !== 0 || data.readUInt16LE(2) !== 1) return false
@@ -65,7 +66,7 @@ function isRaster(data: Buffer): boolean {
  * - a raster image (PNG, JPEG, GIF, WebP, TIFF, HEIF/AVIF) is decoded, and an SVG that passes the
  *   markup pre-check (svg-check.ts) is drawn, each re-encoded as a fresh 64×64 PNG so no markup or
  *   polyglot bytes survive. That work runs in a child process killed after `caps.timeoutMs`, which
- *   exits itself above `caps.memoryMb` (render.ts);
+ *   kills itself above `caps.memoryMb` (render.ts);
  * - anything else is refused.
  * Resolves null when nothing usable comes out; never throws.
  */

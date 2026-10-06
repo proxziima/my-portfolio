@@ -202,6 +202,18 @@ describe('normalizeIcon: SVG pre-check', () => {
   ])('refuses a %s reference chain', async (tag, attr) => {
     await expectRefusedUpFront(chain(tag, attr))
   })
+  it.each([
+    [6, 40],
+    [30, 120],
+  ])('draws an export with %i clipPaths referenced by %i paths', async (clips, paths) => {
+    const defs = Array.from({ length: clips }, (_, i) => `<clipPath id="c${i}"><rect width="64" height="64"/></clipPath>`).join('')
+    const shapes = Array.from({ length: paths }, (_, i) => `<path d="M${i % 60} 0L64 ${i % 60}L0 64Z" fill="red" clip-path="url(#c${i % clips})"/>`)
+    await expectPng(await normalizeIcon(svg(`<defs>${defs}</defs>${shapes.join('')}`, 'width="64" height="64"'), CAPS))
+  })
+  it('draws an icon that places one symbol many times', async () => {
+    const dots = Array.from({ length: 60 }, (_, i) => `<use href="#dot" x="${i % 8}" y="${Math.floor(i / 8)}"/>`).join('')
+    await expectPng(await normalizeIcon(svg(`<defs><symbol id="dot"><rect width="1" height="1" fill="red"/></symbol></defs>${dots}`), CAPS))
+  })
   it('does not count references to gradients', async () => {
     const fills = svg(`<linearGradient id="g"><stop stop-color="red"/></linearGradient>${'<rect width="16" height="16" fill="url(#g)"/>'.repeat(200)}`)
     expect(await opaquePixels(await expectPng(await normalizeIcon(fills, CAPS)))).toBe(64 * 64)
@@ -277,6 +289,6 @@ describe('normalizeIcon: render process', () => {
     spawned.mockClear()
     expect(await normalizeIcon(large, { ...CAPS, memoryMb: 100 })).toBeNull()
     const child = spawned.mock.results[0]!.value as ChildProcess
-    expect(child.exitCode).toBe(3)
+    expect(child.exitCode).not.toBe(0)
   })
 })
