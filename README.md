@@ -47,6 +47,12 @@ bun run --cwd apps/web build
 bun run --cwd apps/web test:e2e
 ```
 
+## CI/CD
+
+Pull requests and pushes run the affected checks (types, lint, tests with coverage, generated-file drift,
+image builds, e2e, evals) plus CodeQL, dependency review and gitleaks. A green `main` publishes the images to
+GHCR and deploys to Easypanel. See [docs/ci-cd.md](docs/ci-cd.md).
+
 ## The desk and its OS
 
 The figure is a three.js scene (`apps/web/features/desk/`): three baked GLBs with one unlit texture each, and a CSS3D `<iframe>` of `/os` set into the monitor. Hovering the monitor zooms the camera to the screen; leaving zooms back. `/os` (`apps/web/features/os/`) is a small Windows-98-style desktop fed by the same CMS data, and works on its own (that is also the mobile route, linked under the figure). Design: [docs/superpowers/specs/2026-10-02-3d-os-scene-design.md](docs/superpowers/specs/2026-10-02-3d-os-scene-design.md).
