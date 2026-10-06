@@ -1,21 +1,37 @@
 import type { ComponentType } from 'react'
-import type { Portfolio } from '@/lib/cms/types'
+import type { Messenger as MessengerData, Portfolio } from '@/lib/cms/types'
 import type { IconName } from './icons'
 import type { Size } from './window-geometry'
 import { Credits } from './apps/Credits'
 import { dosApp } from './apps/dos-app'
+import { Conversation } from './apps/messenger/Conversation'
+import { withName } from './apps/messenger/labels'
+import { Messenger } from './apps/messenger/Messenger'
 import { Showcase } from './apps/Showcase'
 
-export interface OsAppProps {
-  data: Portfolio
+/** What the OS apps read: the portfolio plus the content only the desktop shows. */
+export interface OsData extends Portfolio {
+  messenger: MessengerData
 }
+
+export interface OsAppProps {
+  data: OsData
+  /** Opens another app's window, or raises it when open, as the Messenger opens a conversation. */
+  open: (appId: string) => void
+  /** The desktop's other programs, as the Messenger's service bar launches them. */
+  apps: readonly ResolvedApp[]
+}
+
+/** Text that is fixed, or that comes from content (e.g. the owner's name). */
+type Text = string | ((data: OsData) => string)
 
 export interface OsApp {
   id: string
-  /** A function when the title comes from content (e.g. the owner's name). */
-  title: string | ((data: Portfolio) => string)
-  /** The desktop label, short like the reference's ("My Showcase"); omitted = the title. */
-  shortcut?: string
+  title: Text
+  /** The desktop label, short like the reference's ("My Showcase"); omitted = the title (resolved by resolveApp). */
+  shortcut?: Text
+  /** The app that opens this one (the Messenger opens its conversation): no desktop shortcut, and it closes with its parent. */
+  parent?: string
   icon: IconName
   component: ComponentType<OsAppProps>
   /** Opening size; omitted = fill the desk with a margin. */
@@ -28,8 +44,27 @@ export interface OsApp {
   barColor?: string
 }
 
-/** An app whose title has been resolved against the content, for the chrome that only shows text. */
-export type ResolvedApp = Omit<OsApp, 'title'> & { title: string }
+/** An app whose texts have been resolved against the content, for the chrome that only shows text. */
+export type ResolvedApp = Omit<OsApp, 'title' | 'shortcut'> & { title: string; shortcut: string }
+
+const resolve = (text: Text, data: OsData): string => (typeof text === 'function' ? text(data) : text)
+
+export const resolveApp = (app: OsApp, data: OsData): ResolvedApp => ({
+  ...app,
+  title: resolve(app.title, data),
+  shortcut: resolve(app.shortcut ?? app.title, data),
+})
+
+type Family = Pick<OsApp, 'id' | 'parent'>
+
+/** The apps with a desktop shortcut: those no other app opens. */
+export const desktopApps = <T extends Family>(apps: readonly T[]): T[] => apps.filter((app) => !app.parent)
+
+/** An app and every window it opened, and those windows' own, for closing them together. */
+export const withChildren = (apps: readonly Family[], id: string): string[] => [
+  id,
+  ...apps.filter((app) => app.parent === id).flatMap((child) => withChildren(apps, child.id)),
+]
 
 /** The chrome every DOS program shares, as the reference's Doom window. */
 const DOS_CHROME = { status: 'Powered by JSDOS & DOSBox', barColor: '#1c1c1c' } as const
@@ -60,10 +95,26 @@ export const APPS: readonly OsApp[] = [
     aspect: 4 / 3,
     ...DOS_CHROME,
   },
+  {
+    id: 'messenger',
+    title: (data) => data.messenger.title,
+    shortcut: (data) => data.messenger.shortcut,
+    icon: 'messenger',
+    component: Messenger,
+    // the reference's contact list: its 316×708 inside, plus the chrome
+    size: { width: 330, height: 766 },
+  },
+  {
+    id: 'conversation',
+    title: (data) => withName(data.messenger.labels.conversation, data.messenger.contact.name),
+    icon: 'messenger',
+    component: Conversation,
+    // opened by double-clicking the contact in the Messenger, and closed with it
+    parent: 'messenger',
+    // roomier than the reference's 473×386 inside; the geometry keeps it within the desk
+    size: { width: 720, height: 580 },
+  },
 ]
-
-/** The title the title bar and taskbar show (and the shortcut, when the app has no shorter label). */
-export const appTitle = (app: OsApp, data: Portfolio): string => (typeof app.title === 'function' ? app.title(data) : app.title)
 
 /** Opened when the desktop boots. */
 export const BOOT_APP = 'showcase'

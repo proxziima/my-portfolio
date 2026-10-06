@@ -24,3 +24,11 @@ apps/payload/public/scenes
 **/.DS_Store
 **/*.pem
 **/.vercel
+
+# Local eve run state (workflow data, logs, sandbox cache) and stale builds: never part of an image
+**/.eve
+**/.output
+**/.nitro
+
+# Claude Code state, including worktree checkouts of this repo
+.claude

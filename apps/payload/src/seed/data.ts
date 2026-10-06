@@ -96,7 +96,13 @@ export const projects: ProjectSeed[] = [
   { name: 'Carga', chip: 'G', summary: 'A moving-load solver that draws influence lines while you drag.', disciplines: ['civil'], order: 3 },
 ]
 
-export const profile = { name: 'Vinicius Queiroz', headlineTail: 'and builder.', email: 'vqueiroz@autodoc.com.br', location: 'Brazil' }
+export const profile = {
+  name: 'Vinicius Queiroz',
+  headlineTail: 'and builder.',
+  email: 'vqueiroz@autodoc.com.br',
+  location: 'Brazil',
+  statusMessage: 'building things on the web, one pixel at a time',
+}
 export const contactLinks = [
   { label: 'Send me a message', chip: '@', url: 'mailto:vqueiroz@autodoc.com.br' },
   { label: '/in/vqueiroz', chip: 'in', url: 'https://www.linkedin.com/in/vqueiroz' },
@@ -110,3 +116,17 @@ export const defaultDisciplineSlug = 'se'
 
 // No real content & community data is available yet; the web hides the section when empty.
 export const content: never[] = []
+
+// Only the content: the window title, the visitor and the labels keep the global's field defaults.
+export const messenger = {
+  whatsNew: [
+    { text: 'Vinicius added Messenger to his desktop.', linkLabel: 'See the site', url: '/' },
+    { text: 'Vinicius rebuilt his desktop as a Windows 98 PC.', linkLabel: 'Open it full screen', url: '/os' },
+  ],
+  spotlight: {
+    title: 'Doom boots on this desktop',
+    text: 'The 1993 shareware episode runs in js-dos, right next to Messenger.',
+    url: '/os',
+    source: 'My Desktop',
+  },
+}

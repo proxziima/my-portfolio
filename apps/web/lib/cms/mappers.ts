@@ -1,10 +1,10 @@
 import type {
-  Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Post, Profile, Project, SiteSetting,
+  Contact, Content, Discipline as CmsDiscipline, Experience, Media, Messenger as CmsMessenger, Navigation, Post, Profile, Project, SiteSetting,
 } from '@repo/cms-types'
 import { formatPeriod } from '@/lib/format/period'
 import { safeHref } from '@/shared/ui/chip-markup'
 import { bioParagraphs } from './bio-html'
-import type { Discipline, Entry, LinkItem, NavItem, Portfolio, PostView, Settings } from './types'
+import type { Discipline, Entry, LinkItem, Messenger, MessengerPerson, NavItem, Portfolio, PostView, Settings, Spotlight } from './types'
 
 type Related = number | CmsDiscipline
 
@@ -124,5 +124,52 @@ export function toPostView(p: Post, base: string): PostView {
     authors: (p.populatedAuthors ?? []).flatMap((a) => (a.name?.trim() ? [a.name.trim()] : [])),
     ...(hero && heroUrl ? { heroImage: { url: heroUrl, alt: hero.alt } } : {}),
     status: p._status === 'published' ? 'published' : 'draft',
+  }
+}
+
+const toViewer = (p: CmsMessenger['viewer'], base: string): MessengerPerson => ({
+  name: p.name,
+  status: p.status,
+  personalMessage: p.personalMessage?.trim() || undefined,
+  listeningTo: p.listeningTo?.trim() || undefined,
+  avatar: mediaUrl(p.avatar, base),
+})
+
+/**
+ * The owner as Messenger shows them: name, status message and avatar from Profile, the song from
+ * Messenger. Always available: the twin answers around the clock.
+ */
+const toOwner = (owner: Profile, contact: CmsMessenger['contact'], base: string): MessengerPerson => ({
+  name: owner.name,
+  status: 'available',
+  personalMessage: owner.statusMessage?.trim() || undefined,
+  listeningTo: contact?.listeningTo?.trim() || undefined,
+  avatar: mediaUrl(owner.avatar, base),
+})
+
+const toSpotlight = (s: CmsMessenger['spotlight'], base: string): Spotlight | undefined => {
+  const title = s?.title?.trim()
+  if (!s || !title) return undefined
+  return { title, text: s.text?.trim() || undefined, href: safeHref(s.url), source: s.source?.trim() || undefined, image: mediaUrl(s.image, base) }
+}
+
+/** The Messenger app's content; the contact is the owner's Profile, so it stays in step with the site. */
+export function toMessenger(m: CmsMessenger, owner: Profile, base: string): Messenger {
+  return {
+    title: m.title,
+    shortcut: m.shortcut,
+    viewer: toViewer(m.viewer, base),
+    contact: toOwner(owner, m.contact, base),
+    labels: { ...m.labels, menu: (m.labels.menu ?? []).map((item) => item.label) },
+    whatsNew: (m.whatsNew ?? []).map((w, i) => {
+      const href = safeHref(w.url)
+      return {
+        id: w.id ?? String(i),
+        text: w.text,
+        link: href ? { label: w.linkLabel?.trim() || href, href } : undefined,
+        image: mediaUrl(w.image, base),
+      }
+    }),
+    spotlight: toSpotlight(m.spotlight, base),
   }
 }

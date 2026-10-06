@@ -72,6 +72,7 @@ export interface Config {
     experiences: Experience;
     projects: Project;
     content: Content;
+    knowledge: Knowledge;
     posts: Post;
     categories: Category;
     media: Media;
@@ -92,6 +93,7 @@ export interface Config {
     experiences: ExperiencesSelect<false> | ExperiencesSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     content: ContentSelect<false> | ContentSelect<true>;
+    knowledge: KnowledgeSelect<false> | KnowledgeSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
@@ -115,12 +117,14 @@ export interface Config {
     contact: Contact;
     navigation: Navigation;
     'site-settings': SiteSetting;
+    messenger: Messenger;
   };
   globalsSelect: {
     profile: ProfileSelect<false> | ProfileSelect<true>;
     contact: ContactSelect<false> | ContactSelect<true>;
     navigation: NavigationSelect<false> | NavigationSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    messenger: MessengerSelect<false> | MessengerSelect<true>;
   };
   locale: null;
   widgets: {
@@ -226,6 +230,7 @@ export interface Discipline {
         id?: string | null;
       }[]
     | null;
+  disclosure: 'public' | 'restricted' | 'never';
   updatedAt: string;
   createdAt: string;
 }
@@ -255,6 +260,7 @@ export interface Experience {
    * Lower numbers come first.
    */
   order: number;
+  disclosure: 'public' | 'restricted' | 'never';
   updatedAt: string;
   createdAt: string;
 }
@@ -279,6 +285,7 @@ export interface Project {
    * Lower numbers come first.
    */
   order: number;
+  disclosure: 'public' | 'restricted' | 'never';
   updatedAt: string;
   createdAt: string;
 }
@@ -305,6 +312,39 @@ export interface Content {
    * Lower numbers come first.
    */
   order: number;
+  disclosure: 'public' | 'restricted' | 'never';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "knowledge".
+ */
+export interface Knowledge {
+  id: number;
+  /**
+   * What this answers, e.g. "Notice period".
+   */
+  topic: string;
+  category: 'availability' | 'compensation' | 'logistics' | 'background' | 'voice' | 'other';
+  /**
+   * Written in first person. For "voice", paste a real sample of your writing.
+   */
+  answer: string;
+  /**
+   * Exact strings that must never appear in a twin reply (salary figures, client names, address).
+   */
+  redactTerms?:
+    | {
+        term: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Lower numbers come first.
+   */
+  order: number;
+  disclosure: 'public' | 'restricted' | 'never';
   updatedAt: string;
   createdAt: string;
 }
@@ -591,6 +631,24 @@ export interface PayloadMcpApiKey {
      */
     delete?: boolean | null;
   };
+  knowledge?: {
+    /**
+     * Allow clients to find knowledge.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create knowledge.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update knowledge.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete knowledge.
+     */
+    delete?: boolean | null;
+  };
   media?: {
     /**
      * Allow clients to find media.
@@ -636,6 +694,20 @@ export interface PayloadMcpApiKey {
      * Allow clients to update site-settings global.
      */
     update?: boolean | null;
+  };
+  'payload-mcp-tool'?: {
+    /**
+     * Public identity grounding for the twin: name, headline, location, current roles, writing samples.
+     */
+    twinIdentity?: boolean | null;
+    /**
+     * Search the owner portfolio. Public items in full, restricted items as topic stubs, never-tier items excluded.
+     */
+    twinSearch?: boolean | null;
+    /**
+     * Return one restricted item in full. Only called after the owner approved its disclosure.
+     */
+    twinDisclose?: boolean | null;
   };
   updatedAt: string;
   createdAt: string;
@@ -778,6 +850,10 @@ export interface PayloadLockedDocument {
         value: number | Content;
       } | null)
     | ({
+        relationTo: 'knowledge';
+        value: number | Knowledge;
+      } | null)
+    | ({
         relationTo: 'posts';
         value: number | Post;
       } | null)
@@ -880,6 +956,7 @@ export interface DisciplinesSelect<T extends boolean = true> {
         formula?: T;
         id?: T;
       };
+  disclosure?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -896,6 +973,7 @@ export interface ExperiencesSelect<T extends boolean = true> {
   endYear?: T;
   disciplines?: T;
   order?: T;
+  disclosure?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -910,6 +988,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   summary?: T;
   disciplines?: T;
   order?: T;
+  disclosure?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -926,6 +1005,26 @@ export interface ContentSelect<T extends boolean = true> {
   date?: T;
   disciplines?: T;
   order?: T;
+  disclosure?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "knowledge_select".
+ */
+export interface KnowledgeSelect<T extends boolean = true> {
+  topic?: T;
+  category?: T;
+  answer?: T;
+  redactTerms?:
+    | T
+    | {
+        term?: T;
+        id?: T;
+      };
+  order?: T;
+  disclosure?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1115,6 +1214,14 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         update?: T;
         delete?: T;
       };
+  knowledge?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
   media?:
     | T
     | {
@@ -1143,6 +1250,13 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
     | {
         find?: T;
         update?: T;
+      };
+  'payload-mcp-tool'?:
+    | T
+    | {
+        twinIdentity?: T;
+        twinSearch?: T;
+        twinDisclose?: T;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -1235,7 +1349,14 @@ export interface Profile {
   headlineTail: string;
   email: string;
   location?: string | null;
+  /**
+   * Also your picture in Messenger.
+   */
   avatar?: (number | null) | Media;
+  /**
+   * Shown under your name in Messenger, like an MSN personal message.
+   */
+  statusMessage?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -1329,6 +1450,141 @@ export interface SiteSetting {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "messenger".
+ */
+export interface Messenger {
+  id: number;
+  /**
+   * The window title and taskbar tab.
+   */
+  title: string;
+  /**
+   * The desktop shortcut label.
+   */
+  shortcut: string;
+  /**
+   * The visitor, signed in at the top of the main window.
+   */
+  viewer: {
+    name: string;
+    status: 'available' | 'busy' | 'away' | 'offline';
+    personalMessage?: string | null;
+    /**
+     * A song, shown as "♫ Listening to: …" under the personal message.
+     */
+    listeningTo?: string | null;
+    avatar?: (number | null) | Media;
+  };
+  /**
+   * The one contact (the owner). Name, status message and avatar come from the Profile global; replies come from the twin agent.
+   */
+  contact?: {
+    /**
+     * A song, shown as "♫ Listening to: …" under the personal message.
+     */
+    listeningTo?: string | null;
+  };
+  /**
+   * The fixed words of the Messenger windows.
+   */
+  labels: {
+    search: string;
+    favorites: string;
+    friends: string;
+    whatsNew: string;
+    /**
+     * {name} is replaced by the contact's name.
+     */
+    typing: string;
+    /**
+     * {name} is replaced by the contact's name.
+     */
+    conversation: string;
+    send: string;
+    listeningTo: string;
+    /**
+     * Shown when a visitor sends too fast.
+     */
+    throttled: string;
+    /**
+     * Shown when a message exceeds the length cap.
+     */
+    tooLong: string;
+    /**
+     * Shown when a conversation reaches its limits.
+     */
+    ended: string;
+    /**
+     * Shown when the twin is unreachable.
+     */
+    offline: string;
+    /**
+     * Footer of the conversation window.
+     */
+    privacy: string;
+    /**
+     * Footer link that erases this visitor’s conversations.
+     */
+    deleteData: string;
+    /**
+     * Title bar of the booking dialog.
+     */
+    bookingTitle: string;
+    /**
+     * Label before the visitor’s time zone.
+     */
+    yourTime: string;
+    /**
+     * Label before the owner’s time zone.
+     */
+    myTime: string;
+    /**
+     * System line after a booking; {time} is the visitor’s local time.
+     */
+    bookingNotice: string;
+    /**
+     * The words on the Conversation window's blue band.
+     */
+    menu?:
+      | {
+          label: string;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  /**
+   * The What's new panel; several items get a pager.
+   */
+  whatsNew?:
+    | {
+        text: string;
+        /**
+         * Defaults to the URL.
+         */
+        linkLabel?: string | null;
+        url?: string | null;
+        image?: (number | null) | Media;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * The featured story at the foot of the main window (MSN Video in the original). Hidden without a title.
+   */
+  spotlight?: {
+    title?: string | null;
+    text?: string | null;
+    url?: string | null;
+    /**
+     * The small link under the story, e.g. "My Showcase".
+     */
+    source?: string | null;
+    image?: (number | null) | Media;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "profile_select".
  */
 export interface ProfileSelect<T extends boolean = true> {
@@ -1337,6 +1593,7 @@ export interface ProfileSelect<T extends boolean = true> {
   email?: T;
   location?: T;
   avatar?: T;
+  statusMessage?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
@@ -1411,6 +1668,77 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         sectionGap?: T;
         chips?: T;
         role?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "messenger_select".
+ */
+export interface MessengerSelect<T extends boolean = true> {
+  title?: T;
+  shortcut?: T;
+  viewer?:
+    | T
+    | {
+        name?: T;
+        status?: T;
+        personalMessage?: T;
+        listeningTo?: T;
+        avatar?: T;
+      };
+  contact?:
+    | T
+    | {
+        listeningTo?: T;
+      };
+  labels?:
+    | T
+    | {
+        search?: T;
+        favorites?: T;
+        friends?: T;
+        whatsNew?: T;
+        typing?: T;
+        conversation?: T;
+        send?: T;
+        listeningTo?: T;
+        throttled?: T;
+        tooLong?: T;
+        ended?: T;
+        offline?: T;
+        privacy?: T;
+        deleteData?: T;
+        bookingTitle?: T;
+        yourTime?: T;
+        myTime?: T;
+        bookingNotice?: T;
+        menu?:
+          | T
+          | {
+              label?: T;
+              id?: T;
+            };
+      };
+  whatsNew?:
+    | T
+    | {
+        text?: T;
+        linkLabel?: T;
+        url?: T;
+        image?: T;
+        id?: T;
+      };
+  spotlight?:
+    | T
+    | {
+        title?: T;
+        text?: T;
+        url?: T;
+        source?: T;
+        image?: T;
       };
   updatedAt?: T;
   createdAt?: T;

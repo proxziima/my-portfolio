@@ -1,7 +1,6 @@
 'use client'
 import { useCallback, useReducer, useRef, useState } from 'react'
-import type { Portfolio } from '@/lib/cms/types'
-import { APPS, appTitle, BOOT_APP, type ResolvedApp } from './apps'
+import { APPS, BOOT_APP, desktopApps, resolveApp, withChildren, type OsData, type ResolvedApp } from './apps'
 import { Boot } from './Boot'
 import { Shortcut } from './Shortcut'
 import { Shutdown } from './Shutdown'
@@ -13,7 +12,7 @@ import styles from './Desktop.module.css'
 type Phase = 'boot' | 'desktop' | 'shutdown'
 
 /** The OS root: boot screen → desktop (windows, shortcuts, taskbar) → shutdown → boot again. */
-export function Desktop({ data }: { data: Portfolio }) {
+export function Desktop({ data }: { data: OsData }) {
   const [phase, setPhase] = useState<Phase>('boot')
   const [wm, dispatch] = useReducer(windowReducer, EMPTY_WINDOWS)
   const deskRef = useRef<HTMLDivElement>(null)
@@ -30,19 +29,21 @@ export function Desktop({ data }: { data: Portfolio }) {
     setPhase('desktop')
   }, [])
   const reboot = useCallback(() => setPhase('boot'), [])
+  const open = useCallback((id: string) => dispatch({ type: 'open', id }), [])
 
   if (phase === 'boot') return <Boot name={data.profile.name} onDone={boot} />
   if (phase === 'shutdown') return <Shutdown onDone={reboot} />
 
   const active = activeWindow(wm)
-  const apps: readonly ResolvedApp[] = APPS.map((app) => ({ ...app, title: appTitle(app, data) }))
+  const apps: readonly ResolvedApp[] = APPS.map((app) => resolveApp(app, data))
+  const shortcuts = desktopApps(apps)
   // the reference's status bar is a copyright line, not the window's name
   const status = `© Copyright ${new Date().getFullYear()} ${data.profile.name}`
   return (
     <div ref={deskRef} className={styles.desktop} data-anchor="desktop">
       <div className={styles.shortcuts}>
-        {apps.map((app) => (
-          <Shortcut key={app.id} icon={app.icon} label={app.shortcut ?? app.title} onOpen={() => dispatch({ type: 'open', id: app.id })} />
+        {shortcuts.map((app) => (
+          <Shortcut key={app.id} icon={app.icon} label={app.shortcut} onOpen={() => open(app.id)} />
         ))}
       </div>
       {apps.map((app) => {
@@ -64,13 +65,13 @@ export function Desktop({ data }: { data: Portfolio }) {
             bounds={bounds}
             onFocus={() => dispatch({ type: 'focus', id: app.id })}
             onMinimize={() => dispatch({ type: 'minimize', id: app.id })}
-            onClose={() => dispatch({ type: 'close', id: app.id })}
+            onClose={() => withChildren(APPS, app.id).forEach((id) => dispatch({ type: 'close', id }))}
           >
-            <App data={data} />
+            <App data={data} open={open} apps={shortcuts.filter((other) => other.id !== app.id)} />
           </Window>
         )
       })}
-      <Taskbar apps={apps}windows={wm} active={active} onTab={(id) => dispatch({ type: 'taskbar', id })} onShutdown={() => setPhase('shutdown')} />
+      <Taskbar apps={apps} windows={wm} active={active} onTab={(id) => dispatch({ type: 'taskbar', id })} onShutdown={() => setPhase('shutdown')} />
     </div>
   )
 }

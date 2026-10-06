@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
+import { disclosureRead } from '../access/disclosure-read'
 import { publicContentAccess } from '../access/public-read'
 import { bioEditor } from '../editor/bio-editor'
+import { disclosureField } from '../fields/disclosure'
 import { orderField } from '../fields/order'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
 
@@ -9,7 +11,7 @@ export const Disciplines: CollectionConfig = {
   labels: { singular: 'Discipline', plural: 'Disciplines (roles)' },
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'slug', 'order'] },
   defaultSort: 'order',
-  access: publicContentAccess,
+  access: { ...publicContentAccess, read: disclosureRead },
   hooks: revalidateCollectionHooks,
   fields: [
     { name: 'title', type: 'text', required: true, admin: { description: 'Shown on the headline drum, e.g. "Software engineer".' } },
@@ -37,5 +39,6 @@ export const Disciplines: CollectionConfig = {
         { name: 'formula', type: 'text' },
       ],
     },
+    disclosureField(),
   ],
 }

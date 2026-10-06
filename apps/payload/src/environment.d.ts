@@ -8,6 +8,8 @@ declare global {
       REVALIDATE_SECRET?: string
       CRON_SECRET?: string
       PREVIEW_SECRET?: string
+      /** Bearer secret the web BFF presents to GET /api/twin/redact-terms. */
+      TWIN_REDACT_SECRET?: string
       /** Parent domain for the admin cookie in production, e.g. `.example.com`. */
       COOKIE_DOMAIN?: string
       /** Upload directories; default to `public/media` and `public/scenes` in the app. */

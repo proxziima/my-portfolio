@@ -1,6 +1,6 @@
 import type { SVGProps } from 'react'
 
-export type IconName = 'computer' | 'folder' | 'document' | 'doom' | 'autocad' | 'resume' | 'flag' | 'minimize' | 'maximize' | 'close'
+export type IconName = 'computer' | 'folder' | 'document' | 'doom' | 'autocad' | 'resume' | 'messenger' | 'flag' | 'minimize' | 'maximize' | 'close'
 
 /** Icons taken as the reference's bitmaps rather than redrawn; served from `public/`. */
 const BITMAPS: Partial<Record<IconName, string>> = {
@@ -29,6 +29,11 @@ const PATHS: Partial<Record<IconName, { fill: string; d: string }[]>> = {
     { fill: '#00a000', d: 'M8 2h6v6H8z' },
     { fill: '#0000ff', d: 'M2 8h6v6H2z' },
     { fill: '#ffff00', d: 'M8 8h6v6H8z' },
+  ],
+  // Messenger's two buddies: blue behind, green in front
+  messenger: [
+    { fill: '#2b7bd6', d: 'M9 2h4v4H9zM8 7h6v5H8z' },
+    { fill: '#3aa63a', d: 'M3 4h4v4H3zM2 9h6v5H2z' },
   ],
   minimize: [{ fill: '#000000', d: 'M4 11h8v2H4z' }],
   maximize: [{ fill: '#000000', d: 'M3 3h10v10H3zM4 5v7h8V5z' }],

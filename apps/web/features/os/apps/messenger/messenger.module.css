@@ -1,0 +1,716 @@
+/* Windows Live Messenger 2009 inside the Win98 chrome: Aero blues, Segoe UI, frames coloured by status. */
+.messenger,
+.conversation {
+  --msn-font: 'Segoe UI', Tahoma, Arial, sans-serif;
+  --msn-text: #1e1e1e;
+  --msn-muted: #7a8899;
+  --msn-heading: #1f5aa6;
+  --msn-link: #1f5aa6;
+  --msn-line: #c9dbee;
+  --msn-field: #a7bcd4;
+  --msn-sky: linear-gradient(180deg, #9fd5ec 0, #d3ebf6 22px, #eef7fc 70px, #e6f1f9 100%);
+  --msn-band: linear-gradient(180deg, #5aa7e6 0%, #2e7ccc 100%);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  font: 12px/16px var(--msn-font);
+  color: var(--msn-text);
+  background: linear-gradient(180deg, #ffffff 40%, #e3f1fa 100%);
+}
+
+/* Status colours, used by the avatar frame and the Friends square. */
+.avatar,
+.dot {
+  --msn-status-hi: #b6ef7e;
+  --msn-status-lo: #3f9a1e;
+}
+.avatar[data-status='busy'],
+.dot[data-status='busy'] {
+  --msn-status-hi: #ff9d8f;
+  --msn-status-lo: #c42b1c;
+}
+.avatar[data-status='away'],
+.dot[data-status='away'] {
+  --msn-status-hi: #ffd88a;
+  --msn-status-lo: #d98a10;
+}
+.avatar[data-status='offline'],
+.dot[data-status='offline'] {
+  --msn-status-hi: #f2f2f2;
+  --msn-status-lo: #a9a9a9;
+}
+
+/* The display picture: a glossy frame in the status colour around a white mat. */
+.avatar {
+  flex: none;
+  display: grid;
+  padding: 4px;
+  border: 1px solid var(--msn-status-lo);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.65) 0%, rgb(255 255 255 / 0) 50%),
+    linear-gradient(180deg, var(--msn-status-hi), var(--msn-status-lo));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+/* the Conversation's big frame: a thick glossy band, rounder, with a soft drop shadow */
+.avatar[data-size='lg'] {
+  width: 106px;
+  height: 106px;
+  padding: 7px;
+  border-color: color-mix(in srgb, var(--msn-status-lo) 70%, #ffffff);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.75) 0%, rgb(255 255 255 / 0.1) 45%, rgb(255 255 255 / 0) 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--msn-status-hi) 70%, #ffffff), color-mix(in srgb, var(--msn-status-lo) 80%, #ffffff));
+  box-shadow: 0 2px 5px rgb(0 40 80 / 0.3);
+}
+.avatar[data-size='lg'] > img,
+.avatar[data-size='lg'] > svg {
+  border-radius: 4px;
+}
+.avatar[data-size='md'] {
+  width: 54px;
+  height: 54px;
+  padding: 3px;
+}
+.avatar[data-size='sm'] {
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+  border-radius: 5px;
+}
+.avatar > img,
+.avatar > svg {
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgb(0 0 0 / 0.15);
+  border-radius: 3px;
+  object-fit: cover;
+  background: #ffffff;
+}
+.avatar[data-size='sm'] > img,
+.avatar[data-size='sm'] > svg {
+  border-radius: 2px;
+}
+
+/* The Friends list's status square: glossy, with a darker rim. */
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--msn-status-lo);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.7) 0%, rgb(255 255 255 / 0) 55%),
+    var(--msn-status-lo);
+}
+.dot[data-status='offline'] {
+  background: #ffffff;
+}
+
+/* "Name (Status)" over the personal message, or all on one line ("Name (Status) - message"). */
+.person {
+  display: block;
+  min-width: 0;
+}
+.headline,
+.message,
+.listening {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.headline {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.clip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status,
+.message,
+.listening {
+  color: var(--msn-muted);
+}
+.person[data-layout='inline'] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.person[data-layout='inline'] .headline,
+.person[data-layout='inline'] .message,
+.person[data-layout='inline'] .clip {
+  display: inline;
+}
+.person[data-layout='inline'] .message::before {
+  content: ' - ';
+}
+.person[data-large] .name {
+  font-size: 17px;
+  line-height: 22px;
+  color: #262626;
+}
+.person[data-large] .status {
+  margin-left: 20px;
+}
+.person[data-large] .headline > svg {
+  margin-left: 6px;
+}
+.person[data-large] .message,
+.person[data-large] .listening {
+  color: #2b2b2b;
+}
+
+/* The main window */
+.top {
+  flex: none;
+  background: var(--msn-sky);
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 12px 16px;
+}
+.header > .person {
+  flex: 1;
+}
+.inbox {
+  position: relative;
+  flex: none;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+.badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 14px;
+  padding: 0 3px;
+  border: 1px solid #8aa4bf;
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 12px;
+  text-align: center;
+  color: #1e1e1e;
+  background: #ffffff;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 12px 8px 16px;
+  /* the faint rule between the header and the search, fading out at both ends */
+  background: linear-gradient(90deg, transparent, #bcd6e8 15%, #bcd6e8 85%, transparent) top / 100% 1px no-repeat;
+}
+.search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 22px;
+  padding: 0 5px 0 6px;
+  border: 1px solid var(--msn-field);
+  border-radius: 2px;
+  background: #ffffff;
+}
+.search > input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  font: inherit;
+  color: var(--msn-text);
+  background: none;
+}
+.search > input::placeholder {
+  color: #8494a8;
+}
+.search > input::-webkit-search-cancel-button {
+  display: none;
+}
+.search:focus-within {
+  border-color: var(--msn-heading);
+}
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tool {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0 8px;
+}
+.group > summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 14px 3px;
+  list-style: none;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--msn-heading);
+  cursor: default;
+}
+.group > summary::-webkit-details-marker {
+  display: none;
+}
+.count {
+  font-size: 12px;
+  color: var(--msn-muted);
+}
+.contacts {
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 2px 10px 2px 15px;
+  border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+}
+.row:hover {
+  border-color: #c9def4;
+  background: #eaf3fc;
+}
+.row:focus-visible {
+  outline: 1px dotted var(--msn-heading);
+  outline-offset: -2px;
+  background: #dcebfb;
+}
+.row > .person {
+  flex: 1;
+}
+/* a Favorites row carries a picture and two lines, about 43px from one to the next */
+.row[data-variant='favorite'] {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.whatsNew {
+  position: relative;
+  flex: none;
+  margin: 0 10px;
+  padding: 8px 4px 10px;
+  border-top: 1px solid var(--msn-line);
+}
+.heading {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--msn-heading);
+}
+.news {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.news > p {
+  flex: 1;
+  margin: 0;
+}
+.news a,
+.spotlight a {
+  color: var(--msn-link);
+  text-decoration: none;
+}
+.news a:hover,
+.spotlight a:hover {
+  text-decoration: underline;
+}
+.thumb {
+  width: 72px;
+  height: 52px;
+  border: 1px solid #b8cde3;
+  object-fit: cover;
+}
+/* the original shows its arrows only while the pointer is over the panel */
+.pager {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--msn-muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.whatsNew:hover .pager,
+.whatsNew:focus-within .pager {
+  opacity: 1;
+}
+.pager > button {
+  padding: 0 5px;
+  border: 1px solid #b8cde3;
+  border-radius: 2px;
+  background: #ffffff;
+  font: inherit;
+  line-height: 14px;
+  color: var(--msn-heading);
+}
+
+.foot {
+  flex: none;
+  padding: 6px 12px 10px;
+  border-top: 1px solid #c3dbea;
+  background: linear-gradient(180deg, #d9ecf8 0%, #cfe6f2 50%, #c4e0ea 100%);
+}
+.services {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.services > button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+}
+.services > button:hover,
+.services > button:focus-visible {
+  border-color: #a7c4e4;
+  background: rgb(255 255 255 / 0.6);
+  outline: none;
+}
+.spotlight {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+.spotlightImage {
+  width: 112px;
+  height: 64px;
+  border: 1px solid #9fb6cf;
+  object-fit: cover;
+}
+.spotlightText {
+  min-width: 0;
+}
+.spotlightText > p {
+  margin: 0;
+  color: var(--msn-text);
+}
+.spotlightTitle {
+  display: block;
+  color: var(--msn-link);
+}
+.spotlightSource {
+  display: block;
+  margin-top: 4px;
+  color: #5b84b3;
+}
+
+
+/* The Conversation window: the blue band runs into a cyan fade, white behind the chat, light blue again under the message box */
+.conversation {
+  background: linear-gradient(
+    180deg,
+    #79cbf2 0,
+    #4ba8d4 18px,
+    #5aaed9 36px,
+    /* below the band the blue lets go quickly, so the header reads on a near-white wash */
+    #86c9ea 48px,
+    #b6def2 70px,
+    #dcf0f9 96px,
+    #f1f9fd 118px,
+    #ffffff 142px,
+    #ffffff calc(100% - 100px),
+    #e9f5f8 calc(100% - 90px),
+    #d6eaf7 calc(100% - 26px),
+    #cde6f5 100%
+  );
+}
+.band {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 21px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  color: #ffffff;
+  /* Aero glass: a highlight over the top half, a shade under the band, words lifted by a dark shadow */
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.38) 0, rgb(255 255 255 / 0.14) 48%, rgb(255 255 255 / 0) 52%, rgb(0 40 90 / 0.08) 100%);
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 1px 1px rgb(0 25 60 / 0.5), 0 3px 8px rgb(0 25 60 / 0.6);
+  text-shadow: 0 1px 2px rgb(0 30 70 / 0.65), 0 0 6px rgb(0 50 110 / 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.band > svg {
+  filter: drop-shadow(0 1px 1px rgb(0 30 70 / 0.5));
+}
+.bandTools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.bandTools > svg:last-child {
+  margin-left: 10px;
+}
+.body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 14px;
+  padding: 12px 6px 8px 10px;
+}
+.portraits {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.portrait {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.portraitTools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.chatHeader {
+  padding: 2px 0 10px;
+  /* the rule under the header, fading out to the right */
+  background: linear-gradient(90deg, #a9c9df, #d5e6f1 70%, transparent) bottom / 100% 1px no-repeat;
+}
+/* the header sits on the blue fade: heavier type and Aero's white glow keep it off the background */
+.chatHeader .person {
+  text-shadow: 0 0 6px rgb(255 255 255 / 0.95), 0 0 2px rgb(255 255 255 / 0.9);
+}
+.chatHeader .person[data-large] .name {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 24px;
+  color: #1a1a1a;
+}
+.chatHeader .message,
+.chatHeader .listening {
+  font-weight: 600;
+  line-height: 19px;
+  color: #1f1f1f;
+}
+.chatHeader .status {
+  font-weight: 600;
+  color: #3c3c3c;
+}
+.history {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 8px;
+  padding: 0 6px 0 4px;
+}
+.groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.groups > li + li {
+  margin-top: 4px;
+}
+.sender {
+  line-height: 20px;
+  color: var(--msn-muted);
+}
+.lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Messenger's small grey bullet before each line */
+.lines > li {
+  position: relative;
+  padding-left: 14px;
+  line-height: 19px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.lines > li::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #8ea3b8;
+}
+.typing {
+  min-height: 16px;
+  margin: 2px 0 4px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--msn-muted);
+}
+/* the message box, a speech bubble pointing at the visitor's picture */
+.compose {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin-left: 6px;
+  border: 1px solid #b2cadd;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(40 90 140 / 0.12);
+}
+.compose::before {
+  content: '';
+  position: absolute;
+  top: 34px;
+  left: -7px;
+  width: 12px;
+  height: 12px;
+  border-bottom: 1px solid #b2cadd;
+  border-left: 1px solid #b2cadd;
+  background: #ffffff;
+  transform: rotate(45deg);
+}
+.compose:focus-within,
+.compose:focus-within::before {
+  border-color: var(--msn-heading);
+}
+.compose > textarea {
+  position: relative;
+  height: 44px;
+  padding: 6px 8px;
+  border: 0;
+  outline: none;
+  resize: none;
+  font: inherit;
+  color: var(--msn-text);
+  background: transparent;
+}
+.composeBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border-top: 1px solid #dbe7f1;
+  background: linear-gradient(180deg, #ffffff, #eef5fb);
+  border-radius: 0 0 4px 4px;
+}
+.emoticons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #4d6a8a;
+}
+.composeEnd {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+.composeEnd > span {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0 8px;
+  border-left: 1px solid #dbe7f1;
+}
+.composeEnd > button {
+  height: 100%;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid #dbe7f1;
+  background: none;
+  font: 600 13px/1 Georgia, 'Times New Roman', serif;
+  color: #2b2b2b;
+}
+.composeEnd > button:disabled {
+  color: #9aa7b5;
+}
+.composeEnd > button:not(:disabled):hover {
+  background: #e3effa;
+}
+
+/* The booking dialog: a Windows-era dialog inside the chat (title bar, bevel edges, system font). */
+.lines > li.bookingLine {
+  padding-left: 0;
+  white-space: normal;
+}
+.lines > li.bookingLine::before {
+  content: none;
+}
+.dialog {
+  margin: 6px 0;
+  padding: 2px;
+  font: 11px/14px var(--os-font);
+  color: var(--os-text);
+}
+.dialogTitle {
+  padding: 2px 4px;
+  font-weight: 700;
+  color: var(--os-text-inverse);
+  background: var(--os-title);
+}
+.dialogZones {
+  margin: 4px;
+}
+.dialogBody {
+  min-height: 420px;
+  margin: 0 4px 4px;
+  overflow: auto;
+  background: var(--os-light);
+}
+/* Booking notices and refusals: the grey italic system lines Messenger writes into a chat. */
+.notice,
+.refusal {
+  font-style: italic;
+  color: var(--msn-muted);
+}
+.notice {
+  padding: 2px 0 2px 14px;
+}
+.refusal {
+  margin: 0 0 4px;
+  font-size: 11px;
+}
+/* mounted while empty so its announcements are reliable; takes no room until it says something */
+.refusal:empty {
+  margin: 0;
+}
+.privacy {
+  margin: 6px 0 0 6px;
+  font-size: 11px;
+  color: var(--msn-muted);
+}

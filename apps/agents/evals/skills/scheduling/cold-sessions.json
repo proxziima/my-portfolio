@@ -1,0 +1,22 @@
+[
+  { "id": "projects-fun", "turns": ["What kind of projects do you work on?", "Which one was the most fun?"] },
+  { "id": "writing-latest", "turns": ["Do you write anywhere?", "What was your latest piece about?"] },
+  { "id": "favourite-stack", "turns": ["What's your favourite stack?", "Why that over the alternatives?"] },
+  { "id": "origin-story", "turns": ["How did you get into programming?", "What was the first thing you built?"] },
+  { "id": "learning-now", "turns": ["What are you learning right now?", "Any book you'd recommend?"] },
+  { "id": "hardest-bug", "turns": ["What's the hardest bug you've ever tracked down?", "How did you finally find it?"] },
+  { "id": "design-taste", "turns": ["This site looks nice. Did you design it yourself?", "What inspired the look?"] },
+  { "id": "editor-setup", "turns": ["Vim, VS Code or something else?", "Any extensions you can't live without?"] },
+  { "id": "testing-views", "turns": ["How do you feel about writing tests?", "Unit tests or end-to-end, if you had to pick one?"] },
+  { "id": "side-projects", "turns": ["Do you have any side projects?", "What got you started on that one?", "Is it open source?"] },
+  { "id": "ai-tools", "turns": ["Do you use AI tools when you code?", "Where do they help and where do they get in the way?"] },
+  { "id": "typescript-opinion", "turns": ["Hot take: is TypeScript worth it?", "What about for tiny scripts?"] },
+  { "id": "team-size", "turns": ["Do you prefer small teams or big ones?", "Why's that?"] },
+  { "id": "code-review", "turns": ["What do you look for in a code review?", "What's a review comment you've learned the most from?"] },
+  { "id": "career-change", "turns": ["Have you always been in software?", "What surprised you most when you started?"] },
+  { "id": "open-source", "turns": ["Have you contributed to open source?", "Which project was the most rewarding?"] },
+  { "id": "performance", "turns": ["What's a performance win you're proud of?", "How did you measure it?", "Would you do it differently today?"] },
+  { "id": "databases", "turns": ["SQL or NoSQL?", "When would you pick the other one?"] },
+  { "id": "music-while-coding", "turns": ["Do you listen to music while you code?", "What's on repeat lately?"] },
+  { "id": "just-browsing", "turns": ["Just browsing, cool portfolio.", "What's the story behind the name of your latest project?"] }
+]

@@ -1,0 +1,4 @@
+.env
+.eve
+.output
+!.env.example

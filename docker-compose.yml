@@ -18,6 +18,8 @@ services:
       PREVIEW_SECRET: ${PREVIEW_SECRET:?set PREVIEW_SECRET}
       CRON_SECRET: ${CRON_SECRET:-}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      # Shared with web and agents: authenticates the twin's redact-terms endpoint.
+      TWIN_REDACT_SECRET: ${TWIN_REDACT_SECRET:?set TWIN_REDACT_SECRET}
     volumes:
       # SQLite database (/data/payload.db) and uploads (/data/media, /data/scenes).
       - cms-data:/data
@@ -45,9 +47,104 @@ services:
       CMS_URL: ${CMS_PUBLIC_URL:?set CMS_PUBLIC_URL}
       REVALIDATE_SECRET: ${REVALIDATE_SECRET:?set REVALIDATE_SECRET}
       PREVIEW_SECRET: ${PREVIEW_SECRET:?set PREVIEW_SECRET}
+      # The twin BFF: reaches the agent over the internal network and signs its own session cookie.
+      TWIN_AGENT_URL: http://agents:3000
+      TWIN_JWT_SECRET: ${TWIN_JWT_SECRET:?set TWIN_JWT_SECRET}
+      TWIN_COOKIE_SECRET: ${TWIN_COOKIE_SECRET:?set TWIN_COOKIE_SECRET}
+      TWIN_DATABASE_URL: postgres://${TWIN_PG_USER}:${TWIN_PG_PASSWORD}@postgres:5432/twin
+      TWIN_REDACT_SECRET: ${TWIN_REDACT_SECRET:?set TWIN_REDACT_SECRET}
+      TWIN_PROMPT_CANARY: ${TWIN_PROMPT_CANARY:?set TWIN_PROMPT_CANARY}
+      TWIN_DAILY_SPEND_USD: ${TWIN_DAILY_SPEND_USD:-5}
     depends_on:
       cms:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      agents:
+        condition: service_healthy
+
+  # Twin database: the twin tables and the Workflow world's run state share it.
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TWIN_PG_USER:?set TWIN_PG_USER}
+      POSTGRES_PASSWORD: ${TWIN_PG_PASSWORD:?set TWIN_PG_PASSWORD}
+      POSTGRES_DB: twin
+    volumes:
+      - twin-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TWIN_PG_USER} -d twin"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Portfolio twin agent (eve). Internal only: no domain in Easypanel. Only `web` reaches it (BFF and
+  # webhook forwarders), because the Workflow routes it serves are unauthenticated.
+  agents:
+    build:
+      context: .
+      dockerfile: apps/agents/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      TWIN_DATABASE_URL: postgres://${TWIN_PG_USER}:${TWIN_PG_PASSWORD}@postgres:5432/twin
+      WORKFLOW_POSTGRES_URL: postgres://${TWIN_PG_USER}:${TWIN_PG_PASSWORD}@postgres:5432/twin
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY}
+      # Optional: empty falls back to the defaults in packages/twin/src/env.ts.
+      TWIN_MODEL: ${TWIN_MODEL:-}
+      TWIN_MODEL_FALLBACKS: ${TWIN_MODEL_FALLBACKS:-}
+      TWIN_MODEL_CONTEXT_TOKENS: ${TWIN_MODEL_CONTEXT_TOKENS:-}
+      TWIN_MODEL_LIGHT: ${TWIN_MODEL_LIGHT:-}
+      TWIN_MODEL_LIGHT_CONTEXT_TOKENS: ${TWIN_MODEL_LIGHT_CONTEXT_TOKENS:-}
+      TWIN_MODEL_DEEP: ${TWIN_MODEL_DEEP:-}
+      TWIN_MODEL_DEEP_CONTEXT_TOKENS: ${TWIN_MODEL_DEEP_CONTEXT_TOKENS:-}
+      TWIN_CLASSIFIER_MODEL: ${TWIN_CLASSIFIER_MODEL:-}
+      TWIN_INTENT_MODEL: ${TWIN_INTENT_MODEL:-}
+      TWIN_CLASSIFIER_TIMEOUT_MS: ${TWIN_CLASSIFIER_TIMEOUT_MS:-}
+      TWIN_ABUSE_TIMEOUT_MS: ${TWIN_ABUSE_TIMEOUT_MS:-}
+      TWIN_APPROVAL_TIMEOUT: ${TWIN_APPROVAL_TIMEOUT:-}
+      TWIN_JWT_SECRET: ${TWIN_JWT_SECRET:?set TWIN_JWT_SECRET}
+      TWIN_PROMPT_CANARY: ${TWIN_PROMPT_CANARY:?set TWIN_PROMPT_CANARY}
+      TWIN_STABLE_KEY_SECRET: ${TWIN_STABLE_KEY_SECRET:?set TWIN_STABLE_KEY_SECRET}
+      TWIN_REDACT_SECRET: ${TWIN_REDACT_SECRET:?set TWIN_REDACT_SECRET}
+      # Internal CMS address: the agent never goes through the public domain.
+      CMS_URL: http://cms:3001
+      PAYLOAD_MCP_URL: http://cms:3001/api/mcp
+      PAYLOAD_MCP_API_KEY: ${PAYLOAD_MCP_API_KEY:?set PAYLOAD_MCP_API_KEY}
+      # Optional integrations (INTEGRATIONS in packages/twin/src/env.ts): blank leaves one off, and a
+      # half-set group is rejected at startup.
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-}
+      OWNER_TIMEZONE: ${OWNER_TIMEZONE:?set OWNER_TIMEZONE}
+      CAL_LINK: ${CAL_LINK:-}
+      CAL_ORIGIN: ${CAL_ORIGIN:-}
+      CAL_EMBED_SCRIPT_URL: ${CAL_EMBED_SCRIPT_URL:-}
+      CAL_WEBHOOK_SECRET: ${CAL_WEBHOOK_SECRET:-}
+      TWIN_BOOKING_REF_SECRET: ${TWIN_BOOKING_REF_SECRET:-}
+      IMESSAGE_PROJECT_ID: ${IMESSAGE_PROJECT_ID:-}
+      IMESSAGE_PROJECT_SECRET: ${IMESSAGE_PROJECT_SECRET:-}
+      IMESSAGE_WEBHOOK_SECRET: ${IMESSAGE_WEBHOOK_SECRET:-}
+      OWNER_PHONE_NUMBER: ${OWNER_PHONE_NUMBER:-}
+      EXA_API_KEY: ${EXA_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cms:
+        condition: service_healthy
+    # Slow start: the world schema and twin migrations run before the server listens.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/eve/v1/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
 volumes:
   cms-data:
+  twin-pg:

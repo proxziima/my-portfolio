@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
-import { mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
+import type { Contact, Content, Discipline as CmsDiscipline, Experience, Media, Messenger as CmsMessenger, Navigation, Profile, Project, SiteSetting } from '@repo/cms-types'
+import { mediaUrl, toContentEntry, toDiscipline, toExperienceEntry, toMessenger, toPortfolio, toProjectEntry, type CmsSnapshot } from '@/lib/cms/mappers'
 
 const discipline = { id: 1, slug: 'se', title: 'Software engineer', order: 1, level: 'LV 9', figureCaption: 'Fig. 1', bio: { root: { children: [] } }, curiousNotes: [{ id: 'n', side: 'left', text: 'x', formula: null }], updatedAt: '', createdAt: '' } as unknown as CmsDiscipline
 
@@ -89,4 +89,81 @@ describe('mediaUrl', () => {
       expect(mediaUrl({ id: 1, alt: '', url } as unknown as Media, BASE)).toBeUndefined()
     },
   )
+})
+
+describe('toMessenger', () => {
+  const doc = {
+    id: 1,
+    title: 'Windows Live Messenger',
+    shortcut: 'Messenger',
+    viewer: { name: 'Visitor', status: 'available', personalMessage: '  ', avatar: null },
+    contact: { listeningTo: ' Daft Punk - Digital Love ' },
+    labels: {
+      search: 's', favorites: 'f', friends: 'fr', whatsNew: 'w', typing: '{name} is typing', conversation: '{name} - Conversation', send: 'Send', listeningTo: 'Listening to:',
+      throttled: 't', tooLong: 'tl', ended: 'e', offline: 'o', privacy: 'p', deleteData: 'd', bookingTitle: 'b', yourTime: 'y', myTime: 'my', bookingNotice: 'Booked for {time}',
+      menu: [{ id: 'm1', label: 'Photos' }, { id: 'm2', label: 'Files' }],
+    },
+    spotlight: { title: ' Doom ', text: 'Boots in js-dos.', url: 'javascript:alert(1)', source: 'My Desktop', image: { url: '/api/media/file/d.png' } },
+    whatsNew: [
+      { id: 'n1', text: 'New post', linkLabel: '', url: '/blog', image: { url: '/api/media/file/t.png' } },
+      { id: 'n2', text: 'Unsafe', linkLabel: 'x', url: 'javascript:alert(1)', image: null },
+      { id: null, text: 'Repo', linkLabel: ' GitHub ', url: 'https://github.com/x', image: null },
+    ],
+  } as unknown as CmsMessenger
+
+  const owner = {
+    id: 1,
+    name: 'Vinicius Queiroz',
+    headlineTail: 'and builder.',
+    email: 'v@example.com',
+    statusMessage: ' building things ',
+    avatar: { url: '/api/media/file/v.png' },
+  } as unknown as Profile
+
+  it('maps people, trimming empty personal messages away and resolving avatars', () => {
+    const m = toMessenger(doc, owner, BASE)
+    expect(m.viewer).toEqual({ name: 'Visitor', status: 'available', personalMessage: undefined, avatar: undefined })
+    expect(m.contact).toEqual({
+      name: 'Vinicius Queiroz',
+      status: 'available',
+      personalMessage: 'building things',
+      listeningTo: 'Daft Punk - Digital Love',
+      avatar: 'http://cms.test/api/media/file/v.png',
+    })
+    expect(m.labels.typing).toBe('{name} is typing')
+    expect(m.labels.conversation).toBe('{name} - Conversation')
+    expect(m.labels.bookingNotice).toBe('Booked for {time}')
+    expect(m.labels.deleteData).toBe('d')
+    expect(m.labels.menu).toEqual(['Photos', 'Files'])
+    expect(toMessenger({ ...doc, labels: { ...doc.labels, menu: null } } as unknown as CmsMessenger, owner, BASE).labels.menu).toEqual([])
+    expect(m.title).toBe('Windows Live Messenger')
+    expect(m.shortcut).toBe('Messenger')
+  })
+
+  it("keeps What's new items, labels a link by its URL when unlabelled and drops unsafe links", () => {
+    expect(toMessenger(doc, owner, BASE).whatsNew).toEqual([
+      { id: 'n1', text: 'New post', link: { label: '/blog', href: '/blog' }, image: 'http://cms.test/api/media/file/t.png' },
+      { id: 'n2', text: 'Unsafe', link: undefined, image: undefined },
+      // a labelled link keeps its (trimmed) label; an item saved without an id is keyed by its position
+      { id: '2', text: 'Repo', link: { label: 'GitHub', href: 'https://github.com/x' }, image: undefined },
+    ])
+  })
+
+  it("tolerates a global saved without What's new", () => {
+    expect(toMessenger({ ...doc, whatsNew: null } as unknown as CmsMessenger, owner, BASE).whatsNew).toEqual([])
+  })
+
+  it('maps the spotlight, dropping an unsafe link', () => {
+    expect(toMessenger(doc, owner, BASE).spotlight).toEqual({
+      title: 'Doom',
+      text: 'Boots in js-dos.',
+      href: undefined,
+      source: 'My Desktop',
+      image: 'http://cms.test/api/media/file/d.png',
+    })
+  })
+
+  it('has no spotlight without a title', () => {
+    expect(toMessenger({ ...doc, spotlight: { title: '  ', text: 'x' } } as unknown as CmsMessenger, owner, BASE).spotlight).toBeUndefined()
+  })
 })

@@ -9,12 +9,15 @@ import { Categories } from './collections/Categories'
 import { Content } from './collections/Content'
 import { Disciplines } from './collections/Disciplines'
 import { Experiences } from './collections/Experiences'
+import { Knowledge } from './collections/Knowledge'
 import { Media } from './collections/Media'
 import { Posts } from './collections/Posts'
 import { Projects } from './collections/Projects'
 import { Scenes } from './collections/Scenes'
 import { Users } from './collections/Users'
+import { redactTermsEndpoint } from './endpoints/redact-terms'
 import { Contact } from './globals/Contact'
+import { Messenger } from './globals/Messenger'
 import { Navigation } from './globals/Navigation'
 import { Profile } from './globals/Profile'
 import { SiteSettings } from './globals/SiteSettings'
@@ -32,8 +35,9 @@ export default buildConfig({
     // Shared by every collection that sets `admin.livePreview.url` (today: posts).
     livePreview: { breakpoints: livePreviewBreakpoints },
   },
-  collections: [Disciplines, Experiences, Projects, Content, Posts, Categories, Media, Scenes, Users],
-  globals: [Profile, Contact, Navigation, SiteSettings],
+  collections: [Disciplines, Experiences, Projects, Content, Knowledge, Posts, Categories, Media, Scenes, Users],
+  endpoints: [redactTermsEndpoint],
+  globals: [Profile, Contact, Navigation, SiteSettings, Messenger],
   // The web origin loads uploads (the Spline scene) from the browser, so file responses need CORS.
   cors: process.env.WEB_URL ? [process.env.WEB_URL] : [],
   // Development pushes the schema on start; production (NODE_ENV=production) never pushes and runs any
