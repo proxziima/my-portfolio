@@ -1,0 +1,49 @@
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      bun-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directories: [/, /.github/actions/setup, /.github/actions/secrets, /.github/actions/cms]
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directories: [/apps/web, /apps/payload, /apps/agents]
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      base-images:
+        patterns: ['*']
+    ignore:
+      # Node's major is pinned by package.json engines (24.x); bun's by devEngines. Bump those by hand.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+      - dependency-name: oven/bun
+        update-types: [version-update:semver-major, version-update:semver-minor]
+
+  - package-ecosystem: docker-compose
+    directories: [/]
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    ignore:
+      # A Postgres major needs a dump and restore of the twin-pg volume; never automatic.
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]
