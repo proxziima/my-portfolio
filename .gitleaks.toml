@@ -1,0 +1,21 @@
+# Gitleaks' default rules, minus the placeholders this repo commits on purpose.
+title = "my-portfolio"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "CI and offline-eval placeholders, env templates and lockfile hashes"
+regexes = [
+  '''ci-ci-ci-[a-z0-9-]+''',
+  '''ci-canary-[0-9a-z]+''',
+  '''offline-offline-[a-z0-9-]+''',
+  '''replace-with-[a-z0-9-]+''',
+  '''drift-drift-[a-z0-9-]+''',
+  '''test-secret-that-is-long-enough-for-hs256-[0-9]+''', # apps/agents/tests/visitor-auth.test.ts
+]
+paths = [
+  '''(^|/)bun\.lock$''',
+  '''^apps/agents/fixtures/''',
+  '''^docs/template-portfolio/''',
+]
