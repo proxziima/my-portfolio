@@ -2,6 +2,9 @@ import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
+/** Statuses the Fetch standard forbids a body on. */
+const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304])
+
 /** Headers each provider needs (signature and event metadata); nothing else (cookies, auth) is forwarded. */
 const PROVIDERS = {
   cal: ['content-type', 'x-cal-signature-256', 'x-cal-webhook-version'],
@@ -26,5 +29,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     if (value) headers.set(name, value)
   }
   const upstream = await fetch(`${agentUrl}/webhooks/${provider}`, { method: 'POST', headers, body: await request.text(), cache: 'no-store' })
-  return new Response(await upstream.text(), { status: upstream.status })
+  // A null-body status (the Photon adapter acks receipts and typing events with 204) may carry no
+  // body at all; even an empty string makes the Response constructor throw, which would turn every
+  // such ack into a 500 and make the provider back off the webhook.
+  const body = NULL_BODY_STATUSES.has(upstream.status) ? null : await upstream.text()
+  return new Response(body, { status: upstream.status })
 }

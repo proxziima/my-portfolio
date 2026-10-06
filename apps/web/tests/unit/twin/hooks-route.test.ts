@@ -64,6 +64,17 @@ describe('webhook forwarder', () => {
     expect(await res.text()).toBe('unauthorized')
   })
 
+  // The Photon adapter acknowledges non-message events (receipts, typing) with 204, which may carry
+  // no body: rebuilding it with even an empty string throws and turns every such ack into a 500.
+  it.each([204, 205, 304])('relays a bodiless %i from the agent instead of failing', async status => {
+    vi.stubEnv('TWIN_AGENT_URL', 'http://agent')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status })))
+    const { POST } = await import('@/app/api/twin/hooks/[provider]/route')
+    const res = await POST(new Request('http://web/api/twin/hooks/photon', { method: 'POST', body: '{}' }), { params: Promise.resolve({ provider: 'photon' }) })
+    expect(res.status).toBe(status)
+    expect(res.body).toBeNull()
+  })
+
   it.each(['github', 'telegram', 'sendblue', 'constructor', '__proto__', 'toString'])('404s %s without calling the agent', async provider => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
