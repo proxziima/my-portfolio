@@ -37,8 +37,14 @@ yarn-error.log*
 .DS_Store
 *.pem
 
-# Payload SQLite database
+# CI service logs (the throwaway CMS and agent)
+.ci-logs
+
+# Payload SQLite database (and the throwaway ones under .tmp/)
+.tmp/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.db.bak
 *.db.*.bak

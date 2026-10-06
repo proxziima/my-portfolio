@@ -5,8 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
-# One run per ref. A newer push cancels an older pull-request run; main and develop runs queue so a
-# deploy is never cut off.
+# One run per ref. A newer push cancels an older pull-request run. On main and develop a running run is
+# never cancelled, so a deploy is never cut off mid-run; GitHub keeps one pending run per group, so a burst
+# of pushes collapses to the latest one.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -236,11 +237,12 @@ jobs:
       - name: chromium and its system libraries
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium
+      # Read-only cache: REVALIDATE_SECRET is random per run and part of the build hash, so this build
+      # never hits, and writing its large entry every run would only crowd out useful ones.
       - name: build the site
-        run: bunx turbo run build --filter=web
+        run: bunx turbo run build --filter=web --cache=local:r
+      # The runner sets CI=true, so Playwright serves the production build (playwright.config.ts).
       - name: end-to-end
-        env:
-          CI: 'true'
         run: bun run --cwd apps/web test:e2e
       - name: playwright report and cms log
         if: failure()
@@ -250,7 +252,7 @@ jobs:
           path: |
             apps/web/playwright-report
             apps/web/test-results
-            ${{ runner.temp }}/cms.log
+            .ci-logs/
           retention-days: 7
 
   # Each affected production image builds (no push). Layers are cached per service.
@@ -282,7 +284,7 @@ jobs:
   report:
     needs: [changes, verify]
     if: >-
-      always() && github.event_name == 'pull_request' &&
+      !cancelled() && github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository && needs.verify.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -385,12 +387,13 @@ jobs:
           bun run --cwd apps/agents build
           bun run --cwd apps/agents world:setup
           bun run --cwd packages/twin db:migrate
-          PORT=4100 nohup bun run --cwd apps/agents start > "$RUNNER_TEMP/agent.log" 2>&1 &
+          mkdir -p "$GITHUB_WORKSPACE/.ci-logs"
+          PORT=4100 nohup bun run --cwd apps/agents start > "$GITHUB_WORKSPACE/.ci-logs/agent.log" 2>&1 &
           for _ in $(seq 60); do
             curl -fsS http://127.0.0.1:4100/eve/v1/health > /dev/null && exit 0
             sleep 2
           done
-          tail -n 100 "$RUNNER_TEMP/agent.log"
+          tail -n 100 "$GITHUB_WORKSPACE/.ci-logs/agent.log"
           exit 1
       - name: live evals per skill and acceptance
         run: |
@@ -405,8 +408,7 @@ jobs:
           name: live-evals
           path: |
             apps/agents/.eve/junit.xml
-            ${{ runner.temp }}/cms.log
-            ${{ runner.temp }}/agent.log
+            .ci-logs/
           if-no-files-found: ignore
           retention-days: 14
 
