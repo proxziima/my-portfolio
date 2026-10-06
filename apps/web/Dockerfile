@@ -31,7 +31,10 @@ RUN bunx turbo run build --filter=web
 # Standalone output mirrors the monorepo layout: the server is apps/web/server.js. Static assets and
 # public/ are not part of it and are copied next to it.
 FROM node:24-bookworm-slim AS runtime
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+# The commit CI built this image from (`/api/health` reports it). Declared here, after every build step,
+# so a new value never invalidates the cached install and build layers.
+ARG APP_VERSION=dev
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 APP_VERSION=$APP_VERSION
 WORKDIR /app
 COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static

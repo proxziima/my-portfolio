@@ -30,7 +30,10 @@ RUN bunx turbo run build --filter=cms \
   && rm -rf .turbo apps/payload/.next/cache
 
 FROM build AS runtime
-ENV NODE_ENV=production \
+# The commit CI built this image from. Declared after the build, so it never invalidates cached layers.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION \
+    NODE_ENV=production \
     NODE_OPTIONS=--no-deprecation \
     PORT=3001 \
     DATABASE_URL=file:/data/payload.db \
