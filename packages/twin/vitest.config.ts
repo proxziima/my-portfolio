@@ -9,5 +9,11 @@ export default defineConfig({
     // CI runner, and the migration test applies every migration on a fresh instance: vitest's 5 s
     // default is sized for plain unit tests, not these.
     testTimeout: 30_000,
+    // Only with `--coverage` (CI): a summary for the PR report and a text total for the log.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'json-summary'],
+      reportsDirectory: './coverage',
+    },
   },
 })
