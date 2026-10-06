@@ -30,10 +30,11 @@ RUN bun run --cwd apps/agents build
 
 # Whole /app, so the workspace layout eve's startup resolves (sandbox prewarm modules) is preserved.
 FROM base AS runtime
-# The commit CI built this image from. Declared after the build, so it never invalidates cached layers.
-ARG APP_VERSION=dev
-ENV NODE_ENV=production PORT=3000 APP_VERSION=$APP_VERSION
+ENV NODE_ENV=production PORT=3000
 COPY --from=build --chown=node:node /app /app
+# The commit CI built this image from. Last, so a new value reuses every layer above.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 USER node
 EXPOSE 3000
 # Schema first (the Workflow world, then the twin tables), then the server and its schedule runner.

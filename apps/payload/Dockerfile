@@ -30,10 +30,7 @@ RUN bunx turbo run build --filter=cms \
   && rm -rf .turbo apps/payload/.next/cache
 
 FROM build AS runtime
-# The commit CI built this image from. Declared after the build, so it never invalidates cached layers.
-ARG APP_VERSION=dev
-ENV APP_VERSION=$APP_VERSION \
-    NODE_ENV=production \
+ENV NODE_ENV=production \
     NODE_OPTIONS=--no-deprecation \
     PORT=3001 \
     DATABASE_URL=file:/data/payload.db \
@@ -43,6 +40,9 @@ ENV APP_VERSION=$APP_VERSION \
 # /data is the volume (database + uploads). A new named volume copies this directory, owner included.
 RUN mkdir -p /data/media /data/scenes /data/favicons \
   && chown -R node:node /data apps/payload/.next
+# The commit CI built this image from. Last, so a new value reuses every layer above.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 USER node
 WORKDIR /app/apps/payload
 EXPOSE 3001
