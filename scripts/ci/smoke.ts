@@ -5,24 +5,40 @@ export interface Probe {
 }
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>
 
+/** Per-request limit, so one hung connection cannot eat the whole retry budget. */
+const REQUEST_TIMEOUT_MS = 15_000
+const requestInit = (): RequestInit => ({
+  cache: 'no-store',
+  signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+})
+
 /** Web is live on the expected commit: `/api/health` reports it as `version`. */
 export async function webServes(fetchFn: Fetch, webUrl: string, version: string): Promise<Probe> {
+  let res: Response
   try {
-    const res = await fetchFn(`${webUrl}/api/health`, { cache: 'no-store' })
-    if (!res.ok) return { ok: false, detail: `web /api/health answered ${res.status}` }
-    const body = (await res.json()) as { version?: string }
-    return body.version === version
-      ? { ok: true, detail: `web serves ${version}` }
-      : { ok: false, detail: `web serves ${body.version ?? 'no version'}, waiting for ${version}` }
+    res = await fetchFn(`${webUrl}/api/health`, requestInit())
   } catch (error) {
     return { ok: false, detail: `web unreachable: ${(error as Error).message}` }
   }
+  if (!res.ok) return { ok: false, detail: `web /api/health answered ${res.status}` }
+  let body: { version?: string }
+  try {
+    body = (await res.json()) as { version?: string }
+  } catch {
+    return { ok: false, detail: 'web /api/health is not JSON' }
+  }
+  return body.version === version
+    ? { ok: true, detail: `web serves ${version}` }
+    : { ok: false, detail: `web serves ${body.version ?? 'no version'}, waiting for ${version}` }
 }
 
-/** The CMS has started and applied its migrations: its public profile global answers 200. */
+/**
+ * The CMS answers: its public profile global returns 200, so it is not stuck or crashed after the
+ * deploy. It does not prove the new container is the one serving.
+ */
 export async function cmsServes(fetchFn: Fetch, cmsUrl: string): Promise<Probe> {
   try {
-    const res = await fetchFn(`${cmsUrl}/api/globals/profile`, { cache: 'no-store' })
+    const res = await fetchFn(`${cmsUrl}/api/globals/profile`, requestInit())
     return res.ok
       ? { ok: true, detail: 'cms answers' }
       : { ok: false, detail: `cms answered ${res.status}` }
@@ -53,17 +69,22 @@ export async function waitFor(
   return last
 }
 
-function required(name: string): string {
-  const value = process.env[name]?.replace(/\/+$/, '')
+function env(name: string): string {
+  const value = process.env[name]
   if (!value) throw new Error(`${name} is not set`)
   return value
 }
 
+/** A base URL without trailing slashes, so endpoint paths can be appended. */
+export function normalizeOrigin(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
 /** CI entry (the `deploy` job): exits 1 unless production serves this commit within the time limit. */
 if (import.meta.main) {
-  const web = required('PROD_WEB_URL')
-  const cms = required('PROD_CMS_URL')
-  const version = required('EXPECTED_VERSION')
+  const web = normalizeOrigin(env('PROD_WEB_URL'))
+  const cms = normalizeOrigin(env('PROD_CMS_URL'))
+  const version = env('EXPECTED_VERSION')
   const log = (probe: Probe) => (console.log(probe.detail), probe)
   const webResult = await waitFor(async () => log(await webServes(fetch, web, version)), {
     timeoutMs: 10 * 60_000,

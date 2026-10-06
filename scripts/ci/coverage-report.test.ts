@@ -56,6 +56,18 @@ describe('renderReport', () => {
     expect(body).toContain('No coverage: no tests ran for this change.')
   })
 
+  it('does not claim no tests ran when verify did not succeed and nothing was uploaded', () => {
+    const body = renderReport({
+      all: true,
+      affected: [],
+      verify: 'failure',
+      runUrl: '',
+      coverage: [],
+    })
+    expect(body).toContain('No coverage was uploaded (verify: failure).')
+    expect(body).not.toContain('no tests ran')
+  })
+
   it('shows an unmeasured metric as a dash', () => {
     const body = renderReport({
       all: false,

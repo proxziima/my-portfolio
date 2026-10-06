@@ -41,7 +41,11 @@ export function renderReport(input: {
     '',
   ]
   if (input.coverage.length === 0) {
-    lines.push('No coverage: no tests ran for this change.')
+    lines.push(
+      input.verify === 'success'
+        ? 'No coverage: no tests ran for this change.'
+        : `No coverage was uploaded (verify: ${input.verify}).`,
+    )
   } else {
     lines.push(
       '| Package | Lines | Statements | Functions | Branches |',

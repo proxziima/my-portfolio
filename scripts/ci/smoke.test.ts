@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { cmsServes, waitFor, webServes, type Probe } from './smoke'
+import { cmsServes, normalizeOrigin, waitFor, webServes, type Probe } from './smoke'
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status })
 
@@ -22,6 +22,31 @@ describe('webServes', () => {
       'new',
     )
     expect(probe).toEqual({ ok: false, detail: 'web serves old, waiting for new' })
+  })
+
+  it('sends every request with no-store and a timeout signal', async () => {
+    let init: RequestInit | undefined
+    await webServes(
+      async (_url, i) => ((init = i), json(200, { version: 'v' })),
+      'https://w.test',
+      'v',
+    )
+    expect(init?.cache).toBe('no-store')
+    expect(init?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('reports a 200 that is not JSON as such, not as unreachable', async () => {
+    const probe = await webServes(
+      async () => new Response('<html>bad gateway page</html>', { status: 200 }),
+      'https://w.test',
+      'v',
+    )
+    expect(probe).toEqual({ ok: false, detail: 'web /api/health is not JSON' })
+  })
+
+  it('waits when the health body has no version', async () => {
+    const probe = await webServes(async () => json(200, { ok: true }), 'https://w.test', 'v')
+    expect(probe).toEqual({ ok: false, detail: 'web serves no version, waiting for v' })
   })
 
   it('reports a bad status and an unreachable host', async () => {
@@ -55,6 +80,24 @@ describe('cmsServes', () => {
       ok: false,
       detail: 'cms answered 503',
     })
+  })
+
+  it('is not ok when the CMS is unreachable, and sends a timeout signal', async () => {
+    let init: RequestInit | undefined
+    const probe = await cmsServes(async (_url, i) => {
+      init = i
+      throw new Error('ETIMEDOUT')
+    }, 'https://c.test')
+    expect(probe).toEqual({ ok: false, detail: 'cms unreachable: ETIMEDOUT' })
+    expect(init?.cache).toBe('no-store')
+    expect(init?.signal).toBeInstanceOf(AbortSignal)
+  })
+})
+
+describe('normalizeOrigin', () => {
+  it('drops trailing slashes and leaves anything else alone', () => {
+    expect(normalizeOrigin('https://w.test///')).toBe('https://w.test')
+    expect(normalizeOrigin('https://w.test')).toBe('https://w.test')
   })
 })
 

@@ -67,25 +67,41 @@ function run(cmd: string[]): string {
   return result.stdout.toString()
 }
 
+interface TurboQuery {
+  data?: { affectedPackages?: { items: Array<{ name: string }> } } | null
+  errors?: Array<{ message: string }>
+}
+
+/**
+ * Gathers the event, Turbo's affected packages and the changed files. Throws rather than report
+ * "nothing changed" when a pull request cannot be compared against its base.
+ */
+export function collect(
+  env: Record<string, string | undefined>,
+  run: (cmd: string[]) => string,
+): { event: string; packages: string[]; files: string[] } {
+  const event = env.GITHUB_EVENT_NAME ?? 'workflow_dispatch'
+  if (event !== 'pull_request') return { event, packages: [], files: [] }
+  if (!env.GITHUB_BASE_REF) throw new Error('GITHUB_BASE_REF is not set on a pull_request run')
+  const base = `origin/${env.GITHUB_BASE_REF}`
+  const query = JSON.parse(
+    run(['bunx', 'turbo', 'query', 'affected', '--packages', '--base', base]),
+  ) as TurboQuery
+  if (query.errors?.length) {
+    throw new Error(`turbo query failed: ${query.errors.map((e) => e.message).join('; ')}`)
+  }
+  const items = query.data?.affectedPackages?.items
+  if (!items) throw new Error('turbo query returned no affectedPackages')
+  // -z and --no-renames: paths are NUL-separated and unquoted, and a move reports both paths.
+  const files = run(['git', 'diff', '--name-only', '--no-renames', '-z', `${base}...HEAD`])
+    .split('\0')
+    .filter(Boolean)
+  return { event, packages: items.map((item) => item.name), files }
+}
+
 /** CI entry (the `changes` job). Needs a checkout with history (`fetch-depth: 0`). */
 if (import.meta.main) {
-  const event = process.env.GITHUB_EVENT_NAME ?? 'workflow_dispatch'
-  const baseRef = process.env.GITHUB_BASE_REF
-  let packages: string[] = []
-  let files: string[] = []
-  if (event === 'pull_request' && baseRef) {
-    const base = `origin/${baseRef}`
-    const query = JSON.parse(
-      run(['bunx', 'turbo', 'query', 'affected', '--packages', '--base', base]),
-    ) as {
-      data: { affectedPackages: { items: Array<{ name: string }> } }
-    }
-    packages = query.data.affectedPackages.items.map((item) => item.name)
-    files = run(['git', 'diff', '--name-only', `${base}...HEAD`])
-      .split('\n')
-      .filter(Boolean)
-  }
-  const outputs = toOutputs(decide({ event, packages, files }))
+  const outputs = toOutputs(decide(collect(process.env, run)))
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, outputs)
   process.stdout.write(outputs)
 }
