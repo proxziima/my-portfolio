@@ -1,5 +1,6 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
+import { relationId } from '../fields/relation-ids'
 
 /**
  * Re-fetches the favicon of every company and project with a URL: the backfill after the companies
@@ -7,9 +8,6 @@ import { getPayload } from 'payload'
  * `refreshFavicon`, which never fails the save and logs why when nothing is stored.
  */
 const payload = await getPayload({ config: configPromise })
-
-const idOf = (ref: unknown): number | null =>
-  typeof ref === 'number' ? ref : ref && typeof ref === 'object' && 'id' in ref ? Number((ref as { id: unknown }).id) : null
 
 /** When the favicon doc was last written: a refresh replaces the file in place, keeping its id. */
 const faviconStamp = async (id: number | null) =>
@@ -22,10 +20,10 @@ for (const collection of ['companies', 'projects'] as const) {
     if (!doc.url) continue
     // One record failing (e.g. it no longer validates) must not stop the rest of the backfill.
     try {
-      const before = idOf(doc.favicon)
+      const before = relationId(doc.favicon)
       const stampBefore = await faviconStamp(before)
       const saved = await payload.update({ collection, id: doc.id, data: {}, depth: 0, context: { refreshFavicon: true }, overrideAccess: true })
-      const after = idOf(saved.favicon)
+      const after = relationId(saved.favicon)
       const outcome =
         after === null
           ? 'no favicon found'

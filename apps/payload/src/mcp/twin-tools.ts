@@ -3,13 +3,10 @@ import { z } from 'zod'
 import type { Company } from '@repo/cms-types'
 import type { KnowledgeCategory, TwinIdentity, TwinItem } from '@repo/twin/contract'
 import { stricterTier, type DisclosureTier } from '../fields/disclosure'
+import { relationId } from '../fields/relation-ids'
 import { lexicalText, rankCorpus, type CorpusEntry, type RecordName } from './twin-corpus'
 
 const NOT_NEVER = { disclosure: { not_equals: 'never' } } as const
-
-/** A relationship value's id, populated or not. */
-const refId = (ref: unknown): number | undefined =>
-  typeof ref === 'number' ? ref : ref && typeof ref === 'object' && typeof (ref as { id?: unknown }).id === 'number' ? (ref as { id: number }).id : undefined
 
 /** Every company with its tier, for naming and capping the rows that reference it. */
 async function loadCompanies(payload: Payload, where?: Where): Promise<Map<number, Company>> {
@@ -31,12 +28,12 @@ export async function loadCorpus(payload: Payload): Promise<CorpusEntry[]> {
     payload.findGlobal({ slug: 'contact', depth: 0, overrideAccess: true }),
   ])
   const entry = (item: TwinItem, disclosure: DisclosureTier, category: KnowledgeCategory | null = null): CorpusEntry => ({ item, disclosure, category })
-  const companyOf = (ref: unknown) => companies.get(refId(ref) ?? -1)
+  const companyOf = (ref: unknown) => companies.get(relationId(ref) ?? -1)
   const projectNames = new Map(projects.docs.filter((p) => p.disclosure === 'public').map((p) => [p.id, p.name]))
   // Bios are public prose: a record link is named only while its record is public.
   const recordName: RecordName = (ref) => {
     const { relationTo, value } = (ref ?? {}) as { relationTo?: unknown; value?: unknown }
-    const id = refId(value) ?? -1
+    const id = relationId(value) ?? -1
     if (relationTo === 'companies') {
       const c = companies.get(id)
       return c?.disclosure === 'public' ? c.name : undefined
@@ -86,7 +83,7 @@ export async function loadIdentity(payload: Payload): Promise<TwinIdentity> {
     headline: profile.headlineTail ?? null,
     location: profile.location ?? null,
     currentRoles: current.docs.flatMap((d) => {
-      const company = companies.get(refId(d.company) ?? -1)
+      const company = companies.get(relationId(d.company) ?? -1)
       return company ? [{ title: d.title, company: company.name }] : []
     }),
     voiceSamples: voice.docs.map((d) => d.answer),

@@ -1,9 +1,8 @@
 import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, PayloadRequest } from 'payload'
-import { type BrandSlug, inUse, recordName } from './guard-company-delete'
+import { relationId } from '../fields/relation-ids'
+import { type BrandSlug, inUse, recordName } from './record-usage'
 
 type RecordRef = { relationTo: BrandSlug; id: number | string }
-
-const idOf = (value: unknown): unknown => (value && typeof value === 'object' ? (value as { id?: unknown }).id : value)
 
 /**
  * Whether a Lexical value, or any node under it (lists included), holds a `recordLink` to `ref`. The
@@ -14,8 +13,8 @@ export function linksTo(node: unknown, ref: RecordRef): boolean {
   const n = node as { root?: unknown; children?: unknown; type?: unknown; fields?: { blockType?: unknown; record?: { relationTo?: unknown; value?: unknown } } }
   if (n.type === 'inlineBlock' && n.fields?.blockType === 'recordLink') {
     const record = n.fields.record
-    const id = idOf(record?.value)
-    if (record?.relationTo === ref.relationTo && id != null && String(id) === String(ref.id)) return true
+    const id = relationId(record?.value)
+    if (record?.relationTo === ref.relationTo && id !== null && String(id) === String(ref.id)) return true
   }
   if (n.root) return linksTo(n.root, ref)
   return Array.isArray(n.children) && n.children.some((child) => linksTo(child, ref))

@@ -1,12 +1,7 @@
 import type { Access } from 'payload'
+import { relationId } from '../fields/relation-ids'
 
 const OWNERS = ['companies', 'projects'] as const
-
-const idOf = (ref: unknown): number | null => {
-  if (typeof ref === 'number') return ref
-  if (ref && typeof ref === 'object' && typeof (ref as { id?: unknown }).id === 'number') return (ref as { id: number }).id
-  return null
-}
 
 /**
  * Editors read every favicon. Anonymous readers get only the favicons of public companies and projects,
@@ -31,6 +26,6 @@ export const faviconRead: Access = async ({ req }) => {
       }),
     ),
   )
-  const ids = found.flatMap(({ docs }) => docs.map((doc) => idOf(doc.favicon))).filter((id): id is number => id !== null)
+  const ids = found.flatMap(({ docs }) => docs.map((doc) => relationId(doc.favicon))).filter((id): id is number => id !== null)
   return ids.length > 0 ? { id: { in: ids } } : false
 }

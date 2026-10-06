@@ -1,11 +1,6 @@
 import type { CollectionAfterChangeHook, CollectionAfterDeleteHook, CollectionConfig, CollectionSlug, PayloadRequest } from 'payload'
+import { relationId } from '../fields/relation-ids'
 import { discoverFavicon, type FoundFavicon } from './discover'
-
-const idOf = (ref: unknown): number | null => {
-  if (typeof ref === 'number') return ref
-  if (ref && typeof ref === 'object' && typeof (ref as { id?: unknown }).id === 'number') return (ref as { id: number }).id
-  return null
-}
 
 const HTTP_URL = /^https?:\/\//i
 
@@ -112,7 +107,7 @@ export const syncFavicon: CollectionAfterChangeHook = async ({ doc, previousDoc,
   if (context.skipFavicon) return doc
   try {
     const owner = await storedFields(req, collection.slug, doc)
-    const current = idOf(owner.favicon)
+    const current = relationId(owner.favicon)
     const url: string | null = typeof owner.url === 'string' ? owner.url : null
     const clear = async () => {
       await removeFavicon(req, current)
@@ -150,7 +145,7 @@ export const syncFavicon: CollectionAfterChangeHook = async ({ doc, previousDoc,
 }
 
 export const deleteFavicon: CollectionAfterDeleteHook = async ({ doc, req }) => {
-  await removeFavicon(req, idOf(doc?.favicon))
+  await removeFavicon(req, relationId(doc?.favicon))
 }
 
 /**
