@@ -1,0 +1,51 @@
+name: throwaway cms
+description: >-
+  Builds, migrates, seeds and starts the CMS on :3001 from an empty SQLite file (never payload.db).
+  Run after setup and secrets. The log is $RUNNER_TEMP/cms.log.
+inputs:
+  twin-key:
+    description: Also seed the twin's fact, voice sample and MCP key (exports PAYLOAD_MCP_API_KEY, masked).
+    default: 'false'
+  web-url:
+    description: The web origin the CMS allows (CORS) and revalidates.
+    default: http://localhost:3000
+runs:
+  using: composite
+  steps:
+    # NODE_ENV=production: the first Payload start (here, the seed) applies the committed migrations
+    # (prodMigrations) to the empty database instead of pushing a dev schema.
+    - name: build, migrate and seed
+      shell: bash
+      env:
+        DATABASE_URL: file:./.tmp/throwaway.db
+        NODE_ENV: production
+        NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
+        WEB_URL: ${{ inputs.web-url }}
+      run: |
+        mkdir -p apps/payload/.tmp
+        bun run --cwd apps/payload build
+        bun run --cwd apps/payload seed
+    - name: twin seed and MCP key
+      if: inputs.twin-key == 'true'
+      shell: bash
+      env:
+        DATABASE_URL: file:./.tmp/throwaway.db
+        NODE_ENV: production
+        NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
+        WEB_URL: ${{ inputs.web-url }}
+      run: bun run --cwd apps/payload payload run src/seed/twin-ci.ts
+    - name: start
+      shell: bash
+      env:
+        DATABASE_URL: file:./.tmp/throwaway.db
+        NODE_ENV: production
+        NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
+        WEB_URL: ${{ inputs.web-url }}
+      run: |
+        nohup bun run --cwd apps/payload start > "$RUNNER_TEMP/cms.log" 2>&1 &
+        for _ in $(seq 60); do
+          curl -fsS http://127.0.0.1:3001/api/globals/profile > /dev/null && exit 0
+          sleep 2
+        done
+        tail -n 100 "$RUNNER_TEMP/cms.log"
+        exit 1
