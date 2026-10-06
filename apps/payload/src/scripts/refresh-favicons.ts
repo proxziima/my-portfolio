@@ -15,21 +15,29 @@ const idOf = (ref: unknown): number | null =>
 const faviconStamp = async (id: number | null) =>
   id === null ? null : (await payload.findByID({ collection: 'favicons', id, depth: 0, overrideAccess: true, select: { updatedAt: true } })).updatedAt
 
+let failed = 0
 for (const collection of ['companies', 'projects'] as const) {
   const { docs } = await payload.find({ collection, where: { url: { exists: true } }, depth: 0, pagination: false, overrideAccess: true })
   for (const doc of docs) {
     if (!doc.url) continue
-    const before = idOf(doc.favicon)
-    const stampBefore = await faviconStamp(before)
-    const saved = await payload.update({ collection, id: doc.id, data: {}, depth: 0, context: { refreshFavicon: true }, overrideAccess: true })
-    const after = idOf(saved.favicon)
-    const outcome =
-      after === null
-        ? 'no favicon found'
-        : after !== before || (await faviconStamp(after)) !== stampBefore
-          ? `favicon stored (favicons/${after})`
-          : `unchanged (kept existing favicons/${after})`
-    payload.logger.info(`${collection}/${doc.id} ${doc.url}: ${outcome}`)
+    // One record failing (e.g. it no longer validates) must not stop the rest of the backfill.
+    try {
+      const before = idOf(doc.favicon)
+      const stampBefore = await faviconStamp(before)
+      const saved = await payload.update({ collection, id: doc.id, data: {}, depth: 0, context: { refreshFavicon: true }, overrideAccess: true })
+      const after = idOf(saved.favicon)
+      const outcome =
+        after === null
+          ? 'no favicon found'
+          : after !== before || (await faviconStamp(after)) !== stampBefore
+            ? `favicon stored (favicons/${after})`
+            : `unchanged (kept existing favicons/${after})`
+      payload.logger.info(`${collection}/${doc.id} ${doc.url}: ${outcome}`)
+    } catch (err) {
+      failed++
+      payload.logger.error({ err }, `${collection}/${doc.id} ${doc.url}: refresh failed`)
+    }
   }
 }
-process.exit(0)
+if (failed > 0) payload.logger.warn(`${failed} record(s) could not be refreshed; see the errors above`)
+process.exit(failed > 0 ? 1 : 0)

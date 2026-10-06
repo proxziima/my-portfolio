@@ -18,7 +18,7 @@ type BrandDoc = Pick<Company, 'name' | 'chip' | 'url' | 'logo' | 'favicon'>
 export const brandIcon = (doc: Pick<Company, 'logo' | 'favicon'>, base: string): string | undefined =>
   mediaUrl(doc.logo, base) ?? mediaUrl(doc.favicon, base)
 
-export const toBrand = (doc: BrandDoc, base: string): Brand => ({
+const toBrand = (doc: BrandDoc, base: string): Brand => ({
   label: doc.name,
   chip: doc.chip,
   href: safeHref(doc.url),

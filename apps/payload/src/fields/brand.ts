@@ -9,7 +9,14 @@ import { urlField } from './link-url'
 export const brandFields = (): Field[] => [
   chipField(),
   urlField(),
-  { name: 'logo', type: 'upload', relationTo: 'media', admin: { description: 'Shown instead of the favicon and the chip.' } },
+  {
+    name: 'logo',
+    type: 'upload',
+    relationTo: 'media',
+    admin: {
+      description: "Shown instead of the favicon and the chip. Media uploads are public; don't upload a logo for a company you keep hidden.",
+    },
+  },
   {
     name: 'favicon',
     type: 'upload',
@@ -19,7 +26,8 @@ export const brandFields = (): Field[] => [
     admin: {
       readOnly: true,
       position: 'sidebar',
-      description: 'Fetched from the URL on save. Used when there is no logo; the chip is the last fallback.',
+      description:
+        'Fetched from the URL on save. Used when there is no logo; the chip is the last fallback. If the site has no usable icon, it is retried on each save (up to ~15 s).',
     },
   },
 ]

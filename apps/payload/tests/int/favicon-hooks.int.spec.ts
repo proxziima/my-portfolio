@@ -57,17 +57,38 @@ describe('syncFavicon', () => {
     const { req, result } = run({ id: 7, name: 'Autodoc', url: 'https://autodoc.com.br', favicon: null })
     expect(await result).toMatchObject({ id: 7, favicon: 50 })
     expect(faviconCalls(req, 'create')[0]).toMatchObject({
-      file: { name: 'autodoc-favicon.ico', mimetype: 'image/x-icon', size: 4 },
+      file: { name: 'companies-7-favicon.ico', mimetype: 'image/x-icon', size: 4 },
     })
     expect(parentWrites(req)).toEqual([
       expect.objectContaining({ id: 7, data: { favicon: 50 }, context: PARENT_CONTEXT, depth: 0 }),
     ])
   })
-  it('names the file with an accent-folded slug', async () => {
+  it('names the file after the collection and id, never the record name (the file URL is public)', async () => {
     discover.mockResolvedValue(ICON)
-    const { req, result } = run({ id: 7, name: 'Ação Ltda', url: 'https://a.dev', favicon: null })
+    const { req, result } = run({ id: 7, name: 'Secret Client Ltda', url: 'https://a.dev', favicon: null })
     await result
-    expect(faviconCalls(req, 'create')[0]).toMatchObject({ file: { name: 'acao-ltda-favicon.ico' } })
+    const name = (faviconCalls(req, 'create')[0]!.file as { name: string }).name
+    expect(name).toBe('companies-7-favicon.ico')
+    expect(name).not.toMatch(/secret/i)
+  })
+  it('keeps the neutral name when replacing the icon in place', async () => {
+    discover.mockResolvedValue({ ...ICON, mimetype: 'image/png', ext: 'png' })
+    const { req, result } = run(
+      { id: 7, name: 'A', url: 'https://b.dev', favicon: 9 },
+      { id: 7, name: 'A', url: 'https://a.dev', favicon: 9 },
+    )
+    await result
+    expect(faviconCalls(req, 'update')[0]).toMatchObject({ id: 9, file: { name: 'companies-7-favicon.png' } })
+  })
+  it('passes overrideAccess on every favicons call (the collection refuses API writes)', async () => {
+    discover.mockResolvedValue(ICON)
+    const { req, result } = run({ id: 7, name: 'A', url: 'https://a.dev', favicon: null })
+    await result
+    const cleared = run({ id: 8, name: 'A', url: null, favicon: 9 }, { id: 8, name: 'A', url: 'https://a.dev', favicon: 9 })
+    await cleared.result
+    const all = [...faviconCalls(req, 'create'), ...faviconCalls(cleared.req, 'delete')]
+    expect(all).toHaveLength(2)
+    for (const args of all) expect(args.overrideAccess).toBe(true)
   })
   it('leaves the request context as it found it after writing the record', async () => {
     discover.mockResolvedValue(ICON)
@@ -179,7 +200,7 @@ describe('syncFavicon', () => {
       const { result } = run(doc, previous, {}, req)
       expect(await result).toBe(doc)
       expect(calls(req, 'findByID')).toEqual([
-        expect.objectContaining({ collection: 'companies', id: 7, depth: 0, select: { name: true, url: true, favicon: true } }),
+        expect.objectContaining({ collection: 'companies', id: 7, depth: 0, select: { url: true, favicon: true } }),
       ])
       expect(calls(req, 'delete')).toEqual([])
       expect(parentWrites(req)).toEqual([])

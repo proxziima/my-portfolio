@@ -24,4 +24,10 @@ describe('disclosure tiers', () => {
     expect(stricterTier('never', 'restricted')).toBe('never')
     expect(stricterTier('restricted', 'public')).toBe('restricted')
   })
+
+  it('fails closed: an unknown tier counts as never', () => {
+    expect(stricterTier('public', 'secret' as never)).toBe('never')
+    expect(stricterTier(undefined as never, 'public')).toBe('never')
+    expect(stricterTier(null as never, 'restricted')).toBe('never')
+  })
 })

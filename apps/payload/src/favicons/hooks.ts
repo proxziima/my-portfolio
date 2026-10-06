@@ -1,5 +1,4 @@
 import type { CollectionAfterChangeHook, CollectionAfterDeleteHook, CollectionConfig, CollectionSlug, PayloadRequest } from 'payload'
-import { formatSlug } from '../fields/slug'
 import { discoverFavicon, type FoundFavicon } from './discover'
 
 const idOf = (ref: unknown): number | null => {
@@ -12,7 +11,8 @@ const HTTP_URL = /^https?:\/\//i
 
 // Nested Local API calls below pass `req` so they share it (the SQLite adapter has no transactions, so
 // each write commits on its own) and set `req.file` on it. That is harmless here: Companies and Projects
-// are not upload collections.
+// are not upload collections. Every call passes `overrideAccess: true`: the `favicons` collection refuses
+// all API writes, and the owner's `favicon` field refuses them too.
 
 /**
  * Runs a Local API call that passes `req`. `createLocalReq` reassigns `req.context` on the shared request,
@@ -47,6 +47,7 @@ const writeOwnerFavicon = (req: PayloadRequest, collection: string, id: unknown,
       req,
       context: { skipFavicon: true, disableRevalidate: true },
       depth: 0,
+      overrideAccess: true,
     }),
   )
 
@@ -58,28 +59,32 @@ async function storedFields(
   req: PayloadRequest,
   collection: string,
   doc: Record<string, unknown>,
-): Promise<{ name: unknown; url: unknown; favicon: unknown }> {
-  if ('name' in doc && 'url' in doc && 'favicon' in doc) return doc as { name: unknown; url: unknown; favicon: unknown }
+): Promise<{ url: unknown; favicon: unknown }> {
+  if ('url' in doc && 'favicon' in doc) return doc as { url: unknown; favicon: unknown }
   return (await withOwnContext(req, () =>
     req.payload.findByID({
       collection: collection as CollectionSlug,
       id: doc.id as number,
       depth: 0,
       req,
-      select: { name: true, url: true, favicon: true },
+      select: { url: true, favicon: true },
       overrideAccess: true,
     }),
-  )) as { name: unknown; url: unknown; favicon: unknown }
+  )) as { url: unknown; favicon: unknown }
 }
 
-/** Creates the favicon doc, or replaces the file of `current` in place. Never throws. */
+/**
+ * Creates the favicon doc, or replaces the file of `current` in place. Never throws. The file is served
+ * from a public URL, so its name says only whose icon it is by collection and id (`companies-3-favicon.png`),
+ * never the record's name: a hidden company must not be readable from a file name.
+ */
 async function storeFavicon(
   req: PayloadRequest,
   found: FoundFavicon,
-  name: string,
+  owner: string,
   current: number | null,
 ): Promise<{ id: number | null; currentLost: boolean }> {
-  const file = { data: found.data, mimetype: found.mimetype, name: `${formatSlug(name) || 'site'}-favicon.${found.ext}`, size: found.data.length }
+  const file = { data: found.data, mimetype: found.mimetype, name: `${owner}-favicon.${found.ext}`, size: found.data.length }
   try {
     const doc =
       current !== null
@@ -121,7 +126,7 @@ export const syncFavicon: CollectionAfterChangeHook = async ({ doc, previousDoc,
     if (!urlChanged && current !== null && !context.refreshFavicon) return doc
 
     const found = await discoverFavicon(url)
-    const stored = found ? await storeFavicon(req, found, String(owner.name ?? 'site'), current) : { id: null, currentLost: false }
+    const stored = found ? await storeFavicon(req, found, `${collection.slug}-${doc.id}`, current) : { id: null, currentLost: false }
     if (stored.id === null) {
       req.payload.logger.warn(`no favicon stored for ${url}`)
       if (current !== null && stored.currentLost) {

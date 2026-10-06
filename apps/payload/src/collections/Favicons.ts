@@ -1,12 +1,18 @@
 import type { CollectionConfig } from 'payload'
-import { publicContentAccess } from '../access/public-read'
+import { faviconRead } from '../access/favicon-read'
 import { uploadStaticDir } from '../uploads/static-dir'
 
-/** Site icons fetched from a company's or project's URL (see favicons/hooks.ts). Managed by hooks only. */
+const never = () => false
+
+/**
+ * Site icons fetched from a company's or project's URL (see favicons/hooks.ts). Managed by hooks only:
+ * they write through the Local API with `overrideAccess`, so every API write is refused. Anonymous
+ * readers see only the icons of public records (see access/favicon-read.ts).
+ */
 export const Favicons: CollectionConfig = {
   slug: 'favicons',
   admin: { hidden: true },
-  access: publicContentAccess,
+  access: { read: faviconRead, create: never, update: never, delete: never },
   fields: [],
   upload: {
     staticDir: uploadStaticDir('FAVICONS_DIR', 'favicons'),
