@@ -20,6 +20,7 @@ updates:
     groups:
       actions:
         patterns: ['*']
+        update-types: [minor, patch]
 
   - package-ecosystem: docker
     directories: [/apps/web, /apps/payload, /apps/agents]
@@ -30,12 +31,14 @@ updates:
     groups:
       base-images:
         patterns: ['*']
+        update-types: [minor, patch]
     ignore:
-      # Node's major is pinned by package.json engines (24.x); bun's by devEngines. Bump those by hand.
+      # Node's major is pinned by package.json engines (24.x). Bump it by hand.
       - dependency-name: node
         update-types: [version-update:semver-major]
+      # Bun is pinned in six places (devEngines, the setup action, ci.yml twice, the three Dockerfiles)
+      # and moves together by hand, so no image update is wanted.
       - dependency-name: oven/bun
-        update-types: [version-update:semver-major, version-update:semver-minor]
 
   - package-ecosystem: docker-compose
     directories: [/]

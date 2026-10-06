@@ -16,6 +16,4 @@ regexes = [
 ]
 paths = [
   '''(^|/)bun\.lock$''',
-  '''^apps/agents/fixtures/''',
-  '''^docs/template-portfolio/''',
 ]

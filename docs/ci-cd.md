@@ -32,9 +32,10 @@ fixtures; a real finding is never allowlisted. `pr.yml` labels PRs by area.
 
 Dependabot opens weekly updates against `develop` for bun, GitHub Actions (the workflows and the three composite
 actions), the three Dockerfiles and the compose file. GitHub Actions and base-image updates arrive grouped, and so do
-bun's minor and patch updates. It ignores the major versions of `node` and `postgres` and the major and minor
-versions of `oven/bun`: bump those by hand (Node and bun are pinned in `package.json`; a Postgres major needs a dump
-and restore of the `twin-pg` volume).
+bun's minor and patch updates (a major version arrives as its own PR). It ignores the major versions of `node` and
+`postgres` and every `oven/bun` image update: bump those by hand (Node is pinned in `package.json`; bun in six places,
+the `devEngines` field, the setup action, `ci.yml` twice and the three Dockerfiles; a Postgres major needs a dump and
+restore of the `twin-pg` volume).
 
 ## When a gate fails
 
@@ -71,7 +72,11 @@ Tests run one suite at a time because wall-clock assertions in the cms favicon t
    profile's **Packages** and set its visibility to **public**, so Easypanel pulls without credentials. Keep them
    private instead by adding a registry credential in Easypanel (a token with `read:packages`).
 4. **Secret scanning:** Settings → Code security → enable **Secret scanning** and **Push protection**.
-5. **Ruleset:** once this workflow is on `main` (so the `ci-ok` check exists), protect `main`. The ruleset
+5. **Dependency graph:** Settings → Code security → enable **Dependency graph** and **Dependabot alerts**.
+   The `dependency-review` job needs the graph and fails on every PR without it. GitHub's graph doesn't read
+   `bun.lock`, so dependency review sees the direct `package.json` dependencies and the workflow actions only;
+   Dependabot's bun updates are what cover the lockfile.
+6. **Ruleset:** once this workflow is on `main` (so the `ci-ok` check exists), protect `main`. The ruleset
    requires a pull request and the `ci-ok` check:
    ```bash
    gh api -X POST repos/proxziima/my-portfolio/rulesets --input .github/rulesets/main.json
