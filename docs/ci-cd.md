@@ -33,7 +33,7 @@ fixtures; a real finding is never allowlisted. `pr.yml` labels PRs by area.
 Dependabot opens weekly updates against `develop` for bun, GitHub Actions (the workflows and the three composite
 actions), the three Dockerfiles and the compose file. GitHub Actions and base-image updates arrive grouped, and so do
 bun's minor and patch updates (a major version arrives as its own PR). It ignores the major versions of `node` and
-`postgres` and every `oven/bun` image update: bump those by hand (Node is pinned in `package.json`; bun in six places,
+`postgres` and every `oven/bun` image update: bump those by hand (Node is pinned in `package.json`; bun in seven places,
 the `devEngines` field, the setup action, `ci.yml` twice and the three Dockerfiles; a Postgres major needs a dump and
 restore of the `twin-pg` volume).
 
@@ -44,6 +44,8 @@ restore of the `twin-pg` volume).
   [deploy-easypanel.md](deploy-easypanel.md#updating)) and commit it. Otherwise regenerate and commit:
   `bun run --cwd apps/payload generate:types`, `generate:importmap`, `bun run --cwd packages/twin db:generate`.
 - **e2e:** download the `e2e-report` artifact (Playwright report, traces and the CMS log from `ci-logs/`).
+- **agents:** if the offline evals fail, the `agents-evals` artifact has their JUnit report
+  (`apps/agents/fixtures/offline/.eve/junit.xml`).
 - **live-evals:** the `live-evals` artifact has the JUnit report and the CMS and agent logs from `ci-logs/`.
 - **gitleaks:** treat a real finding as leaked and rotate the secret. Allowlist only a placeholder or a test
   fixture, in `.gitleaks.toml`.
@@ -66,8 +68,8 @@ Tests run one suite at a time because wall-clock assertions in the cms favicon t
    service's **Deployment Trigger** URL (Deployments tab).
 2. **GitHub → Settings → Environments → `production`** (created by the first deploy run, or create it): add
    the secret `EASYPANEL_DEPLOY_WEBHOOK` (the trigger URL) and the variables `PROD_WEB_URL` and `PROD_CMS_URL`
-   (public origins, no trailing slash). Until the secret exists, `deploy` publishes the images and skips the
-   deploy with a notice.
+   (public origins, no trailing slash). Until the secret exists, `publish` pushes the images and `deploy`
+   skips with a notice.
 3. **GHCR:** after the first `publish`, open each package (`my-portfolio-web`, `-cms`, `-agents`) under your
    profile's **Packages** and set its visibility to **public**, so Easypanel pulls without credentials. Keep them
    private instead by adding a registry credential in Easypanel (a token with `read:packages`).
@@ -77,7 +79,8 @@ Tests run one suite at a time because wall-clock assertions in the cms favicon t
    `bun.lock`, so dependency review sees the direct `package.json` dependencies and the workflow actions only;
    Dependabot's bun updates are what cover the lockfile.
 6. **Ruleset:** once this workflow is on `main` (so the `ci-ok` check exists), protect `main`. The ruleset
-   requires a pull request and the `ci-ok` check:
+   requires a pull request and the `ci-ok` check; repository admins can bypass it only through a pull request
+   (`bypass_mode: pull_request`):
    ```bash
    gh api -X POST repos/proxziima/my-portfolio/rulesets --input .github/rulesets/main.json
    ```

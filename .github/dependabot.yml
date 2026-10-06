@@ -36,7 +36,7 @@ updates:
       # Node's major is pinned by package.json engines (24.x). Bump it by hand.
       - dependency-name: node
         update-types: [version-update:semver-major]
-      # Bun is pinned in six places (devEngines, the setup action, ci.yml twice, the three Dockerfiles)
+      # Bun is pinned in seven places (devEngines, the setup action, ci.yml twice, the three Dockerfiles)
       # and moves together by hand, so no image update is wanted.
       - dependency-name: oven/bun
 

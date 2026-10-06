@@ -135,6 +135,8 @@ jobs:
           changed=$(git status --porcelain)
           if [ -n "$changed" ]; then
             echo "$changed"
+            # Intent-to-add makes the diff show the content of a new, untracked migration too.
+            git add --intent-to-add .
             git --no-pager diff
             echo "::error::Generated files are stale. See docs/ci-cd.md#when-a-gate-fails: a new migration file means a schema change has none; otherwise regenerate and commit."
             exit 1
@@ -170,6 +172,14 @@ jobs:
           bun run --cwd packages/twin db:migrate
           bun run --cwd apps/agents world:setup
           cd apps/agents/fixtures/offline && cp .env.example .env && bun run eval
+      - name: offline eval results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: agents-evals
+          path: apps/agents/fixtures/offline/.eve/junit.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Every web route that reads the CMS is force-dynamic, so `next build` never fetches it: CMS_URL
   # only has to parse. turbo.json passes these values through to the build, so the scan is meaningful.

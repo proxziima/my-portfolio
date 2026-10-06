@@ -1,6 +1,6 @@
 # Deploy on Easypanel
 
-Production runs as one Easypanel **Compose** service built from this repository's `docker-compose.yml`:
+Production runs as one Easypanel **Compose** service defined by this repository's `docker-compose.yml`:
 
 | Service | Image | Port | Public URL (example) | State |
 | --- | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload
 ## 1. Create the Compose service
 
 1. In Easypanel, open a project (or create one) and choose **+ Service → Compose**.
-2. **Source**: the Git repository (GitHub, or any Git URL) and the branch to deploy. Keep the build path at the repository root (`/`) and the compose file at `docker-compose.yml`. Easypanel still reads `docker-compose.yml` from the repository, but the app services only have an `image:`, so a deploy pulls the images CI published. Turn **auto-deploy off**: CI triggers the deploy after its checks pass (see [ci-cd.md](ci-cd.md#one-time-setup-repository-owner)).
+2. **Source**: the Git repository (GitHub, or any Git URL) and the branch `main`: Easypanel reads the compose file from that branch, and the images are the ones CI published from `main`. Keep the build path at the repository root (`/`) and the compose file at `docker-compose.yml`. Easypanel still reads `docker-compose.yml` from the repository, but the app services only have an `image:`, so a deploy pulls the images CI published. Turn **auto-deploy off**: CI triggers the deploy after its checks pass (see [ci-cd.md](ci-cd.md#one-time-setup-repository-owner)).
 3. Don't deploy yet: set the environment first. The compose file refuses to start while a required variable is empty.
 
 ## 2. Set the environment

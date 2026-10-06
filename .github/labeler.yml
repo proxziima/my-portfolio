@@ -22,6 +22,8 @@
           - 'bun.lock'
           - 'scripts/**'
           - '.env.deploy.example'
+          - '.gitleaks.toml'
+          - '.gitignore'
 'area:docs':
   - changed-files:
       - any-glob-to-any-file: ['docs/**', '**/*.md']
