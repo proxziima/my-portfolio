@@ -5,6 +5,7 @@ import { brandFields } from '../fields/brand'
 import { disclosureField } from '../fields/disclosure'
 import { withFaviconHooks } from '../favicons/hooks'
 import { guardCompanyDelete } from '../hooks/guard-company-delete'
+import { guardDeletingLinkedRecord, guardHidingLinkedRecord } from '../hooks/guard-linked-record'
 import { revalidateCollectionHooks } from '../hooks/revalidate-web'
 
 /**
@@ -17,6 +18,10 @@ export const Companies: CollectionConfig = {
   admin: { useAsTitle: 'name', defaultColumns: ['name', 'url', 'disclosure'] },
   defaultSort: 'name',
   access: { ...publicContentAccess, read: disclosureRead },
-  hooks: { ...withFaviconHooks(revalidateCollectionHooks), beforeDelete: [guardCompanyDelete] },
+  hooks: {
+    ...withFaviconHooks(revalidateCollectionHooks),
+    beforeChange: [guardHidingLinkedRecord],
+    beforeDelete: [guardCompanyDelete, guardDeletingLinkedRecord],
+  },
   fields: [{ name: 'name', type: 'text', required: true, unique: true }, ...brandFields(), disclosureField()],
 }

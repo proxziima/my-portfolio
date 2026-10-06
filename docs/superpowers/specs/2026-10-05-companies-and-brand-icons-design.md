@@ -103,8 +103,11 @@ recorded here with its reason.
      the site can't read is dropped, and a project's company aside is omitted.
    - **Bios.** The relationship in `recordLink` has
      `filterOptions: { disclosure: { equals: 'public' } }`, so bios (always public prose) can only
-     link public records. A record made non-public later disappears from the bio, which is the
-     owner hiding it everywhere.
+     link public records. Payload re-validates that on every save of a discipline, so a linked
+     record that stopped being public, or was deleted, would make every later save of those bios
+     fail. The CMS therefore refuses to hide or delete a company or project while a bio links it,
+     naming the bios (`guardHidingLinkedRecord` and `guardDeletingLinkedRecord`). The web and the
+     twin still drop unresolved links defensively.
    - **Twin.** The corpus applies the same rules: effective tiers for experiences, and bio links
      resolve only public names. Restricted entries expose their title as a topic stub, so an
      experience at a non-public company is titled "<role> (company undisclosed)". The company's
