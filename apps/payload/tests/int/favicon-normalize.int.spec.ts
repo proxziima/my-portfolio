@@ -222,6 +222,16 @@ describe('normalizeIcon: SVG pre-check', () => {
     const decoys = Array.from({ length: 13 }, (_, i) => `<linearGradient id="x${i}"/>`).join('')
     await expectRefusedUpFront(Buffer.from(chain('mask', 'mask').toString().replace('<defs>', `<defs>${decoys}`)))
   })
+  it('refuses a chain whose masks hide from the id count behind a "[" in a DOCTYPE literal', async () => {
+    // Read as an internal subset, the "[" would make everything up to the later "]>" opaque: the masks'
+    // ids would go uncounted, and the decoy gradients would look unique and exempt the chain.
+    const decoys = Array.from({ length: 9 }, (_, i) => `<linearGradient id="x${i}"/>`).join('')
+    const masks = chain('mask', 'mask', 10, 8).toString().replace('</defs>', `<desc>]></desc>${decoys}</defs>`)
+    await expectRefusedUpFront(Buffer.from(`<!DOCTYPE svg SYSTEM "[">\n${masks}`))
+  })
+  it('draws an SVG whose DOCTYPE has a "[" inside a quoted literal', async () => {
+    expect(await opaquePixels(await expectPng(await normalizeIcon(Buffer.from(`<!DOCTYPE svg SYSTEM "a[b.dtd">\n${RED_SVG}`), CAPS)))).toBe(64 * 64)
+  })
   it('refuses an SVG with more than 5000 elements', async () => {
     await expectRefusedUpFront(svg('<rect width="1" height="1"/>'.repeat(5001)))
   })

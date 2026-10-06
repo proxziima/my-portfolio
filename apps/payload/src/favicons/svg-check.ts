@@ -100,10 +100,25 @@ function* tokenize(markup: string): Generator<Token> {
     else if (markup.startsWith('<![CDATA[', open)) end = past(']]>', open + 9)
     else if (markup.startsWith('<?', open)) end = past('?>', open + 2)
     else if (markup.startsWith('<!', open)) {
-      // A DOCTYPE; an internal subset in brackets may hold `>`.
-      const close = past('>', open + 2)
-      const bracket = markup.slice(open, close).indexOf('[')
-      end = bracket < 0 ? close : past('>', past(']', open + bracket + 1))
+      // A DOCTYPE: it ends at its first `>` outside a quoted literal, unless a `[` (also outside one)
+      // opens an internal subset first, which may hold `>` and runs to `]`, then `>`.
+      end = length
+      for (let i = open + 2; i < length; i++) {
+        const code = markup.charCodeAt(i)
+        if (code === 0x3e) {
+          end = i + 1
+          break
+        }
+        if (code === 0x5b) {
+          end = past('>', past(']', i + 1))
+          break
+        }
+        if (code === 0x22 || code === 0x27) {
+          const quote = markup.indexOf(markup[i]!, i + 1)
+          if (quote < 0) break
+          i = quote
+        }
+      }
     } else if (markup.startsWith('</', open)) {
       end = past('>', open + 2)
       token = { kind: 'end', name: markup.slice(open + 2, end - 1).trim() }
@@ -147,7 +162,10 @@ function chainedReferences(markup: string): number {
   const hrefTargets = new Set(attributeValues(markup, 'href|src').map(asUrl).filter((url) => url.startsWith('#')))
   const open: { name: string; inside: boolean }[] = []
   const openNames = new Map<string, number>()
+  // Ids are counted over the whole markup, opaque regions included: one the tokenizer reads as a
+  // comment or DTD subset still makes a gradient's id a duplicate (erring towards counting the reference).
   const idCounts = new Map<string, number>()
+  for (const id of attributeValues(markup, 'id')) idCounts.set(`#${id}`, (idCounts.get(`#${id}`) ?? 0) + 1)
   const gradients: string[] = []
   const counted: string[] = []
   for (const token of tokenize(markup)) {
@@ -161,7 +179,6 @@ function chainedReferences(markup: string): number {
       }
     } else {
       const ids = attributeValues(token.text, 'id').map((id) => `#${id}`)
-      for (const id of ids) idCounts.set(id, (idCounts.get(id) ?? 0) + 1)
       const local = token.name.slice(token.name.indexOf(':') + 1)
       if (GRADIENTS.has(local)) gradients.push(...ids)
       const inside = (open.at(-1)?.inside ?? false) || CONTAINERS.has(local) || ids.some((id) => hrefTargets.has(id))
