@@ -32,7 +32,7 @@ RUN bun run --cwd apps/agents build
 FROM base AS runtime
 ENV NODE_ENV=production PORT=3000
 COPY --from=build --chown=node:node /app /app
-# The commit CI built this image from. Last, so a new value reuses every layer above.
+# The release (e.g. 0.0.1) CI built this image for. Last, so a new value reuses every layer above.
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 USER node

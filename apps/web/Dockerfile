@@ -36,7 +36,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=node:node /app/apps/web/public ./apps/web/public
-# The commit CI built this image from (`/api/health` reports it). Last, so a new value reuses every layer above.
+# The release (e.g. 0.0.1) CI built this image for (`/api/health` reports it). Last, so a new value reuses every layer above.
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 USER node

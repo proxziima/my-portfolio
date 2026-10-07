@@ -40,7 +40,7 @@ ENV NODE_ENV=production \
 # /data is the volume (database + uploads). A new named volume copies this directory, owner included.
 RUN mkdir -p /data/media /data/scenes /data/favicons \
   && chown -R node:node /data apps/payload/.next
-# The commit CI built this image from. Last, so a new value reuses every layer above.
+# The release (e.g. 0.0.1) CI built this image for. Last, so a new value reuses every layer above.
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 USER node
