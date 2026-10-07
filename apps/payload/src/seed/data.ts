@@ -1,24 +1,34 @@
-import { b, chip, curious, richText } from './lexical'
+import { b, chip, company, curious, project, type Segment } from './lexical'
 
 export interface DisciplineSeed {
   slug: string; title: string; order: number; level: string; figureCaption: string
-  bio: ReturnType<typeof richText>
+  bio: Segment[][]
   curiousNotes: { side: 'left' | 'right'; text: string; formula?: string }[]
 }
-export interface ExperienceSeed { company: string; chip: string; title: string; startYear: number; endYear?: number; disciplines: string[]; order: number }
-export interface ProjectSeed { name: string; chip: string; summary: string; disciplines: string[]; order: number }
+export interface CompanySeed { name: string; chip: string; url?: string }
+export interface ExperienceSeed { company: string; title: string; startYear: number; endYear?: number; disciplines: string[]; order: number }
+export interface ProjectSeed { name: string; chip: string; company?: string; summary: string; disciplines: string[]; order: number }
+
+export const companies: CompanySeed[] = [
+  { name: 'Autodoc', chip: 'A', url: 'https://autodoc.com.br' },
+  { name: 'Nexo Labs', chip: 'N' },
+  { name: 'Meridiano', chip: 'M' },
+  { name: 'Kyte', chip: 'K' },
+  { name: 'UFMG', chip: 'U' },
+  { name: 'DER-MG', chip: 'D' },
+]
 
 export const disciplines: DisciplineSeed[] = [
   {
     slug: 'se', title: 'Software engineer', order: 1, level: 'LV 9 · backend',
     figureCaption: 'Fig. 1 — one request: edge, gateway, services, queue, stores',
-    bio: richText([
+    bio: [
       ['Hi, I’m Vinicius, a 🇧🇷 Brazilian ', b('software engineer'), ' and builder, though most weeks that just means ', b('backend plumber'), '. I love the early stage of a system, when the ', b('contract'), ' is still messy and there is a lot to figure out. Apparently, ambiguity is my idea of fun.'],
-      ['I currently build ', b('order and pricing services'), ' at ', chip('Autodoc', 'A', 'https://autodoc.com.br'), ', where I joined in 2023 and have helped shape the ', b('platform, its deploy path, and its on-call culture'), ' from the ground up. Most days I am still close to the work — ', b('writing Go, reading traces, and sweating the p99'), '.'],
-      ['Before Autodoc I worked on ', b('payment integrations'), ' at ', chip('Nexo Labs', 'N'), ', ', b('event-driven refactors'), ' for ', chip('Meridiano', 'M'), ', and ', b('a B2B catalogue'), ' used by 400 stores.'],
-      ['I recently designed and coded ', chip('Pipeline Zero', 'P'), ', ', b('a declarative ingestion framework'), ', and ', chip('Sonda', 'S'), ', ', b('a trace sampler that keeps the one percent of spans worth keeping'), '. Small projects like these are my favourite excuse to learn new stuff and try things out.'],
+      ['I currently build ', b('order and pricing services'), ' at ', company('Autodoc'), ', where I joined in 2023 and have helped shape the ', b('platform, its deploy path, and its on-call culture'), ' from the ground up. Most days I am still close to the work — ', b('writing Go, reading traces, and sweating the p99'), '.'],
+      ['Before Autodoc I worked on ', b('payment integrations'), ' at ', company('Nexo Labs'), ', ', b('event-driven refactors'), ' for ', company('Meridiano'), ', and ', b('a B2B catalogue'), ' used by 400 stores.'],
+      ['I recently designed and coded ', project('Pipeline Zero'), ', ', b('a declarative ingestion framework'), ', and ', project('Sonda'), ', ', b('a trace sampler that keeps the one percent of spans worth keeping'), '. Small projects like these are my favourite excuse to learn new stuff and try things out.'],
       ['I’m a big ', chip('Ted Lasso', 'TL'), ' fan, and the line that has stayed with me is “Be ', curious(), ', not judgmental.” It’s also a pretty good way to approach systems, if you ask me.'],
-    ]),
+    ],
     curiousNotes: [
       { side: 'right', text: 'Little’s law for the whole stack', formula: 'L = λ·W' },
       { side: 'right', text: '1.2M req/day ≈ 14 rps; at W = 84 ms the queue holds about one request.', formula: 'L ≈ 14 × 0.084 ≈ 1.2' },
@@ -29,13 +39,13 @@ export const disciplines: DisciplineSeed[] = [
   {
     slug: 'ai', title: 'AI engineer', order: 2, level: 'LV 4 · applied ML',
     figureCaption: 'Fig. 2 — a network above the loss surface it descends',
-    bio: richText([
+    bio: [
       ['Hi, I’m Vinicius, a 🇧🇷 Brazilian ', b('AI engineer'), ' and builder, though most weeks that just means ', b('eval janitor'), '. I love the early stage of a system, when the ', b('dataset'), ' is still messy and there is a lot to figure out. Apparently, ambiguity is my idea of fun.'],
-      ['I currently build ', b('retrieval and ranking over 800k parts'), ' at ', chip('Autodoc', 'A', 'https://autodoc.com.br'), ', where I joined in 2023 and have helped shape the ', b('eval harness, its golden sets, and its release gates'), ' from the ground up. Most days I am still close to the work — ', b('writing Python, reading failure cases, and sweating the recall'), '.'],
-      ['Before Autodoc I worked on ', b('demand forecasting'), ' at ', chip('Nexo Labs', 'N'), ', ', b('a pt-BR intent classifier'), ' for ', chip('Meridiano', 'M'), ', and ', b('NLP for legal text'), ' at a university lab.'],
-      ['I recently designed and coded ', chip('Retriever', 'R'), ', ', b('an eval harness with drift alerts and per-commit scoring'), ', and ', chip('Vozes', 'V'), ', ', b('an open Portuguese speech corpus of 120 hours'), '. Small projects like these are my favourite excuse to learn new stuff and try things out.'],
+      ['I currently build ', b('retrieval and ranking over 800k parts'), ' at ', company('Autodoc'), ', where I joined in 2023 and have helped shape the ', b('eval harness, its golden sets, and its release gates'), ' from the ground up. Most days I am still close to the work — ', b('writing Python, reading failure cases, and sweating the recall'), '.'],
+      ['Before Autodoc I worked on ', b('demand forecasting'), ' at ', company('Nexo Labs'), ', ', b('a pt-BR intent classifier'), ' for ', company('Meridiano'), ', and ', b('NLP for legal text'), ' at a university lab.'],
+      ['I recently designed and coded ', project('Retriever'), ', ', b('an eval harness with drift alerts and per-commit scoring'), ', and ', project('Vozes'), ', ', b('an open Portuguese speech corpus of 120 hours'), '. Small projects like these are my favourite excuse to learn new stuff and try things out.'],
       ['I’m a big ', chip('Ted Lasso', 'TL'), ' fan, and the line that has stayed with me is “Be ', curious(), ', not judgmental.” It’s also a pretty good way to approach models, if you ask me.'],
-    ]),
+    ],
     curiousNotes: [
       { side: 'right', text: 'what the layers minimise', formula: 'ℒ = −∑ yᵢ log ŷᵢ' },
       { side: 'right', text: 'and how the gradient walks back through them', formula: '∂ℒ/∂Wₗ = δₗ · aₗ₋₁ᵀ' },
@@ -46,13 +56,13 @@ export const disciplines: DisciplineSeed[] = [
   {
     slug: 'civil', title: 'Civil engineer', order: 3, level: 'LV 9 · structures',
     figureCaption: 'Fig. 3 — Warren truss bridge over the river, 52 m span',
-    bio: richText([
+    bio: [
       ['Hi, I’m Vinicius, a 🇧🇷 Brazilian ', b('civil engineer'), ' and builder, though most weeks that just means ', b('load-path pedant'), '. I love the early stage of a project, when the ', b('site survey'), ' is still messy and there is a lot to figure out. Apparently, ambiguity is my idea of fun.'],
-      ['I currently build ', b('mezzanines and rack structures'), ' at ', chip('Autodoc', 'A', 'https://autodoc.com.br'), ', where I joined in 2023 and have helped shape the ', b('load registry, its inspection cycle, and its sensor network'), ' from the ground up. Most days I am still close to the work — ', b('drawing reinforcement, reading strain data, and sweating the deflection'), '.'],
-      ['Before Autodoc I worked on ', b('nine mid-rise buildings'), ' at ', chip('Meridiano', 'M'), ', ', b('bridge rehabilitation plans'), ' for ', chip('DER-MG', 'D'), ', and ', b('a precast catalogue'), ' for a regional plant.'],
-      ['I recently designed and instrumented ', chip('Ponte Viva', 'P'), ', ', b('a 52 metre span with strain telemetry and a public dashboard'), ', and ', chip('Concreto', 'C'), ', ', b('a mix optimiser balancing strength, cost and carbon'), '. Small projects like these are my favourite excuse to learn new stuff and try things out.'],
+      ['I currently build ', b('mezzanines and rack structures'), ' at ', company('Autodoc'), ', where I joined in 2023 and have helped shape the ', b('load registry, its inspection cycle, and its sensor network'), ' from the ground up. Most days I am still close to the work — ', b('drawing reinforcement, reading strain data, and sweating the deflection'), '.'],
+      ['Before Autodoc I worked on ', b('nine mid-rise buildings'), ' at ', company('Meridiano'), ', ', b('bridge rehabilitation plans'), ' for ', company('DER-MG'), ', and ', b('a precast catalogue'), ' for a regional plant.'],
+      ['I recently designed and instrumented ', project('Ponte Viva'), ', ', b('a 52 metre span with strain telemetry and a public dashboard'), ', and ', project('Concreto'), ', ', b('a mix optimiser balancing strength, cost and carbon'), '. Small projects like these are my favourite excuse to learn new stuff and try things out.'],
       ['I’m a big ', chip('Ted Lasso', 'TL'), ' fan, and the line that has stayed with me is “Be ', curious(), ', not judgmental.” It’s also a pretty good way to approach structures, if you ask me.'],
-    ]),
+    ],
     curiousNotes: [
       { side: 'right', text: 'uniformly distributed load on the deck', formula: 'w = 12 kN/m' },
       { side: 'right', text: 'simply supported, so the moment peaks at mid-span', formula: 'Mₘₐₓ = wL²/8' },
@@ -66,20 +76,20 @@ export const disciplines: DisciplineSeed[] = [
 // Work rows appear once per (company, title). `order` is the row's position in the
 // source list of the discipline it came from (all 12 rows are distinct, so none is shared).
 export const experiences: ExperienceSeed[] = [
-  { company: 'Autodoc', chip: 'A', title: 'Senior Software Engineer', startYear: 2023, disciplines: ['se'], order: 1 },
-  { company: 'Nexo Labs', chip: 'N', title: 'Backend Engineer', startYear: 2021, endYear: 2023, disciplines: ['se'], order: 2 },
-  { company: 'Meridiano', chip: 'M', title: 'Full-stack Engineer', startYear: 2019, endYear: 2021, disciplines: ['se'], order: 3 },
-  { company: 'Kyte', chip: 'K', title: 'Engineer, Platform', startYear: 2017, endYear: 2019, disciplines: ['se'], order: 4 },
+  { company: 'Autodoc', title: 'Senior Software Engineer', startYear: 2023, disciplines: ['se'], order: 1 },
+  { company: 'Nexo Labs', title: 'Backend Engineer', startYear: 2021, endYear: 2023, disciplines: ['se'], order: 2 },
+  { company: 'Meridiano', title: 'Full-stack Engineer', startYear: 2019, endYear: 2021, disciplines: ['se'], order: 3 },
+  { company: 'Kyte', title: 'Engineer, Platform', startYear: 2017, endYear: 2019, disciplines: ['se'], order: 4 },
 
-  { company: 'Autodoc', chip: 'A', title: 'AI Engineer', startYear: 2024, disciplines: ['ai'], order: 1 },
-  { company: 'Nexo Labs', chip: 'N', title: 'Machine Learning Engineer', startYear: 2022, endYear: 2024, disciplines: ['ai'], order: 2 },
-  { company: 'UFMG', chip: 'U', title: 'Research Assistant, NLP', startYear: 2021, endYear: 2022, disciplines: ['ai'], order: 3 },
-  { company: 'Kyte', chip: 'K', title: 'Data Scientist', startYear: 2019, endYear: 2021, disciplines: ['ai'], order: 4 },
+  { company: 'Autodoc', title: 'AI Engineer', startYear: 2024, disciplines: ['ai'], order: 1 },
+  { company: 'Nexo Labs', title: 'Machine Learning Engineer', startYear: 2022, endYear: 2024, disciplines: ['ai'], order: 2 },
+  { company: 'UFMG', title: 'Research Assistant, NLP', startYear: 2021, endYear: 2022, disciplines: ['ai'], order: 3 },
+  { company: 'Kyte', title: 'Data Scientist', startYear: 2019, endYear: 2021, disciplines: ['ai'], order: 4 },
 
-  { company: 'Autodoc', chip: 'A', title: 'Facilities & Structures Lead', startYear: 2023, disciplines: ['civil'], order: 1 },
-  { company: 'Meridiano', chip: 'M', title: 'Structural Engineer', startYear: 2019, endYear: 2023, disciplines: ['civil'], order: 2 },
-  { company: 'DER-MG', chip: 'D', title: 'Bridge Engineer', startYear: 2017, endYear: 2019, disciplines: ['civil'], order: 3 },
-  { company: 'UFMG', chip: 'U', title: 'Structures Lab Assistant', startYear: 2015, endYear: 2017, disciplines: ['civil'], order: 4 },
+  { company: 'Autodoc', title: 'Facilities & Structures Lead', startYear: 2023, disciplines: ['civil'], order: 1 },
+  { company: 'Meridiano', title: 'Structural Engineer', startYear: 2019, endYear: 2023, disciplines: ['civil'], order: 2 },
+  { company: 'DER-MG', title: 'Bridge Engineer', startYear: 2017, endYear: 2019, disciplines: ['civil'], order: 3 },
+  { company: 'UFMG', title: 'Structures Lab Assistant', startYear: 2015, endYear: 2017, disciplines: ['civil'], order: 4 },
 ]
 
 export const projects: ProjectSeed[] = [

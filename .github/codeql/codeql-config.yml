@@ -1,0 +1,4 @@
+name: my-portfolio
+# The cloned reference sites under docs/ are not our code.
+paths-ignore:
+  - docs/**

@@ -20,6 +20,8 @@ export interface Entry {
   chip: string
   label: string
   href?: string
+  /** Logo or favicon URL; the chip shows when absent. */
+  icon?: string
   meta: string
   aside?: string
   /** Discipline slugs; empty = shown for every discipline. */

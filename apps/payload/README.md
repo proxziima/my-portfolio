@@ -17,15 +17,26 @@ Copy `.env.example` to `.env` first. `WEB_URL` and `REVALIDATE_SECRET` let the C
 
 | Slug | Admin label | Fields |
 |---|---|---|
-| `disciplines` | Disciplines (roles) | `title` ("Software engineer"), `slug` (unique, e.g. `se`), `order` (number), `level` ("LV 9 · backend", shown in the picker), `bio` (Lexical: paragraphs, bold, and inline blocks `chipLink` + `curiousToggle`), `figureCaption`, `curiousNotes[]` { `side`: left/right, `text`, `formula`? } |
-| `experiences` | Professional background | `company`, `chip` (≤3 chars), `url`?, `title`, `startYear`, `endYear`? (empty = present), `disciplines` (hasMany relation), `order` |
-| `projects` | Portfolio | `name`, `chip`, `url`?, `summary`, `disciplines` (hasMany), `order` |
+| `companies` | Companies | `name` (unique), `chip` (≤3 chars), `url`?, `logo`? (media), `favicon` (read-only, see below), `disclosure` |
+| `disciplines` | Disciplines (roles) | `title` ("Software engineer"), `slug` (unique, e.g. `se`), `order` (number), `level` ("LV 9 · backend", shown in the picker), `bio` (Lexical: paragraphs, bold, and inline blocks `recordLink`, `chipLink` + `curiousToggle`), `figureCaption`, `curiousNotes[]` { `side`: left/right, `text`, `formula`? } |
+| `experiences` | Professional background | `company` (required relation to `companies`; the chip and URL come from it), `title`, `startYear`, `endYear`? (empty = present), `disciplines` (hasMany relation), `order` |
+| `projects` | Portfolio | `name`, `chip`, `url`?, `logo`? (media), `favicon` (read-only), `summary`, `company`? (relation to `companies`: where or for whom it was built), `disciplines` (hasMany), `order` |
 | `content` | Content & community | `title`, `kind` (article / talk / podcast / open-source / community), `venue`?, `url`, `date`, `disciplines` (hasMany; empty = every role), `order` |
 | `media` | Media | upload (alt required) |
 | `scenes` | Spline scenes (group Site) | upload (`.spline` / `.splinecode` only), `title`, `notes`? |
 | `users` | Users | auth, `name` (required display name, shown as the post author) |
+| `favicons` | (hidden) | upload managed only by the favicon hooks; not exposed over MCP |
 
-The bio's inline blocks are `chipLink` { `label`, `chip`, `url`? } and `curiousToggle` { `word`, default "curious" }. Keep the same sentence skeleton across disciplines and change only the vocabulary: the page animates just the words that differ.
+The bio's inline blocks are `recordLink` { `record`: a public company or project; its name, chip, URL and icon come from the record }, `chipLink` { `label`, `chip`, `url`? } for free-text links that are not records, and `curiousToggle` { `word`, default "curious" }. Keep the same sentence skeleton across disciplines and change only the vocabulary: the page animates just the words that differ. A company or project can't be hidden or deleted while a bio links it; the error names the bios to edit first.
+
+### Brand icons
+
+A company or project shows its uploaded `logo`, else its `favicon`, else its text `chip`.
+
+- **Favicons are fetched on save** from the record's `url` (when the URL changes, or while none is stored) and self-hosted in the hidden `favicons` collection, stored as PNG or ICO. Only `http(s)` URLs qualify. Any other image is decoded and redrawn as a 64×64 PNG in a sandboxed child process with time and memory caps, so nothing the site served (SVG markup included) reaches the CMS origin as-is. A failed fetch never fails the save. See `src/favicons/`.
+- **Files are named** `<collection>-<id>-favicon.<ext>`, never after the record. Anonymous readers can only read the favicons of public companies and projects, and nothing can write `favicons` through the API.
+- **Refresh** every icon (the backfill after the companies migration, or stale icons): `bun run --cwd apps/payload favicons:refresh`. It re-saves each company and project that has a URL and logs the outcome for each.
+- `logo` uploads go to `media`, which is public: don't upload a logo for a company you keep hidden.
 
 ### Globals
 
@@ -36,7 +47,7 @@ The bio's inline blocks are `chipLink` { `label`, `chip`, `url`? } and `curiousT
 | `navigation` | `items[]` { `label`, `href`, `newTab` }: rendered as a quiet footer nav; section anchors (`#work`, `#projects`, `#content`) are valid hrefs |
 | `site-settings` | `seo` { `title`, `description`, `ogImage`? }, `defaultDiscipline` (relation), `figure` { `scene`? (scenes upload, wins over the URL), `splineSceneUrl`? }, `sectionLabels` { `work`, `projects`, `content` }, `pickerHint`, `pageNotes` { `headline`, `columnWidth` (supports `{w}`), `wallSwitch`, `sectionGap`, `chips`, `role` } |
 
-Access: public `read` on all portfolio collections and globals; writes need an authenticated user.
+Access: public `read` on all portfolio collections and globals (only `public`-tier records for the collections with a `disclosure` field, and only public records' icons in `favicons`); writes need an authenticated user.
 
 ## Updating the desk model
 

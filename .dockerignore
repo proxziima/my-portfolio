@@ -20,6 +20,7 @@ docs/template-portfolio/node_modules
 # Local uploads: production keeps them on the /data volume
 apps/payload/public/media
 apps/payload/public/scenes
+apps/payload/public/favicons
 
 **/.DS_Store
 **/*.pem
@@ -32,3 +33,6 @@ apps/payload/public/scenes
 
 # Claude Code state, including worktree checkouts of this repo
 .claude
+
+# Design docs and reference sites: never part of an image
+docs

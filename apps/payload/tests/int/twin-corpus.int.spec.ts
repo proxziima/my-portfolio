@@ -66,6 +66,20 @@ describe('twin corpus', () => {
     expect(lexicalText(bio)).toBe('I build tools.\nSecond.')
   })
 
+  it('names record links through the resolver and drops unresolved ones', () => {
+    const bio = { root: { children: [{ type: 'paragraph', children: [
+      { type: 'text', text: 'At ' },
+      { type: 'inlineBlock', fields: { blockType: 'recordLink', record: { relationTo: 'companies', value: 3 } } },
+      { type: 'text', text: ' and ' },
+      { type: 'inlineBlock', fields: { blockType: 'recordLink', record: { relationTo: 'projects', value: 9 } } },
+    ] }] } }
+    const names = (ref: unknown) => {
+      const { relationTo, value } = ref as { relationTo: string; value: number }
+      return relationTo === 'companies' && value === 3 ? 'Autodoc' : undefined
+    }
+    expect(lexicalText(bio, names)).toBe('At Autodoc and')
+  })
+
   it('scores restricted entries on their title only, so hidden text cannot be probed', () => {
     const c = [entry('knowledge:7', 'Notice period', 'Thirty days in Berlin', 'restricted', 'availability')]
     expect(rankCorpus(c, 'berlin', 5).restricted).toEqual([])

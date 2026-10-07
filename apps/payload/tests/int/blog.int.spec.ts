@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { publishedOrAuthenticated } from '@/access/published-or-authenticated'
 import { canRunJobs } from '@/access/run-jobs'
 import { validateLinkUrl } from '@/fields/link-url'
-import { relationIds } from '@/fields/relation-ids'
+import { relationId, relationIds } from '@/fields/relation-ids'
 import { toPopulatedAuthors } from '@/hooks/populate-authors'
 import { isAutosave, revalidateAfterChange } from '@/hooks/revalidate-web'
 import { blogPostUrl, categoryPath, seoTitle } from '@/plugins/blog-urls'
@@ -34,6 +34,20 @@ describe('toPopulatedAuthors', () => {
   })
   it('falls back to an empty name', () => {
     expect(toPopulatedAuthors([{ id: 2, name: null }])).toEqual([{ id: '2', name: '' }])
+  })
+})
+
+describe('relationId', () => {
+  it('reads a raw or populated numeric id', () => {
+    expect(relationId(7)).toBe(7)
+    expect(relationId({ id: 7, name: 'Autodoc' })).toBe(7)
+  })
+  it('is null when there is no numeric id', () => {
+    expect(relationId(null)).toBeNull()
+    expect(relationId(undefined)).toBeNull()
+    expect(relationId('7')).toBeNull()
+    expect(relationId({ id: '7' })).toBeNull()
+    expect(relationId({ name: 'Autodoc' })).toBeNull()
   })
 })
 

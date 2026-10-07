@@ -17,7 +17,7 @@ export function EntryList({ id, title, entries }: { id: string; title: string; e
         {rows.map((row) => (
           <li key={row.id} className={styles.row}>
             <span className={styles.main}>
-              <ChipLink chip={row.chip} label={row.label} href={row.href} />
+              <ChipLink chip={row.chip} label={row.label} href={row.href} icon={row.icon} />
               <span className={styles.meta}>{row.meta}</span>
             </span>
             {row.aside && <span className={styles.aside}>{row.aside}</span>}

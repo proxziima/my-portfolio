@@ -18,3 +18,13 @@ export const disclosureField = (): SelectField => ({
   ],
   admin: { position: 'sidebar' },
 })
+
+/** How strict a tier is. It fails closed: anything that is not a known tier (e.g. a missing value) counts as `never`. */
+const strictness = (tier: DisclosureTier): number => {
+  const rank = DISCLOSURE_TIERS.indexOf(tier)
+  return rank === -1 ? DISCLOSURE_TIERS.length - 1 : rank
+}
+
+/** The stricter of two tiers: a fact is only as visible as the least visible thing it reveals. */
+export const stricterTier = (a: DisclosureTier, b: DisclosureTier): DisclosureTier =>
+  DISCLOSURE_TIERS[Math.max(strictness(a), strictness(b))]!

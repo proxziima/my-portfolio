@@ -59,6 +59,19 @@ svg {
   text-align: center;
 }
 
+/* A logo or favicon in the chip slot: same box as the text chip, no tile behind it. */
+.chip-img {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  object-fit: contain;
+  background: none;
+  vertical-align: -2px;
+  image-rendering: auto;
+}
+
 /* the curious-mode toggle is a page feature: show its word, drop its switch */
 .curiosity-trigger {
   all: unset;

@@ -134,6 +134,12 @@ h2 {
   transition: var(--theme-transition);
 }
 
+/* A logo or favicon in the chip slot: same box as the text chip, no tile behind it. */
+.chip-img {
+  object-fit: contain;
+  background: none;
+}
+
 /* contact links */
 .links {
   display: flex;

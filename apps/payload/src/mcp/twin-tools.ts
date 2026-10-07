@@ -1,15 +1,24 @@
-import type { Payload, PayloadRequest } from 'payload'
+import type { Payload, PayloadRequest, Where } from 'payload'
 import { z } from 'zod'
+import type { Company } from '@repo/cms-types'
 import type { KnowledgeCategory, TwinIdentity, TwinItem } from '@repo/twin/contract'
-import type { DisclosureTier } from '../fields/disclosure'
-import { lexicalText, rankCorpus, type CorpusEntry } from './twin-corpus'
+import { stricterTier, type DisclosureTier } from '../fields/disclosure'
+import { relationId } from '../fields/relation-ids'
+import { lexicalText, rankCorpus, type CorpusEntry, type RecordName } from './twin-corpus'
 
 const NOT_NEVER = { disclosure: { not_equals: 'never' } } as const
+
+/** Every company with its tier, for naming and capping the rows that reference it. */
+async function loadCompanies(payload: Payload, where?: Where): Promise<Map<number, Company>> {
+  const found = await payload.find({ collection: 'companies', ...(where ? { where } : {}), limit: 1000, depth: 0, overrideAccess: true, pagination: false })
+  return new Map(found.docs.map((c) => [c.id, c]))
+}
 
 /** Loads every non-never document the twin may search; the corpus is a few hundred docs at most. */
 export async function loadCorpus(payload: Payload): Promise<CorpusEntry[]> {
   const opts = { where: NOT_NEVER, limit: 1000, depth: 0, overrideAccess: true, pagination: false } as const
-  const [experiences, projects, content, disciplines, knowledge, profile, contact] = await Promise.all([
+  const [companies, experiences, projects, content, disciplines, knowledge, profile, contact] = await Promise.all([
+    loadCompanies(payload),
     payload.find({ collection: 'experiences', ...opts }),
     payload.find({ collection: 'projects', ...opts }),
     payload.find({ collection: 'content', ...opts }),
@@ -19,33 +28,64 @@ export async function loadCorpus(payload: Payload): Promise<CorpusEntry[]> {
     payload.findGlobal({ slug: 'contact', depth: 0, overrideAccess: true }),
   ])
   const entry = (item: TwinItem, disclosure: DisclosureTier, category: KnowledgeCategory | null = null): CorpusEntry => ({ item, disclosure, category })
+  const companyOf = (ref: unknown) => companies.get(relationId(ref) ?? -1)
+  const projectNames = new Map(projects.docs.filter((p) => p.disclosure === 'public').map((p) => [p.id, p.name]))
+  // Bios are public prose: a record link is named only while its record is public.
+  const recordName: RecordName = (ref) => {
+    const { relationTo, value } = (ref ?? {}) as { relationTo?: unknown; value?: unknown }
+    const id = relationId(value) ?? -1
+    if (relationTo === 'companies') {
+      const c = companies.get(id)
+      return c?.disclosure === 'public' ? c.name : undefined
+    }
+    return relationTo === 'projects' ? projectNames.get(id) : undefined
+  }
   return [
     entry({ sourceId: 'profile:global', kind: 'profile', title: `Profile: ${profile.name}`, text: [profile.name, profile.headlineTail, profile.location].filter(Boolean).join(' · ') }, 'public'),
     entry({ sourceId: 'contact:global', kind: 'contact', title: 'Contact links', text: (contact.links ?? []).map((l) => `${l.label}: ${l.url}`).join('\n') }, 'public'),
-    ...experiences.docs.map((d) => entry({ sourceId: `experiences:${d.id}`, kind: 'experience', title: `${d.title} at ${d.company}`, text: `${d.title} at ${d.company}, ${d.startYear}–${d.endYear ?? 'present'}`, url: d.url ?? undefined }, d.disclosure)),
-    ...projects.docs.map((d) => entry({ sourceId: `projects:${d.id}`, kind: 'project', title: `Project: ${d.name}`, text: d.summary, url: d.url ?? undefined }, d.disclosure)),
+    ...experiences.docs.flatMap((d) => {
+      const company = companyOf(d.company)
+      // An unresolved company fails closed: the row is dropped rather than shown without its company.
+      if (!company) return []
+      // A restricted entry's title is exposed as its topic stub, so it must not name a non-public company;
+      // the full text, with the name, only leaves through an approved twinDisclose.
+      const title = company.disclosure === 'public' ? `${d.title} at ${company.name}` : `${d.title} (company undisclosed)`
+      const item = { sourceId: `experiences:${d.id}`, kind: 'experience' as const, title, text: `${d.title} at ${company.name}, ${d.startYear}–${d.endYear ?? 'present'}`, url: company.url ?? undefined }
+      return [entry(item, stricterTier(d.disclosure, company.disclosure))]
+    }),
+    // A project's name is public on the site whatever its company is, so it keeps its own tier;
+    // only a public company may be named alongside it.
+    ...projects.docs.map((d) => {
+      const company = companyOf(d.company)
+      const text = company?.disclosure === 'public' ? `${d.summary} (at ${company.name})` : d.summary
+      return entry({ sourceId: `projects:${d.id}`, kind: 'project', title: `Project: ${d.name}`, text, url: d.url ?? undefined }, d.disclosure)
+    }),
     ...content.docs.map((d) => entry({ sourceId: `content:${d.id}`, kind: 'content', title: `${d.kind}: ${d.title}`, text: [d.title, d.venue, d.date?.slice(0, 10)].filter(Boolean).join(' · '), url: d.url ?? undefined }, d.disclosure)),
-    ...disciplines.docs.map((d) => entry({ sourceId: `disciplines:${d.id}`, kind: 'discipline', title: `Role: ${d.title}`, text: lexicalText(d.bio) }, d.disclosure)),
+    ...disciplines.docs.map((d) => entry({ sourceId: `disciplines:${d.id}`, kind: 'discipline', title: `Role: ${d.title}`, text: lexicalText(d.bio, recordName) }, d.disclosure)),
     ...knowledge.docs.map((d) => entry({ sourceId: `knowledge:${d.id}`, kind: 'knowledge', title: d.topic, text: d.answer }, d.disclosure, d.category)),
-  ]
+  ].filter((e) => e.disclosure !== 'never') // Defence in depth: an effective never tier (e.g. via its company) stays out of memory.
 }
 
 /** MCP text content carrying JSON; the agent validates it against `@repo/twin/contract`. */
 const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] })
 
-/** Public identity grounding: profile, current roles, and `voice` samples written by the owner. */
+/** Public identity grounding: profile, current roles at public companies, and `voice` samples written by the owner. */
 export async function loadIdentity(payload: Payload): Promise<TwinIdentity> {
   const publicOnly = { disclosure: { equals: 'public' } } as const
-  const [profile, current, voice] = await Promise.all([
+  const [profile, current, voice, companies] = await Promise.all([
     payload.findGlobal({ slug: 'profile', depth: 0, overrideAccess: true }),
     payload.find({ collection: 'experiences', where: { and: [publicOnly, { endYear: { exists: false } }] }, limit: 10, depth: 0, overrideAccess: true, pagination: false }),
     payload.find({ collection: 'knowledge', where: { and: [publicOnly, { category: { equals: 'voice' } }] }, limit: 5, depth: 0, overrideAccess: true, pagination: false, sort: 'order' }),
+    loadCompanies(payload, publicOnly),
   ])
   return {
     name: profile.name,
     headline: profile.headlineTail ?? null,
     location: profile.location ?? null,
-    currentRoles: current.docs.map((d) => ({ title: d.title, company: d.company })),
+    currentRoles: current.docs.flatMap((d) => {
+      const company = companies.get(relationId(d.company) ?? -1)
+      return company ? [{ title: d.title, company: company.name }] : []
+    }),
     voiceSamples: voice.docs.map((d) => d.answer),
   }
 }

@@ -1,15 +1,15 @@
 # Deploy on Easypanel
 
-Production runs as one Easypanel **Compose** service built from this repository's `docker-compose.yml`:
+Production runs as one Easypanel **Compose** service defined by this repository's `docker-compose.yml`:
 
 | Service | Image | Port | Public URL (example) | State |
 | --- | --- | --- | --- | --- |
-| `web` | `apps/web/Dockerfile`: Next standalone server | 3000 | `https://example.com` | none |
-| `cms` | `apps/payload/Dockerfile`: the full `cms` workspace, `next start` | 3001 | `https://cms.example.com` | volume `cms-data` at `/data` |
+| `web` | `my-portfolio-web` (`apps/web/Dockerfile`): Next standalone server | 3000 | `https://example.com` | none |
+| `cms` | `my-portfolio-cms` (`apps/payload/Dockerfile`): the full `cms` workspace, `next start` | 3001 | `https://cms.example.com` | volume `cms-data` at `/data` |
 | `postgres` | `postgres:17-alpine` | 5432 | none (internal) | volume `twin-pg` |
-| `agents` | `apps/agents/Dockerfile`: the portfolio twin (eve), `eve start` | 3000 | none (internal) | none (state is in `postgres`) |
+| `agents` | `my-portfolio-agents` (`apps/agents/Dockerfile`): the portfolio twin (eve), `eve start` | 3000 | none (internal) | none (state is in `postgres`) |
 
-The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload.db`) and the uploads (`/data/media`, `/data/scenes`). The `twin-pg` volume holds the portfolio twin's Postgres database `twin`. That database contains both the twin's own tables (schema `twin`) and eve's durable Workflow runtime (schemas `workflow` and `graphile_worker`). Every image is built from the repository root, and every setting is read at runtime, so nothing environment-specific is baked into an image.
+The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload.db`) and the uploads (`/data/media`, `/data/scenes`, `/data/favicons`). The `twin-pg` volume holds the portfolio twin's Postgres database `twin`. That database contains both the twin's own tables (schema `twin`) and eve's durable Workflow runtime (schemas `workflow` and `graphile_worker`). CI builds the three app images from the repository root and publishes them to GHCR (`ghcr.io/proxziima/my-portfolio-{web,cms,agents}`) for each release. Easypanel pulls them; it builds nothing. Every setting is read at runtime, so nothing environment-specific is baked into an image. The pipeline is described in [ci-cd.md](ci-cd.md).
 
 **`agents` must never get a domain.** It serves eve's Workflow routes (`/.well-known/workflow/v1/*`), which are unauthenticated: anyone who can reach them can forge or replay workflow steps. Only `web` talks to it, over the compose network (`http://agents:3000`). That covers the visitor BFF and the two webhook forwarders `https://<web>/api/twin/hooks/cal` and `https://<web>/api/twin/hooks/photon`. How the twin works: [apps/agents/README.md](../apps/agents/README.md).
 
@@ -21,7 +21,7 @@ The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload
 ## 1. Create the Compose service
 
 1. In Easypanel, open a project (or create one) and choose **+ Service → Compose**.
-2. **Source**: the Git repository (GitHub, or any Git URL) and the branch to deploy. Keep the build path at the repository root (`/`) and the compose file at `docker-compose.yml`.
+2. **Source**: the Git repository (GitHub, or any Git URL) and the branch `main`: Easypanel reads the compose file from that branch, and the images are the ones CI published for a release. Keep the build path at the repository root (`/`) and the compose file at `docker-compose.yml`. Easypanel still reads `docker-compose.yml` from the repository, but the app services only have an `image:`, so a deploy pulls the images CI published. Turn **auto-deploy off**: CI triggers the deploy after its checks pass (see [ci-cd.md](ci-cd.md#one-time-setup-repository-owner)).
 3. Don't deploy yet: set the environment first. The compose file refuses to start while a required variable is empty.
 
 ## 2. Set the environment
@@ -30,6 +30,7 @@ Open the service's **Environment** tab and paste [`.env.deploy.example`](../.env
 
 | Variable | Used by | Value |
 | --- | --- | --- |
+| `IMAGE_REGISTRY`, `IMAGE_TAG` | cms, web, agents | Where the images come from. Keep `ghcr.io/proxziima` and `latest` (the newest release); set a version like `IMAGE_TAG=0.0.1` to pin a release or roll back. |
 | `WEB_PUBLIC_URL` | cms (`WEB_URL`) | The site's exact origin, e.g. `https://example.com`. It's the CMS's only CORS origin, the target of revalidations and the base of preview links. |
 | `CMS_PUBLIC_URL` | web (`CMS_URL`), cms (`NEXT_PUBLIC_SERVER_URL`) | The CMS's exact origin, e.g. `https://cms.example.com`. The web fetches content from it and builds upload URLs (the Spline scene) that the browser loads from it. |
 | `COOKIE_DOMAIN` | cms | The shared parent domain with a leading dot, e.g. `.example.com`. |
@@ -66,7 +67,7 @@ The portfolio twin adds the variables below. Each one is described in [`.env.dep
 
 Generate each secret with `openssl rand -hex 32`. Don't reuse the development values. Origins are `https://`, with no trailing slash and no path.
 
-The image already sets `NODE_ENV=production`, `DATABASE_URL=file:/data/payload.db`, `MEDIA_DIR=/data/media` and `SCENES_DIR=/data/scenes`. Don't override them.
+The image already sets `NODE_ENV=production`, `DATABASE_URL=file:/data/payload.db`, `MEDIA_DIR=/data/media`, `SCENES_DIR=/data/scenes` and `FAVICONS_DIR=/data/favicons`. Don't override them.
 
 ## 3. Add the domains
 
@@ -90,12 +91,12 @@ Both are created on the first deploy and kept across redeploys and rebuilds. Onl
 
 ## 5. First deploy
 
-1. Click **Deploy**. Both images build (a few minutes: `bun install`, then `turbo run build`; `next/font/google` downloads the fonts during the web build, so the build needs network access).
+1. Click **Deploy** (or merge the release PR once the deploy trigger is set up). Easypanel pulls the three images from GHCR. The GHCR packages must be public, or Easypanel needs a registry credential ([ci-cd.md](ci-cd.md#one-time-setup-repository-owner)).
 2. `cms` and `postgres` start first. The `cms` healthcheck requests `/api/globals/profile`; that first request starts Payload, which creates the schema by running the committed migrations (`Migrating: …_initial` in the cms logs).
 3. `agents` starts once both are healthy. Before it listens, its command creates the Workflow world's schema (`world:setup`) and applies the twin migrations (`db:migrate`). Both are idempotent and run on every start. Its healthcheck requests `/eve/v1/health`. `web` starts once `cms`, `postgres` and `agents` are healthy.
 4. **Create the admin user right away** at `https://cms.example.com/admin`. Until the first user exists, anyone who opens the admin can create it.
 5. Add the content, either way:
-   - **Seed** the portfolio content (disciplines, experiences, projects, content, globals). In Easypanel, open the `cms` container's console (or run `docker compose exec cms …` on the server) and run:
+   - **Seed** the portfolio content (companies, disciplines, experiences, projects, content, globals). In Easypanel, open the `cms` container's console (or run `docker compose exec cms …` on the server) and run:
      ```bash
      bun run seed
      ```
@@ -142,7 +143,15 @@ Retention runs inside `agents`. Every day at 03:00 it purges visitors not seen f
 
 ## Updating
 
-Push to the deployed branch, then click **Deploy** (or enable Easypanel's auto-deploy for the service). The images are rebuilt from the new commit and the containers are replaced; the `cms-data` and `twin-pg` volumes stay. On start, `agents` applies any new twin migration. When the new `cms` handles its first request, it runs any migration that isn't in `payload_migrations` yet.
+Merge the release PR ([ci-cd.md](ci-cd.md#releases)). CI tags the release, publishes its images and triggers the deploy. Easypanel pulls the new images and replaces the containers; the `cms-data` and `twin-pg` volumes stay. On start, `agents` applies any new twin migration. When the new `cms` handles its first request, it runs any migration that isn't in `payload_migrations` yet.
+
+**Deploying the companies version** (the first with `companies` and `favicons`): its migration runs on start and carries the experiences' companies over, but it fetches no favicons (migrations have no network). Once it is up, run this once in the `cms` console to fetch them:
+
+```bash
+bun run favicons:refresh
+```
+
+It re-saves every company and project that has a URL, logs what it stored for each, and exits non-zero if any record failed. It is safe to re-run to refresh stale icons.
 
 **Schema changes need a migration.** Development pushes the schema automatically; production never does. After changing a collection, global or field, create a migration before you deploy and commit it:
 
@@ -162,16 +171,27 @@ bun run payload migrate:status   # which migrations have run
 bun run payload migrate          # run pending migrations by hand (the server does this on start)
 ```
 
+## Building from source instead
+
+To build the images on the server (or locally) instead of pulling them, layer the build override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up --build -d
+```
+
+Easypanel can't do this by itself (it uses one compose file), so this is for a server you run by hand.
+`next/font/google` downloads the fonts during the web build, so the build needs network access.
+
 ## Backups
 
-Everything is in `/data` in the `cms` container: `payload.db`, `media/` and `scenes/`.
+Everything is in `/data` in the `cms` container: `payload.db`, `media/`, `scenes/` and `favicons/`.
 
 - **Database, consistent while running.** In the `cms` console:
   ```bash
   node -e "new (require('node:sqlite').DatabaseSync)('/data/payload.db').exec(\"VACUUM INTO '/data/backup.db'\")"
   ```
   Then download `/data/backup.db` and delete it from the volume. A plain copy of `payload.db` is only safe while nothing is writing, e.g. with `cms` stopped.
-- **Uploads.** Copy `/data/media` and `/data/scenes`.
+- **Uploads.** Copy `/data/media`, `/data/scenes` and `/data/favicons`. Favicons can also be fetched again with `bun run favicons:refresh`.
 - **Whole volume, on the server.** Stop `cms`, then archive the volume (find its name with `docker volume ls | grep cms-data`):
   ```bash
   docker run --rm -v <volume>:/data -v "$PWD":/backup busybox tar czf /backup/cms-data-$(date +%F).tar.gz -C /data .
@@ -187,7 +207,7 @@ To restore, put the files back in `/data` with `cms` stopped, owned by uid 1000 
 
 ## Line endings (Windows checkouts)
 
-Easypanel builds from Git, so its checkout has the line endings in the repository. A local `docker build` or `docker compose up` from a Windows working tree with `core.autocrlf=true` could otherwise get CRLF in the files that run on Linux, and the shell would read the Dockerfile's `CMD` and the scripts with stray `\r` characters. `.gitattributes` forces LF for `Dockerfile`, `*.sh`, `*.yml`, `*.yaml` and `*.ndjson`, so those check out with LF everywhere. If you add a file that runs inside a container (an entrypoint script, a file in another format), add its pattern there with `text eol=lf`. The twin's `SKILL.md` files don't need it: the skill bundler normalises CRLF.
+CI builds the images from a Linux checkout, so they have the line endings in the repository. A local `docker build` or `docker compose up` from a Windows working tree with `core.autocrlf=true` could otherwise get CRLF in the files that run on Linux, and the shell would read the Dockerfile's `CMD` and the scripts with stray `\r` characters. `.gitattributes` forces LF for `Dockerfile`, `*.sh`, `*.yml`, `*.yaml` and `*.ndjson`, so those check out with LF everywhere. If you add a file that runs inside a container (an entrypoint script, a file in another format), add its pattern there with `text eol=lf`. The twin's `SKILL.md` files don't need it: the skill bundler normalises CRLF.
 
 ## Known issue: MCP
 

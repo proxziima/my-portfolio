@@ -1,0 +1,29 @@
+'area:web':
+  - changed-files:
+      - any-glob-to-any-file: ['apps/web/**']
+'area:cms':
+  - changed-files:
+      - any-glob-to-any-file: ['apps/payload/**', 'packages/cms-types/**']
+'area:agents':
+  - changed-files:
+      - any-glob-to-any-file: ['apps/agents/**']
+'area:twin':
+  - changed-files:
+      - any-glob-to-any-file: ['packages/twin/**']
+'area:infra':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'docker-compose*.yml'
+          - '.dockerignore'
+          - '**/Dockerfile'
+          - 'turbo.json'
+          - 'package.json'
+          - 'bun.lock'
+          - 'scripts/**'
+          - '.env.deploy.example'
+          - '.gitleaks.toml'
+          - '.gitignore'
+'area:docs':
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '**/*.md']
