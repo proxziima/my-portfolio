@@ -3,15 +3,69 @@ on:
   push:
     branches: [main, develop]
   pull_request:
+    branches: [main, develop]
   workflow_dispatch:
 
+# One run per ref. A newer push cancels an older pull-request run. On main and develop a running run is
+# never cancelled, so a deploy is never cut off mid-run; GitHub keeps one pending run per group, so a burst
+# of pushes collapses to the latest one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+  DO_NOT_TRACK: 1
+
 jobs:
-  checks:
+  # What this run has to check (scripts/ci/affected.ts). Push, dispatch and repo-wide changes check everything.
+  changes:
     runs-on: ubuntu-latest
-    # Secrets can't be read in a job-level `if`, so this job exports whether live evals can run.
-    # The value is the boolean, never the secret.
+    timeout-minutes: 10
     outputs:
+      all: ${{ steps.affected.outputs.all }}
+      web: ${{ steps.affected.outputs.web }}
+      cms: ${{ steps.affected.outputs.cms }}
+      agents: ${{ steps.affected.outputs.agents }}
+      twin: ${{ steps.affected.outputs.twin }}
+      images: ${{ steps.affected.outputs.images }}
+      affected: ${{ steps.affected.outputs.affected }}
+      # Secrets can't be read in a job-level `if`, so this exports whether live evals can run.
+      # The value is the boolean, never the secret.
       live-evals: ${{ secrets.OPENROUTER_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - id: affected
+        run: bun scripts/ci/affected.ts
+
+  # Repository-level files: workflow syntax and both compose files.
+  repo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: workflows (actionlint + shellcheck)
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+      - name: compose files resolve with the template env
+        run: |
+          docker compose --env-file .env.deploy.example -f docker-compose.yml config --quiet
+          docker compose --env-file .env.deploy.example -f docker-compose.yml -f docker-compose.build.yml config --quiet
+
+  # Types, lint and every test suite (with coverage) for the affected workspaces, plus the repo scripts.
+  verify:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17-alpine
@@ -23,55 +77,78 @@ jobs:
     env:
       TWIN_DATABASE_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
       WORKFLOW_POSTGRES_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
+      # Payload's integration tests: a throwaway SQLite file, never payload.db.
+      DATABASE_URL: file:./.tmp/ci.db
+      PAYLOAD_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
+      # Empty when everything is checked; otherwise turbo limits itself to the packages the PR affects.
+      # The steps expand it as ${AFFECTED:+"$AFFECTED"}: quoted (shellcheck), and no argument at all when empty.
+      AFFECTED: ${{ needs.changes.outputs.all != 'true' && '--affected' || '' }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: 1.3.10 }
-      - uses: actions/setup-node@v5
-        with: { node-version: 24 }
-      - run: bun install --frozen-lockfile
-      - run: bunx turbo run check-types lint
-      - run: bun run --cwd packages/twin test
-      - run: bun run --cwd apps/agents test
-      - name: payload integration tests (throwaway SQLite, never payload.db)
-        env:
-          DATABASE_URL: file:./.tmp/ci.db
-          PAYLOAD_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
-        run: bun run --cwd apps/payload test:int
-      - run: bun run --cwd apps/web test
-      - run: bun test scripts/scan-client-bundle.test.ts
-      - name: agent builds and discovers every capability
-        run: bun run --cwd apps/agents info && bun run --cwd apps/agents build
-      - name: offline acceptance evals (scripted model, local stubs)
-        run: |
-          bun run --cwd packages/twin db:migrate
-          bun run --cwd apps/agents world:setup
-          cd apps/agents/fixtures/offline && cp .env.example .env && bun run eval
-      # Every web route that reads the CMS is force-dynamic, so `next build` never fetches it: CMS_URL
-      # only has to parse. Page data is real at request time and nothing is stubbed.
-      - name: client bundle carries no secrets or prompt fragments
-        env:
-          TWIN_JWT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-00
-          TWIN_COOKIE_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-11
-          TWIN_REDACT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-22
-          TWIN_STABLE_KEY_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
-          TWIN_BOOKING_REF_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-44
-          IMESSAGE_PROJECT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-55
-          IMESSAGE_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-88
-          CAL_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-66
-          PAYLOAD_MCP_API_KEY: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-77
-          TWIN_PROMPT_CANARY: ci-canary-0123456789
-          CMS_URL: http://127.0.0.1:3001
-        run: bunx turbo run build --filter=web && bun scripts/scan-client-bundle.ts apps/web/.next/static
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: types and lint
+        run: bunx turbo run check-types lint ${AFFECTED:+"$AFFECTED"}
+      # One suite at a time: wall-clock assertions in the cms favicon tests need an unshared CPU.
+      - name: tests with coverage
+        run: bunx turbo run test ${AFFECTED:+"$AFFECTED"} --concurrency=1 -- --coverage
+      - name: repo scripts
+        run: bun test scripts
+      - name: upload coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: |
+            apps/*/coverage/coverage-summary.json
+            packages/*/coverage/coverage-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
 
-  # Live evals against a real model, with a throwaway CMS and agent inside this runner: production
-  # agents are internal-only, so nothing outside the compose network can reach them. Spends model credit.
-  live-evals:
-    needs: checks
-    if: >-
-      needs.checks.outputs.live-evals == 'true' &&
-      (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+  # Generated files and migrations must match their sources: a schema change without a migration breaks prod.
+  drift:
+    needs: changes
+    if: needs.changes.outputs.cms == 'true' || needs.changes.outputs.twin == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: file:./.tmp/drift.db
+      PAYLOAD_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: payload migrations cover the config
+        run: |
+          mkdir -p apps/payload/.tmp
+          bun run --cwd apps/payload payload migrate:create drift --skip-empty
+      - name: payload types
+        run: bun run --cwd apps/payload generate:types
+      - name: payload import map
+        run: bun run --cwd apps/payload generate:importmap
+      - name: twin migrations cover the schema
+        run: bun run --cwd packages/twin db:generate
+      - name: nothing drifted
+        run: |
+          changed=$(git status --porcelain)
+          if [ -n "$changed" ]; then
+            echo "$changed"
+            # Intent-to-add makes the diff show the content of a new, untracked migration too.
+            git add --intent-to-add .
+            git --no-pager diff
+            echo "::error::Generated files are stale. See docs/ci-cd.md#when-a-gate-fails: a new migration file means a schema change has none; otherwise regenerate and commit."
+            exit 1
+          fi
+
+  # The agent builds, discovers every capability and passes the offline acceptance evals.
+  agents:
+    needs: changes
+    if: needs.changes.outputs.agents == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
@@ -80,9 +157,222 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U twin -d twin_eval" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      # The agent's env (agentsEnvSchema). Secrets shared with the CMS and the eval runner are
-      # generated in the first step. Google is stubbed; iMessage is left unconfigured (it is optional), so
-      # restricted entries are never offered and no approval runs.
+      TWIN_DATABASE_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
+      WORKFLOW_POSTGRES_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: agent builds and discovers every capability
+        run: |
+          bun run --cwd apps/agents info
+          bun run --cwd apps/agents build
+      - name: offline acceptance evals (scripted model, local stubs)
+        run: |
+          bun run --cwd packages/twin db:migrate
+          bun run --cwd apps/agents world:setup
+          cd apps/agents/fixtures/offline && cp .env.example .env && bun run eval
+      - name: offline eval results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: agents-evals
+          path: apps/agents/fixtures/offline/.eve/junit.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Every web route that reads the CMS is force-dynamic, so `next build` never fetches it: CMS_URL
+  # only has to parse. turbo.json passes these values through to the build, so the scan is meaningful.
+  bundle:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TWIN_JWT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-00
+      TWIN_COOKIE_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-11
+      TWIN_REDACT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-22
+      TWIN_STABLE_KEY_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
+      TWIN_BOOKING_REF_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-44
+      IMESSAGE_PROJECT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-55
+      IMESSAGE_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-88
+      CAL_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-66
+      PAYLOAD_MCP_API_KEY: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-77
+      TWIN_PROMPT_CANARY: ci-canary-0123456789
+      CMS_URL: http://127.0.0.1:3001
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: client bundle carries no secrets or prompt fragments
+        run: |
+          bunx turbo run build --filter=web
+          bun scripts/scan-client-bundle.ts apps/web/.next/static
+
+  # The site against a seeded throwaway CMS, in Chromium. The twin's endpoints are stubbed in the browser.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.cms == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: twin, POSTGRES_PASSWORD: twin, POSTGRES_DB: twin_eval }
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U twin -d twin_eval" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      CMS_URL: http://127.0.0.1:3001
+      TWIN_DATABASE_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
+      # Nothing listens here: the browser-side stubs answer the twin's routes.
+      TWIN_AGENT_URL: http://127.0.0.1:1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/secrets
+      - uses: ./.github/actions/cms
+      - name: playwright version
+        id: playwright
+        working-directory: apps/web
+        run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: playwright browsers cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: chromium and its system libraries
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium
+      # Read-only cache: REVALIDATE_SECRET is random per run and part of the build hash, so this build
+      # never hits, and writing its large entry every run would only crowd out useful ones.
+      - name: build the site
+        run: bunx turbo run build --filter=web --cache=local:r
+      # The runner sets CI=true, so Playwright serves the production build (playwright.config.ts).
+      - name: end-to-end
+        run: bun run --cwd apps/web test:e2e
+      - name: playwright report and cms log
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            ci-logs/
+          retention-days: 7
+
+  # Each affected production image builds (no push). Layers are cached per service.
+  docker:
+    needs: changes
+    if: needs.changes.outputs.images != '[]'
+    name: docker (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          build-args: APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # One sticky comment on the PR: what was checked and coverage per package.
+  report:
+    needs: [changes, verify]
+    if: >-
+      !cancelled() && github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository && needs.verify.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.10
+      # No artifact exists when no test produced coverage; the report says so.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: coverage
+          path: coverage-artifact
+      - name: render
+        env:
+          ALL: ${{ needs.changes.outputs.all }}
+          AFFECTED: ${{ needs.changes.outputs.affected }}
+          VERIFY: ${{ needs.verify.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bun scripts/ci/coverage-report.ts coverage-artifact > "$RUNNER_TEMP/report.md"
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REPORT: ${{ runner.temp }}/report.md
+        with:
+          script: |
+            const fs = require('node:fs')
+            const body = fs.readFileSync(process.env.REPORT, 'utf8')
+            const marker = '<!-- ci-report -->'
+            const { owner, repo } = context.repo
+            const issue_number = context.issue.number
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
+            const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker))
+            if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body })
+
+  # The single required check: green when every gate passed or was skipped as unaffected.
+  ci-ok:
+    needs: [changes, repo, verify, drift, agents, bundle, e2e, docker]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          failed=$(echo "$RESULTS" | jq -r '[to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key] | join(" ")')
+          if [ -n "$failed" ]; then
+            echo "::error::failed: $failed"
+            exit 1
+          fi
+          echo "every gate passed or was not affected"
+
+  # Live evals against a real model, with a throwaway CMS and agent inside this runner: production
+  # agents are internal-only, so nothing outside the compose network can reach them. Spends model credit.
+  live-evals:
+    needs: [changes, ci-ok]
+    if: >-
+      needs.changes.outputs.live-evals == 'true' &&
+      (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: twin, POSTGRES_PASSWORD: twin, POSTGRES_DB: twin_eval }
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U twin -d twin_eval" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      # The agent's env (agentsEnvSchema). Shared secrets come from the secrets action. Google is stubbed;
+      # iMessage is left unconfigured (it is optional), so restricted entries are never offered and no approval runs.
       TWIN_DATABASE_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
       WORKFLOW_POSTGRES_URL: postgres://twin:twin@127.0.0.1:5433/twin_eval
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -95,60 +385,26 @@ jobs:
       OWNER_TIMEZONE: America/Sao_Paulo
       CAL_LINK: ci/intro
     steps:
-      - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: 1.3.10 }
-      - uses: actions/setup-node@v5
-        with: { node-version: 24 }
-      - run: bun install --frozen-lockfile
-      - name: generate throwaway secrets
-        run: |
-          for name in PAYLOAD_SECRET TWIN_REDACT_SECRET TWIN_JWT_SECRET TWIN_STABLE_KEY_SECRET CAL_WEBHOOK_SECRET TWIN_BOOKING_REF_SECRET; do
-            value=$(openssl rand -hex 32)
-            echo "::add-mask::$value"
-            echo "$name=$value" >> "$GITHUB_ENV"
-          done
-          canary="canary-$(openssl rand -hex 16)"
-          echo "::add-mask::$canary"
-          echo "TWIN_PROMPT_CANARY=$canary" >> "$GITHUB_ENV"
-      # NODE_ENV=production: the first Payload start (here, the seed) applies the committed migrations
-      # (prodMigrations) to the empty database instead of pushing a dev schema.
-      - name: throwaway cms (build, migrate, seed)
-        env:
-          DATABASE_URL: file:./.tmp/live.db
-          NODE_ENV: production
-          NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
-        run: |
-          mkdir -p apps/payload/.tmp
-          bun run --cwd apps/payload build
-          bun run --cwd apps/payload seed
-          # Adds a public fact, a voice sample and the twin's MCP key (three tools only); writes
-          # PAYLOAD_MCP_API_KEY to $GITHUB_ENV, masked.
-          bun run --cwd apps/payload payload run src/seed/twin-ci.ts
-      - name: start the cms
-        env:
-          DATABASE_URL: file:./.tmp/live.db
-          NODE_ENV: production
-          NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
-        run: |
-          nohup bun run --cwd apps/payload start > "$RUNNER_TEMP/cms.log" 2>&1 &
-          for _ in $(seq 60); do
-            curl -fsS http://127.0.0.1:3001/api/globals/profile > /dev/null && exit 0
-            sleep 2
-          done
-          tail -n 100 "$RUNNER_TEMP/cms.log"
-          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/secrets
+      - uses: ./.github/actions/cms
+        with:
+          twin-key: 'true'
       - name: build and start the agent
         run: |
           bun run --cwd apps/agents build
           bun run --cwd apps/agents world:setup
           bun run --cwd packages/twin db:migrate
-          PORT=4100 nohup bun run --cwd apps/agents start > "$RUNNER_TEMP/agent.log" 2>&1 &
+          mkdir -p "$GITHUB_WORKSPACE/ci-logs"
+          PORT=4100 nohup bun run --cwd apps/agents start > "$GITHUB_WORKSPACE/ci-logs/agent.log" 2>&1 &
           for _ in $(seq 60); do
             curl -fsS http://127.0.0.1:4100/eve/v1/health > /dev/null && exit 0
             sleep 2
           done
-          tail -n 100 "$RUNNER_TEMP/agent.log"
+          tail -n 100 "$GITHUB_WORKSPACE/ci-logs/agent.log"
           exit 1
       - name: live evals per skill and acceptance
         run: |
@@ -156,8 +412,123 @@ jobs:
           echo "::add-mask::$token"
           export EVE_EVAL_AUTH_TOKEN="$token"
           cd apps/agents && bunx eve eval --url http://127.0.0.1:4100 --strict --junit .eve/junit.xml
-      - name: service logs
-        if: failure()
+      - name: eval results and service logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: live-evals
+          path: |
+            apps/agents/.eve/junit.xml
+            ci-logs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # A green main runs release-please (release-please-config.json): it opens or updates the release PR, and
+  # once that PR is merged it tags v<version>, creates the GitHub Release and tells publish and deploy to run.
+  # A PR opened with GITHUB_TOKEN triggers no workflow, so its ci-ok check would never report and the main
+  # ruleset would block it. RELEASE_PLEASE_TOKEN (a fine-grained PAT) avoids that; without it the job falls
+  # back to github.token and the release PR is merged through the admin bypass (docs/ci-cd.md).
+  release:
+    needs: [ci-ok]
+    if: ${{ !cancelled() && needs.ci-ok.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # A new release publishes every image to GHCR: <version>, latest and sha-<short commit>.
+  publish:
+    needs: [changes, release]
+    if: needs.release.outputs.created == 'true'
+    name: publish (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          # The checked-out tag's commit, not github.sha, feeds sha-<short> and the OCI revision label.
+          context: git
+          images: ghcr.io/${{ github.repository_owner }}/my-portfolio-${{ matrix.service }}
+          tags: |
+            type=raw,value=${{ needs.release.outputs.version }}
+            type=raw,value=latest
+            type=sha,prefix=sha-
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: APP_VERSION=${{ needs.release.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # Easypanel pulls the new images (pull_policy: always), then production must report the released version.
+  deploy:
+    needs: [release, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.PROD_WEB_URL }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.10
+      - id: trigger
+        name: trigger the Easypanel deploy
+        env:
+          WEBHOOK: ${{ secrets.EASYPANEL_DEPLOY_WEBHOOK }}
+          VERSION: ${{ needs.release.outputs.version }}
         run: |
-          tail -n 200 "$RUNNER_TEMP/cms.log" || true
-          tail -n 200 "$RUNNER_TEMP/agent.log" || true
+          if [ -z "$WEBHOOK" ]; then
+            echo "::notice::EASYPANEL_DEPLOY_WEBHOOK is not set: the images for $VERSION are published, nothing was deployed (docs/ci-cd.md)"
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          curl -fsS --retry 3 -X POST "$WEBHOOK" > /dev/null
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+      - name: production serves this release
+        if: steps.trigger.outputs.deployed == 'true'
+        env:
+          PROD_WEB_URL: ${{ vars.PROD_WEB_URL }}
+          PROD_CMS_URL: ${{ vars.PROD_CMS_URL }}
+          EXPECTED_VERSION: ${{ needs.release.outputs.version }}
+        run: bun scripts/ci/smoke.ts

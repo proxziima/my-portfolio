@@ -1,0 +1,19 @@
+# Builds the three app images from this checkout instead of pulling them from GHCR. Layer it on the
+# production file (locally, or on a server without registry access):
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+services:
+  cms:
+    build:
+      context: .
+      dockerfile: apps/payload/Dockerfile
+    pull_policy: build
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    pull_policy: build
+  agents:
+    build:
+      context: .
+      dockerfile: apps/agents/Dockerfile
+    pull_policy: build
