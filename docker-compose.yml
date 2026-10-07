@@ -1,6 +1,6 @@
 # Production stack for an Easypanel "Compose" service (docs/deploy-easypanel.md, docs/ci-cd.md).
-# - Images come from GHCR, built and pushed by CI from a green main. IMAGE_TAG picks the release
-#   (`latest`, or `sha-<short commit>` to pin or roll back). To build from source instead, add
+# - Images come from GHCR, built and pushed by CI for each release. IMAGE_TAG picks the release
+#   (`latest`, or a version like `0.0.1` to pin or roll back). To build from source instead, add
 #   docker-compose.build.yml: docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
 # - No host ports: Easypanel routes each domain to a service's container port (web -> 3000, cms -> 3001).
 # - No secrets here: every ${VAR} comes from the service's Environment tab (template: .env.deploy.example).

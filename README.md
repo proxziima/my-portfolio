@@ -50,8 +50,9 @@ bun run --cwd apps/web test:e2e
 ## CI/CD
 
 Pull requests and pushes run the affected checks (types, lint, tests with coverage, generated-file drift,
-image builds, e2e, evals) plus CodeQL, dependency review and gitleaks. A green `main` publishes the images to
-GHCR and deploys to Easypanel. See [docs/ci-cd.md](docs/ci-cd.md).
+image builds, e2e, evals) plus CodeQL, dependency review and gitleaks. Releases are cut by release-please: a
+green `main` keeps a release PR open, and merging it tags `v<version>`, publishes the images to GHCR and
+deploys them to Easypanel. See [docs/ci-cd.md](docs/ci-cd.md).
 
 ## The desk and its OS
 

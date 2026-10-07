@@ -9,7 +9,7 @@ Production runs as one Easypanel **Compose** service defined by this repository'
 | `postgres` | `postgres:17-alpine` | 5432 | none (internal) | volume `twin-pg` |
 | `agents` | `my-portfolio-agents` (`apps/agents/Dockerfile`): the portfolio twin (eve), `eve start` | 3000 | none (internal) | none (state is in `postgres`) |
 
-The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload.db`) and the uploads (`/data/media`, `/data/scenes`, `/data/favicons`). The `twin-pg` volume holds the portfolio twin's Postgres database `twin`. That database contains both the twin's own tables (schema `twin`) and eve's durable Workflow runtime (schemas `workflow` and `graphile_worker`). CI builds the three app images from the repository root and publishes them to GHCR (`ghcr.io/proxziima/my-portfolio-{web,cms,agents}`) from a green `main`. Easypanel pulls them; it builds nothing. Every setting is read at runtime, so nothing environment-specific is baked into an image. The pipeline is described in [ci-cd.md](ci-cd.md).
+The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload.db`) and the uploads (`/data/media`, `/data/scenes`, `/data/favicons`). The `twin-pg` volume holds the portfolio twin's Postgres database `twin`. That database contains both the twin's own tables (schema `twin`) and eve's durable Workflow runtime (schemas `workflow` and `graphile_worker`). CI builds the three app images from the repository root and publishes them to GHCR (`ghcr.io/proxziima/my-portfolio-{web,cms,agents}`) for each release. Easypanel pulls them; it builds nothing. Every setting is read at runtime, so nothing environment-specific is baked into an image. The pipeline is described in [ci-cd.md](ci-cd.md).
 
 **`agents` must never get a domain.** It serves eve's Workflow routes (`/.well-known/workflow/v1/*`), which are unauthenticated: anyone who can reach them can forge or replay workflow steps. Only `web` talks to it, over the compose network (`http://agents:3000`). That covers the visitor BFF and the two webhook forwarders `https://<web>/api/twin/hooks/cal` and `https://<web>/api/twin/hooks/photon`. How the twin works: [apps/agents/README.md](../apps/agents/README.md).
 
@@ -21,7 +21,7 @@ The `cms-data` volume holds the CMS's state: the SQLite database (`/data/payload
 ## 1. Create the Compose service
 
 1. In Easypanel, open a project (or create one) and choose **+ Service → Compose**.
-2. **Source**: the Git repository (GitHub, or any Git URL) and the branch `main`: Easypanel reads the compose file from that branch, and the images are the ones CI published from `main`. Keep the build path at the repository root (`/`) and the compose file at `docker-compose.yml`. Easypanel still reads `docker-compose.yml` from the repository, but the app services only have an `image:`, so a deploy pulls the images CI published. Turn **auto-deploy off**: CI triggers the deploy after its checks pass (see [ci-cd.md](ci-cd.md#one-time-setup-repository-owner)).
+2. **Source**: the Git repository (GitHub, or any Git URL) and the branch `main`: Easypanel reads the compose file from that branch, and the images are the ones CI published for a release. Keep the build path at the repository root (`/`) and the compose file at `docker-compose.yml`. Easypanel still reads `docker-compose.yml` from the repository, but the app services only have an `image:`, so a deploy pulls the images CI published. Turn **auto-deploy off**: CI triggers the deploy after its checks pass (see [ci-cd.md](ci-cd.md#one-time-setup-repository-owner)).
 3. Don't deploy yet: set the environment first. The compose file refuses to start while a required variable is empty.
 
 ## 2. Set the environment
@@ -30,7 +30,7 @@ Open the service's **Environment** tab and paste [`.env.deploy.example`](../.env
 
 | Variable | Used by | Value |
 | --- | --- | --- |
-| `IMAGE_REGISTRY`, `IMAGE_TAG` | cms, web, agents | Where the images come from. Keep `ghcr.io/proxziima` and `latest`; set `IMAGE_TAG=sha-<short>` to pin a release or roll back. |
+| `IMAGE_REGISTRY`, `IMAGE_TAG` | cms, web, agents | Where the images come from. Keep `ghcr.io/proxziima` and `latest` (the newest release); set a version like `IMAGE_TAG=0.0.1` to pin a release or roll back. |
 | `WEB_PUBLIC_URL` | cms (`WEB_URL`) | The site's exact origin, e.g. `https://example.com`. It's the CMS's only CORS origin, the target of revalidations and the base of preview links. |
 | `CMS_PUBLIC_URL` | web (`CMS_URL`), cms (`NEXT_PUBLIC_SERVER_URL`) | The CMS's exact origin, e.g. `https://cms.example.com`. The web fetches content from it and builds upload URLs (the Spline scene) that the browser loads from it. |
 | `COOKIE_DOMAIN` | cms | The shared parent domain with a leading dot, e.g. `.example.com`. |
@@ -91,7 +91,7 @@ Both are created on the first deploy and kept across redeploys and rebuilds. Onl
 
 ## 5. First deploy
 
-1. Click **Deploy** (or push to `main` once the deploy trigger is set up). Easypanel pulls the three images from GHCR. The GHCR packages must be public, or Easypanel needs a registry credential ([ci-cd.md](ci-cd.md#one-time-setup-repository-owner)).
+1. Click **Deploy** (or merge the release PR once the deploy trigger is set up). Easypanel pulls the three images from GHCR. The GHCR packages must be public, or Easypanel needs a registry credential ([ci-cd.md](ci-cd.md#one-time-setup-repository-owner)).
 2. `cms` and `postgres` start first. The `cms` healthcheck requests `/api/globals/profile`; that first request starts Payload, which creates the schema by running the committed migrations (`Migrating: …_initial` in the cms logs).
 3. `agents` starts once both are healthy. Before it listens, its command creates the Workflow world's schema (`world:setup`) and applies the twin migrations (`db:migrate`). Both are idempotent and run on every start. Its healthcheck requests `/eve/v1/health`. `web` starts once `cms`, `postgres` and `agents` are healthy.
 4. **Create the admin user right away** at `https://cms.example.com/admin`. Until the first user exists, anyone who opens the admin can create it.
@@ -143,7 +143,7 @@ Retention runs inside `agents`. Every day at 03:00 it purges visitors not seen f
 
 ## Updating
 
-Merge into `main`. CI checks it, publishes the images and triggers the deploy. Easypanel pulls the new images and replaces the containers; the `cms-data` and `twin-pg` volumes stay. On start, `agents` applies any new twin migration. When the new `cms` handles its first request, it runs any migration that isn't in `payload_migrations` yet.
+Merge the release PR ([ci-cd.md](ci-cd.md#releases)). CI tags the release, publishes its images and triggers the deploy. Easypanel pulls the new images and replaces the containers; the `cms-data` and `twin-pg` volumes stay. On start, `agents` applies any new twin migration. When the new `cms` handles its first request, it runs any migration that isn't in `payload_migrations` yet.
 
 **Deploying the companies version** (the first with `companies` and `favicons`): its migration runs on start and carries the experiences' companies over, but it fetches no favicons (migrations have no network). Once it is up, run this once in the `cms` console to fetch them:
 
