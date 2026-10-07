@@ -12,7 +12,7 @@ const requestInit = (): RequestInit => ({
   signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 })
 
-/** Web is live on the expected commit: `/api/health` reports it as `version`. */
+/** Web is live on the expected release version: `/api/health` reports it as `version`. */
 export async function webServes(fetchFn: Fetch, webUrl: string, version: string): Promise<Probe> {
   let res: Response
   try {
@@ -80,7 +80,7 @@ export function normalizeOrigin(url: string): string {
   return url.replace(/\/+$/, '')
 }
 
-/** CI entry (the `deploy` job): exits 1 unless production serves this commit within the time limit. */
+/** CI entry (the `deploy` job): exits 1 unless production serves this release version within the time limit. */
 if (import.meta.main) {
   const web = normalizeOrigin(env('PROD_WEB_URL'))
   const cms = normalizeOrigin(env('PROD_CMS_URL'))

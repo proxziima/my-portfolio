@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "bootstrap-sha": "2a1ed2d33c198f0d0d19ae83dbc5fbfa1d2b53f4",
+  "bootstrap-sha": "d2a2daa1d1e2dd591bf444bcba5f26f9e9713cc0",
   "bump-minor-pre-major": true,
   "include-component-in-tag": false,
   "changelog-sections": [
@@ -17,7 +17,6 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "my-portfolio",
       "changelog-path": "CHANGELOG.md",
       "initial-version": "0.0.1"
     }

@@ -430,7 +430,7 @@ jobs:
   # back to github.token and the release PR is merged through the admin bypass (docs/ci-cd.md).
   release:
     needs: [ci-ok]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ !cancelled() && needs.ci-ok.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -476,6 +476,8 @@ jobs:
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
+          # The checked-out tag's commit, not github.sha, feeds sha-<short> and the OCI revision label.
+          context: git
           images: ghcr.io/${{ github.repository_owner }}/my-portfolio-${{ matrix.service }}
           tags: |
             type=raw,value=${{ needs.release.outputs.version }}

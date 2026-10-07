@@ -43,8 +43,8 @@ restore of the `twin-pg` volume).
 
 The product has one version, in the root `package.json`: web, cms and agents ship together. release-please
 (`release-please-config.json`, `.release-please-manifest.json`) reads the conventional commits that reach `main`
-and decides the next version. The first release is `v0.0.1`; its changelog starts after the PR #1 merge
-(`bootstrap-sha`).
+and decides the next version. The first release is `v0.0.1`; its changelog starts after `bootstrap-sha`, the
+newest `main` commit older than all the work not yet released.
 
 | Commit                                             | Bump below 1.0           |
 | -------------------------------------------------- | ------------------------ |
@@ -62,6 +62,16 @@ and decides the next version. The first release is `v0.0.1`; its changelog start
    `sha-<short>`. The images report the version as `APP_VERSION`, so `/api/health` answers `0.0.1`, and `deploy`
    waits for exactly that.
 5. Merge `main` back into `develop` after each release, so `develop` has the version bump and the changelog.
+
+**Branch flow.** release-please reads the history of `main` by date, like `git log`, and stops at the last
+release. A commit dated before the last release but merged after it is never read. So after promoting
+`develop` into `main`, merge the release PR before new work lands on `develop`, then merge `main` back into
+`develop`. If that order is missed, the code still ships with the next release, but commits made on `develop`
+while a release PR was open can be missing from the changelog and from the version bump.
+
+If `publish` or `deploy` fails, use **Re-run failed jobs**, not **Re-run all jobs**. A full re-run runs
+release-please again, which no longer reports a new release, so `publish` and `deploy` are skipped. Once the
+images are published, a fallback is to set `IMAGE_TAG` to the version in Easypanel and deploy.
 
 Going to 1.0.0 is a deliberate decision: add the footer `Release-As: 1.0.0` to a commit that reaches `main`, e.g.
 `git commit --allow-empty -m "chore: release 1.0.0" -m "Release-As: 1.0.0"`. After 1.0, a breaking change bumps

@@ -27,7 +27,7 @@ The first release is `v0.0.1`.
   | `chore`, `docs`, `test`, `ci`, `build`, `refactor` | no release by themselves |
 
   Going to 1.0.0 is a deliberate owner decision (a `Release-As: 1.0.0` commit footer).
-- **History in the first changelog.** `bootstrap-sha` is the current `origin/main` head (`2a1ed2d`, the PR #1 merge), so the first changelog covers only the work after it: companies and CI/CD.
+- **History in the first changelog.** `bootstrap-sha` is `d2a2daa`, the newest `main` commit that is older (by commit date) than every commit not yet released. release-please walks the branch history in date order, like `git log`, and stops at the bootstrap SHA. The PR #1 merge (`2a1ed2d`) would cut that walk short: companies and CI/CD commits written before it but merged after it would be skipped. The first changelog therefore covers companies, CI/CD and the late PR #1 fixes that were committed after `d2a2daa`. v0.0.1 is the first release, so those fixes belong in it.
 - **Deploy only on a release.** A push to `main` no longer deploys by itself. The order is fixed: `ci-ok` → `release` (release-please) → `publish` (only if a release was created) → `deploy`. Everything stays in `ci.yml`, for two reasons:
   - tags and releases made with the built-in token don't trigger other workflows;
   - a release is only cut from a commit whose gates passed.
