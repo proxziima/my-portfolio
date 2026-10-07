@@ -3,6 +3,7 @@ on:
   push:
     branches: [main, develop]
   pull_request:
+    branches: [main, develop]
   workflow_dispatch:
 
 # One run per ref. A newer push cancels an older pull-request run. On main and develop a running run is
@@ -422,10 +423,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # A green main publishes every image to GHCR: latest, main and sha-<short commit>.
-  publish:
-    needs: [changes, ci-ok]
+  # A green main runs release-please (release-please-config.json): it opens or updates the release PR, and
+  # once that PR is merged it tags v<version>, creates the GitHub Release and tells publish and deploy to run.
+  # A PR opened with GITHUB_TOKEN triggers no workflow, so its ci-ok check would never report and the main
+  # ruleset would block it. RELEASE_PLEASE_TOKEN (a fine-grained PAT) avoids that; without it the job falls
+  # back to github.token and the release PR is merged through the admin bypass (docs/ci-cd.md).
+  release:
+    needs: [ci-ok]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # A new release publishes every image to GHCR: <version>, latest and sha-<short commit>.
+  publish:
+    needs: [changes, release]
+    if: needs.release.outputs.created == 'true'
     name: publish (${{ matrix.service }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -439,6 +465,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.release.outputs.tag }}
           persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -451,8 +478,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/my-portfolio-${{ matrix.service }}
           tags: |
+            type=raw,value=${{ needs.release.outputs.version }}
             type=raw,value=latest
-            type=raw,value=main
             type=sha,prefix=sha-
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -461,13 +488,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: APP_VERSION=${{ github.sha }}
+          build-args: APP_VERSION=${{ needs.release.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  # Easypanel pulls the new images (pull_policy: always), then production must report this commit.
+  # Easypanel pulls the new images (pull_policy: always), then production must report the released version.
   deploy:
-    needs: publish
+    needs: [release, publish]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -487,18 +514,19 @@ jobs:
         name: trigger the Easypanel deploy
         env:
           WEBHOOK: ${{ secrets.EASYPANEL_DEPLOY_WEBHOOK }}
+          VERSION: ${{ needs.release.outputs.version }}
         run: |
           if [ -z "$WEBHOOK" ]; then
-            echo "::notice::EASYPANEL_DEPLOY_WEBHOOK is not set: the images are published, nothing was deployed (docs/ci-cd.md)"
+            echo "::notice::EASYPANEL_DEPLOY_WEBHOOK is not set: the images for $VERSION are published, nothing was deployed (docs/ci-cd.md)"
             echo "deployed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           curl -fsS --retry 3 -X POST "$WEBHOOK" > /dev/null
           echo "deployed=true" >> "$GITHUB_OUTPUT"
-      - name: production serves this commit
+      - name: production serves this release
         if: steps.trigger.outputs.deployed == 'true'
         env:
           PROD_WEB_URL: ${{ vars.PROD_WEB_URL }}
           PROD_CMS_URL: ${{ vars.PROD_CMS_URL }}
-          EXPECTED_VERSION: ${{ github.sha }}
+          EXPECTED_VERSION: ${{ needs.release.outputs.version }}
         run: bun scripts/ci/smoke.ts
