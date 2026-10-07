@@ -2,8 +2,8 @@
   "name": "my-portfolio",
   "version": "0.0.1",
   "devDependencies": {
-    "prettier": "3.9.6",
-    "turbo": "^2.11.5",
+    "prettier": "3.9.9",
+    "turbo": "^2.11.7",
     "typescript": "7.0.2"
   },
   "devEngines": {
