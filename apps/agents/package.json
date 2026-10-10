@@ -40,6 +40,8 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
+    "@opentelemetry/context-async-hooks": "2.11.0",
+    "@opentelemetry/core": "2.11.0",
     "@types/node": "24.x",
     "jose": "6.2.12",
     "typescript": "7.0.2",

@@ -7,6 +7,7 @@ import { classifyMessage, closingContext, countsAsViolation, deflectionContext, 
 import { ensureConversation } from '../lib/conversation'
 import { db } from '../lib/db'
 import { getEnv } from '../lib/env'
+import { traceIdentity } from '../lib/observability/trace-context'
 import { recentTurns } from '../lib/transcript'
 import { visitorAuth } from '../lib/visitor-auth'
 
@@ -73,6 +74,7 @@ export default eveChannel({
       textOf(message),
       await previousExchange(sessionId),
       getEnv().TWIN_ABUSE_TIMEOUT_MS,
+      traceIdentity(auth, sessionId),
     )
     // Deflections are one short line in character, so anything that isn't ok runs on the light tier.
     const modelTier: ModelTier = verdict === 'ok' ? depth : 'light'

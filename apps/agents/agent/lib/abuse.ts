@@ -3,6 +3,8 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { isAbort } from './abort'
 import { classifierModel } from './models'
+import { generationSpan, modelIdOf } from './observability/spans'
+import type { TraceIdentity } from './observability/trace-context'
 
 /** Abuse categories (spec §10). `prompt_attack` is counted, not blocked: boundaries handle it. `off_scope` is civil: never counted, only deflected. */
 export const AbuseVerdict = z.enum(['ok', 'off_scope', 'harassment', 'sexual', 'hate', 'prompt_attack', 'spam'])
@@ -59,22 +61,27 @@ export function gatePrompt(text: string, previous: ReadonlyArray<{ role: 'visito
  * the reply needs. The previous exchange informs depth only. Never throws: a timeout or any other
  * failure yields `ok` on the standard tier (the boundaries skill and the output filter still apply),
  * because eve turns an `onMessage` throw into HTTP 500 for every visitor. Non-timeout failures are logged.
+ * With `trace`, the call is a `twin.gate` generation span in the visitor's conversation.
  */
 export async function classifyMessage(
   text: string,
   previous: ReadonlyArray<{ role: 'visitor' | 'twin'; text: string }>,
   timeoutMs: number,
+  trace?: TraceIdentity,
 ): Promise<GateDecision> {
   const signal = AbortSignal.timeout(timeoutMs)
   try {
-    const { output } = await generateText({
-      model: classifierModel(),
-      instructions: GATE_SYSTEM,
-      prompt: gatePrompt(text, previous),
-      output: Output.object({ schema: GateDecision }),
-      abortSignal: signal,
-      maxRetries: 0, // the timeout decides the fallback
-    })
+    const model = classifierModel()
+    const { output } = await generationSpan('twin.gate', modelIdOf(model), trace, () =>
+      generateText({
+        model,
+        instructions: GATE_SYSTEM,
+        prompt: gatePrompt(text, previous),
+        output: Output.object({ schema: GateDecision }),
+        abortSignal: signal,
+        maxRetries: 0, // the timeout decides the fallback
+      }),
+    )
     return GateDecision.parse(output)
   } catch (error) {
     if (signal.aborted || isAbort(error)) return FALLBACK

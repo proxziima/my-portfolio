@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 type State = { violations: number; ended: boolean; modelTier: string; modelTierAt: string | null }
 
 const mocks = vi.hoisted(() => ({
-  auth: { kind: 'visitor' },
+  auth: { principalType: 'user', principalId: 'web:v-1', authenticator: 'visitor', attributes: { ph_did: 'ph-1', ph_sid: 'replay-1' } },
   classifyMessage: vi.fn(),
   recentTurns: vi.fn(),
   updateConversation: vi.fn(),
@@ -32,6 +32,8 @@ import { closingContext, deflectionContext, offScopeContext } from '../agent/lib
 type OnMessage = (ctx: unknown, message: string) => Promise<{ auth: unknown; context?: string[] }>
 const onMessage = (channel as unknown as { onMessage: OnMessage }).onMessage
 const withSession = { eve: { sessionId: 's1' } }
+/** The trace identity the gate's generation span carries: the visitor's PostHog ids from the JWT. */
+const identity = { distinctId: 'ph-1', conversationId: 's1', replaySessionId: 'replay-1' }
 
 /** The conversation state the channel left behind: each updater applied in turn to the state it was given. */
 let stored: State
@@ -101,7 +103,7 @@ describe('visitor channel gate', () => {
     mocks.classifyMessage.mockResolvedValue({ verdict: 'ok', depth: 'deep' })
     await onMessage(withSession, 'and for RAG?')
     expect(mocks.recentTurns).toHaveBeenCalledWith('s1', 2)
-    expect(mocks.classifyMessage).toHaveBeenCalledWith('and for RAG?', previous, 10)
+    expect(mocks.classifyMessage).toHaveBeenCalledWith('and for RAG?', previous, 10, identity)
   })
 
   it('still classifies, with no context, when the previous exchange cannot be read', async () => {
@@ -109,7 +111,7 @@ describe('visitor channel gate', () => {
     mocks.recentTurns.mockRejectedValue(new Error('db down'))
     mocks.classifyMessage.mockResolvedValue({ verdict: 'ok', depth: 'standard' })
     expect(await onMessage(withSession, 'oi')).toEqual({ auth: mocks.auth })
-    expect(mocks.classifyMessage).toHaveBeenCalledWith('oi', [], 10)
+    expect(mocks.classifyMessage).toHaveBeenCalledWith('oi', [], 10, identity)
     expect(stored.modelTier).toBe('standard')
     spy.mockRestore()
   })

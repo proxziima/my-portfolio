@@ -2,6 +2,7 @@ import { defineHook } from 'eve/hooks'
 import { countTurn, ensureConversation, pruneSettledApprovals } from '../lib/conversation'
 import type { Principal } from '../lib/identity'
 import { evaluateCallIntent } from '../lib/intent/evaluate'
+import { traceIdentity } from '../lib/observability/trace-context'
 import { recordMessage } from '../lib/transcript'
 
 /**
@@ -38,7 +39,8 @@ export default defineHook({
       if (event.data.finishReason === 'tool-calls') return
       try {
         await recordMessage(ctx.session.id, 'twin', event.data.turnId, event.data.sequence, event.data.message)
-        await evaluateCallIntent(ctx.session.id, event.data.turnId, event.data.sequence)
+        const principal = ctx.session.auth.current as Principal | null
+        await evaluateCallIntent(ctx.session.id, event.data.turnId, event.data.sequence, traceIdentity(principal, ctx.session.id))
       } catch (err) {
         console.error(`[conversation] message.completed bookkeeping failed for session ${ctx.session.id}`, err)
         throw err
