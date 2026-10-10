@@ -10,6 +10,8 @@ const nextConfig = {
   transpilePackages: ['@repo/twin', '@repo/observability'],
   // PostHog's API paths end in a slash (`/e/`); a redirect would drop the POST body.
   skipTrailingSlashRedirect: true,
+  // Two root layouts: unmatched URLs render `app/global-not-found.tsx` (still experimental in this Next).
+  experimental: { globalNotFound: true },
 }
 
 export default nextConfig

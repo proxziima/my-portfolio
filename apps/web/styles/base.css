@@ -150,17 +150,30 @@ h2 {
 }
 
 /* footer */
+/* a sibling after <main> (a landmark of its own), so it re-creates main's column and trailing space */
+main:has(+ .site-footer) {
+  padding-bottom: var(--section-gap);
+}
+
 .site-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 6px 20px;
-  margin-top: var(--section-gap);
+  max-width: calc(var(--column) + 2 * var(--gutter));
+  margin: 0 auto 108px;
+  padding-inline: var(--gutter);
   padding-bottom: 64px;
   font-size: 12.5px;
   color: var(--ink-soft);
   transition: var(--theme-transition);
+}
+
+@media (max-width: 640px) {
+  .site-footer {
+    margin-bottom: 72px;
+  }
 }
 
 .site-footer nav {

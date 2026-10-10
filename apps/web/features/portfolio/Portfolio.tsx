@@ -35,8 +35,8 @@ export function Portfolio({ data }: { data: PortfolioData }) {
           <EntryList id="work" title={settings.sectionLabels.work} entries={data.work} />
           <EntryList id="projects" title={settings.sectionLabels.projects} entries={data.projects} />
           <EntryList id="content" title={settings.sectionLabels.content} entries={data.content} />
-          <FooterNav items={data.nav} name={data.profile.name} />
         </main>
+        <FooterNav items={data.nav} name={data.profile.name} />
         <CuriousOverlay pageNotes={settings.pageNotes} />
       </CuriousProvider>
     </RoleProvider>
