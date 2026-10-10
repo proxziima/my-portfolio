@@ -6,7 +6,7 @@
 
 **Architecture:**
 - **Phase 1** fixes the font-fallback reflow that causes CLS, inlines the small CSS, and makes hashed media immutable. It moves every desk and theme asset behind a committed, re-runnable pipeline: sharp, gltf-transform with meshopt, and ffmpeg with a parity-gated CRF search. The pipeline writes hashed files to `public/assets/` and a generated TS manifest.
-- **Phase 2** powers the monitor's `/os` iframe on visitor intent through a pure state machine. It turns the letter's root into a Server Component with client islands, loads posthog-js lazily, and code-splits the OS apps.
+- **Phase 2** boots the monitor's `/os` iframe on approach (pointer entering the figure, keyboard focus, on touch the monitor half in view) through a pure state machine. It turns the letter's root into a Server Component with client islands, loads posthog-js lazily, and code-splits the OS apps.
 - **Phase 3** moves the desk's WebGL rendering into a worker (OffscreenCanvas). The camera rig and CSS3D stay on the main thread, and worker frames come back as ImageBitmaps applied in the same task as the matching CSS3D transform. A main-thread host with the same scene code is the fallback. Lighthouse CI budgets and PostHog web-vitals alerts close the loop.
 
 **Tech Stack:** Next.js 16.3.4 (App Router, Turbopack, `experimental.inlineCss`), React 19.2, three 0.186 (WebGLRenderer, CSS3DRenderer, GLTFLoader, ImageBitmapLoader, MeshoptDecoder), sharp 0.35.5, @gltf-transform/core|functions|extensions 4.5.1, meshoptimizer 1.3.0, ffmpeg ≥ 7 (system, with libsvtav1, libvpx-vp9, libx264, libvmaf), @capsizecss/metrics 4.3.0, fontkit 2.0.4, wawoff2 2.0.1, pixelmatch 8.0.0, pngjs 7.0.0, Lighthouse 13.5.0, @lhci/cli 0.15.1, @posthog/cli 0.18.10 (bunx, pinned), vitest 5, Playwright 1.63, bun 1.3.10.
@@ -494,7 +494,12 @@ In `app/globals.css`, add `@import '../styles/font-fallbacks.css';` before `toke
 Run: `bunx next build` (from `apps/web`), start it on 3100, then `bun run fonts:fallbacks`, then rebuild and restart, then `$env:PORT='3100'; bunx playwright test tests/e2e/font-fallback.spec.ts`.
 Expected: PASS at 390, 768 and 1440.
 
-**If it still fails after tuning** (some role and width keeps a line difference), apply the spec's escalation (§4.1 item 4): `display: 'optional'` for Inter only. Re-run the gate with the fallback-blocked half skipped for `optional` (the swap never happens, so there is nothing to compare), and record the failing cases from the tuned run in the PR.
+**If it still fails after tuning** (some role and width keeps a line difference): **STOP. Do not change `display`, and do not apply `display: 'optional'` or any other loading strategy.** Report to the owner (spec §4.1 item 4) and wait for the decision before continuing Task 1.1. The report contains:
+- the failing cases: role, width, the fallback face in use, the paragraph or `h1`, and its height/line count in each face;
+- the residual shift: `node scripts/perf/layout-shifts.ts --cpu 6 --runs 3` at 1350×940 and at `--width 412 --height 823`, against the local production build with the tuned fallbacks;
+- the corrections the generator tried and the best maximum line-width error it reached.
+
+Tasks 1.2 onwards do not depend on this one and may continue meanwhile. Commit the generator and fallbacks only once the gate passes or the owner has decided.
 
 - [ ] **Step 9: Verify CLS with the recorder**
 
@@ -1249,9 +1254,15 @@ git commit -m "chore(web): serve only pipeline outputs; check asset drift in CI"
 
 ---
 
-## Phase 2: power on with intent, smaller client tree, lighter bundles
+## Phase 2: boot on approach, smaller client tree, lighter bundles
 
-### Task 2.1: The power state machine and the intent watcher
+### Task 2.1: The power state machine and the approach watcher
+
+Owner decision, "boot on approach":
+- pointer devices boot when the pointer enters the figure area or keyboard focus reaches the screen;
+- touch devices boot when the monitor is ≥ 50 % in view (IntersectionObserver), with no tap and no dwell. The screen must never sit dark while a mobile visitor is looking at it;
+- full screen also boots;
+- the powered-off CRT shows only until one of these fires.
 
 **Files:** Create `apps/web/features/desk/power.ts`, `apps/web/features/desk/intent.ts`, `apps/web/tests/unit/desk/power.test.ts`, `apps/web/tests/unit/desk/intent.test.ts`
 
@@ -1268,19 +1279,19 @@ describe('reducePower', () => {
   })
   it('ignores repeated intents and an early load', () => {
     expect(reducePower('booting', { type: 'intent', source: 'focus' })).toBe('booting')
-    expect(reducePower('on', { type: 'intent', source: 'tap' })).toBe('on')
+    expect(reducePower('on', { type: 'intent', source: 'visible' })).toBe('on')
     expect(reducePower('off', { type: 'loaded' })).toBe('off')
   })
 })
 ```
 
-- [ ] **Step 2: `intent.test.ts`** (jsdom, fake timers, a stub IntersectionObserver that exposes `trigger(ratio)`):
-  - a mouse `pointerenter` on the box calls `onIntent('pointer')` once, and later events are ignored (fires once);
-  - a touch `pointerenter` does **not** fire `pointer`, and a touch `pointerdown` fires `tap`;
-  - `focusin` on the screen fires `focus`;
-  - with `coarse = true`, ratio 0.7 held for 800 ms fires `dwell`, and ratio 0.7 then 0.3 before 800 ms does not;
-  - with `coarse = false`, no IntersectionObserver is created;
-  - cleanup removes the listeners, disconnects the observer and clears the timer.
+- [ ] **Step 2: `intent.test.ts`** (jsdom, a stub IntersectionObserver that records its `threshold` option and exposes `trigger(ratio)`):
+  - pointer mode (`touch = false`): a mouse or pen `pointerenter` on the box calls `onApproach('pointer')` once; later events are ignored (fires once).
+  - pointer mode: no IntersectionObserver is created.
+  - `focusin` on the screen fires `focus` in both modes.
+  - touch mode (`touch = true`): the observer is created on the box with a threshold including `0.5`. `trigger(0.5)` fires `visible` **immediately** (no timer). `trigger(0.49)` does not fire, and a later `trigger(0.6)` does.
+  - touch mode: a touch `pointerenter` or `pointerdown` fires nothing (there is no tap trigger).
+  - cleanup removes the listeners and disconnects the observer. After firing, the watcher has already cleaned up.
 
   Dispatch events with `new Event('pointerenter')` plus `Object.defineProperty(e, 'pointerType', { value: 'mouse' })`; jsdom has no PointerEvent constructor.
 
@@ -1291,53 +1302,46 @@ describe('reducePower', () => {
 ```ts
 import type { IntentSource } from './power'
 
-const DWELL_MS = 800
-const DWELL_RATIO = 0.6
+/** On touch, the monitor counts as approached once this much of the figure box is in view. */
+export const VISIBLE_RATIO = 0.5
 
 /**
- * Calls `onIntent` once, on the first sign the visitor means to use the monitor: a mouse or pen
- * entering the figure box (well before it reaches the screen, so the OS boots during the approach),
- * keyboard focus on the screen, a tap, or (touch devices, which have no hover) the box held mostly
- * in view for a moment. Returns the cleanup.
+ * Calls `onApproach` once, as the visitor approaches the monitor. With a pointer: the mouse or pen
+ * entering the figure box (well before it reaches the screen, so the OS boots during the approach
+ * and not during the zoom). On touch, which has no hover: the monitor half in view, at once, so the
+ * screen never sits dark while it is being looked at. Keyboard focus on the screen counts in both
+ * modes. Returns the cleanup.
  */
-export function watchIntent(box: HTMLElement, screen: HTMLElement, coarse: boolean, onIntent: (source: IntentSource) => void): () => void {
+export function watchApproach(box: HTMLElement, screen: HTMLElement, touch: boolean, onApproach: (source: IntentSource) => void): () => void {
   let done = false
-  let timer: ReturnType<typeof setTimeout> | undefined
   let io: IntersectionObserver | null = null
   const fire = (source: IntentSource) => {
     if (done) return
     done = true
     cleanup()
-    onIntent(source)
+    onApproach(source)
   }
   const onEnter = (e: Event) => {
     const type = (e as PointerEvent).pointerType
     if (type === 'mouse' || type === 'pen') fire('pointer')
   }
-  const onDown = (e: Event) => {
-    if ((e as PointerEvent).pointerType === 'touch') fire('tap')
-  }
   const onFocus = () => fire('focus')
-  box.addEventListener('pointerenter', onEnter)
-  box.addEventListener('pointerdown', onDown)
   screen.addEventListener('focusin', onFocus)
-  if (coarse) {
+  if (touch) {
     io = new IntersectionObserver(
       (entries) => {
-        const visible = (entries.at(-1)?.intersectionRatio ?? 0) >= DWELL_RATIO
-        clearTimeout(timer)
-        if (visible) timer = setTimeout(() => fire('dwell'), DWELL_MS)
+        if (entries.some((e) => e.intersectionRatio >= VISIBLE_RATIO)) fire('visible')
       },
-      { threshold: [0, DWELL_RATIO, 1] },
+      { threshold: [VISIBLE_RATIO] },
     )
     io.observe(box)
+  } else {
+    box.addEventListener('pointerenter', onEnter)
   }
   function cleanup() {
     box.removeEventListener('pointerenter', onEnter)
-    box.removeEventListener('pointerdown', onDown)
     screen.removeEventListener('focusin', onFocus)
     io?.disconnect()
-    clearTimeout(timer)
   }
   return cleanup
 }
@@ -1349,7 +1353,7 @@ export function watchIntent(box: HTMLElement, screen: HTMLElement, coarse: boole
 git add apps/web/features/desk/power.ts apps/web/features/desk/intent.ts apps/web/tests/unit/desk/power.test.ts apps/web/tests/unit/desk/intent.test.ts
 ```
 ```bash
-git commit -m "feat(web): power state machine and intent watcher for the monitor"
+git commit -m "feat(web): power state machine and boot-on-approach watcher for the monitor"
 ```
 
 ### Task 2.2: The powered-off screen and `powerOn()`
@@ -1390,7 +1394,7 @@ git commit -m "feat(web): power state machine and intent watcher for the monitor
 
 - [ ] **Step 2: Implement.**
   - `DeskScene` props: `{ onFail, onReady, muted, fullscreen, onPower }`.
-  - In the mount effect, after the engine exists, it runs: `const coarse = matchMedia('(hover: none)').matches`, `const box = host.parentElement!` (the figure box), and `const stop = watchIntent(box, engine.screen.element, coarse, (source) => dispatch({ type: 'intent', source }))`. It uses `useReducer(reducePower, 'off')`.
+  - In the mount effect, after the engine exists, it runs: `const touch = matchMedia('(hover: none)').matches`, `const box = host.parentElement!` (the figure box), and `const stop = watchApproach(box, engine.screen.element, touch, (source) => dispatch({ type: 'intent', source }))`. It uses `useReducer(reducePower, 'off')`.
   - An effect on `power === 'booting'` calls `engine.screen.powerOn()` and `onPower('booting')`.
   - `engine.screen.onLoaded(() => dispatch({ type: 'loaded' }))`, and an effect on `power === 'on'` calls `onPower('on')`.
   - An effect on `fullscreen` dispatches `{ type: 'intent', source: 'fullscreen' }`.
@@ -1399,10 +1403,13 @@ git commit -m "feat(web): power state machine and intent watcher for the monitor
   - `use-fullscreen.ts`: signature `useFullscreen(ref, rebind?: unknown)`, with `rebind` added to the effect's deps.
 
 - [ ] **Step 3: e2e updates.** In `figure.spec.ts` "the monitor shows the OS…":
-  - Before scrolling: `await expect(scene.locator('iframe')).toHaveCount(0)` once `data-loaded` is true (the scene draws with the screen powered off).
+  - Pointer (desktop Chrome project): once `data-loaded` is true and the pointer has not entered the box, assert `await expect(scene.locator('iframe')).toHaveCount(0)` (the powered-off CRT).
   - Then `await page.locator('[data-anchor="figure-box"]').hover()`, and the existing assertions follow (iframe attached, `data-ready`, a playing video).
+  - Add "the pointer entering the figure area boots the OS before it reaches the screen": hover the box at `{ x: 5, y: 5 }` (a corner, off the screen) and expect the iframe attached.
   - Add a test "keyboard reaches the OS through the powered-off screen": Tab until `[aria-label="Desktop (powered off)"]` is focused (use `page.keyboard.press('Tab')` in a loop, at most 20), then expect the iframe `title="Desktop"` to become `document.activeElement` within 20 s.
-  - Add a touch test (`test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })`): scroll the figure fully into view, wait 1 s, and expect the iframe attached (dwell).
+  - Add a touch describe (`test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })`) with two tests:
+    - "the monitor boots as it scrolls into view": after `openPortfolio`, if the figure box is under 50 % visible, assert no iframe. Then `scrollIntoViewIfNeeded()` on the figure box and expect the iframe attached **within 2 s, with no tap**. Then expect `.screen-fx` `data-ready="true"` (the desktop and static show while it is on screen).
+    - "the screen is never dark while in view": scroll the figure box into view and, polling every 100 ms for 2 s, record whether an iframe exists while the box's visible ratio is ≥ 0.5 (computed in the page from `getBoundingClientRect` and `innerHeight`). Expect the first in-view sample without an iframe to be followed by one within 300 ms, the IntersectionObserver delivery delay.
 
   In `desk-parity.spec.ts` `ready()`, the hover on the box already powers the screen on. No change, but confirm.
 
@@ -1418,21 +1425,21 @@ git commit -m "feat(web): power state machine and intent watcher for the monitor
 git add apps/web/features/desk apps/web/features/figure apps/web/lib/dom/use-fullscreen.ts apps/web/tests
 ```
 ```bash
-git commit -m "perf(web): the monitor's OS powers on with intent instead of booting during load"
+git commit -m "perf(web): the monitor's OS boots on approach instead of during load"
 ```
 
 ### Task 2.4: Tracking plan for the new boot timing
 
 **Files:** Modify `docs/observability-tracking-plan.md`
 
-- [ ] **Step 1:** In `#### os_boot`, Notes: add "Inside the desk monitor the iframe mounts on intent (a mouse entering the figure, focus on the screen, a tap, a touch visitor dwelling on the figure, or full screen), so the embedded `os_boot` starts then, not during the page load." Update the line references (`Desktop.tsx` is unchanged). In the verification table row for `experience_ready`, change "(and an embedded one from the monitor)" to "(and an embedded one after hovering the desk)".
+- [ ] **Step 1:** In `#### os_boot`, Notes: add "Inside the desk monitor the iframe mounts on approach (a mouse entering the figure, keyboard focus on the screen, on touch the monitor scrolling half into view, or full screen), so the embedded `os_boot` starts then, not necessarily during the page load." Update the line references (`Desktop.tsx` is unchanged). In the verification table row for `experience_ready`, change "(and an embedded one from the monitor)" to "(and an embedded one after hovering the desk)".
 - [ ] **Step 2: Commit**
 
 ```bash
 git add docs/observability-tracking-plan.md
 ```
 ```bash
-git commit -m "docs: embedded os_boot starts on intent"
+git commit -m "docs: embedded os_boot starts on approach"
 ```
 
 ### Task 2.5: posthog-js loads lazily, events queue until it does
@@ -2068,5 +2075,5 @@ The owner creates the insights and alerts in PostHog; this plan does not change 
 - [ ] `bun run --cwd apps/web test:parity` (production build): all pass, worker and main
 - [ ] `bun run --cwd apps/web assets:check`: exit 0
 - [ ] `node scripts/perf/chunks.ts`: exit 0
-- [ ] Real-browser check on localhost, fresh profile and returning visitor (role, muted and theme in storage): letter, theme switch and blowout, role picker and bio morph, curious mode, desk hover zoom, OS power-on and boot, CRT static, full screen and Escape, keyboard path into the OS, touch dwell (device emulation), reduced motion (no static video, no jitter)
+- [ ] Real-browser check on localhost, fresh profile and returning visitor (role, muted and theme in storage): letter, theme switch and blowout, role picker and bio morph, curious mode, desk hover zoom, OS power-on and boot, CRT static, full screen and Escape, keyboard path into the OS, touch boot on scroll-into-view with no dark screen while visible (device emulation), reduced motion (no static video, no jitter)
 - [ ] Lighthouse: final calibrated and devtools runs compared with the baseline, pasted in the PR; production PSI after deploy

@@ -108,7 +108,7 @@ stays the ground truth, and every phase ends with a PSI run on production (§10)
 | (4) "meshopt/Draco" | Meshopt with 16-bit quantization (dedup, prune, weld, quantize, meshopt): computer 113→45 KB, decor 85→40 KB, environment 95→36 KB (−59 %). The Meshopt decoder is a few KB of JS with embedded WASM and works in workers. Draco's decoder is about 300 KB of WASM to save a few KB more on tiny meshes. | Meshopt only. |
 | (6) "Server Components + islands" | Hydration is where the framework chunk's 538 ms goes, so a smaller client tree pays off directly. The *bundle* saving is small, though: the bulk of unused JS is posthog and three. | Keep (6). Add **posthog-js lazy loading** and **OS app code-splitting** (Messenger, Conversation, Credits, DOS player), which remove about 100 KB from the letter's critical path and most of the 914 KB from the iframe's boot (§6). |
 | (1) "three.js in a worker via OffscreenCanvas … input/resize/visibility forwarding" | The monitor's screen is a **CSS3D DOM layer (the iframe) composited under the WebGL canvas**, kept aligned by sharing one camera. With `transferControlToOffscreen`, the worker's canvas commits on its own schedule, so during the 2 s camera zoom the GL bezels and occluder hole would drift a frame behind the DOM screen and show a light sliver at the screen edge. | The camera rig and CSS3D stay on the main thread (cheap). The worker renders into its own `OffscreenCanvas` and sends `transferToImageBitmap()` frames back. The main thread applies each bitmap (`bitmaprenderer`, zero-copy) **in the same task** as the CSS3D transform for that frame's camera, so the two layers never drift. Pointer input never needs forwarding because the rig is on the main thread (§8). |
-| (2) "boot on intent" | The iframe has keyboard (Tab focuses it and zooms the camera) and touch roles that hover alone does not cover. `useFullscreen` binds Escape inside the iframe only when full screen is entered, so an iframe mounted later is missed. | An explicit power state machine with fine-pointer, keyboard, touch and full-screen intents, a focusable powered-off screen that hands focus to the iframe, and a rebind key for the full-screen Escape listener (§7). |
+| (2) "boot on intent" (owner refined it to "boot on approach") | The iframe has keyboard (Tab focuses it and zooms the camera) and touch roles that hover alone does not cover. `useFullscreen` binds Escape inside the iframe only when full screen is entered, so an iframe mounted later is missed. | An explicit power state machine. Triggers: pointer entering the figure, keyboard focus, the monitor ≥ 50 % in view on touch, and full screen. A focusable powered-off screen hands focus to the iframe, and the full-screen Escape listener gets a rebind key (§7). |
 
 ## 3. Goals and non-goals
 
@@ -156,13 +156,17 @@ order, each gated by measurement:
    It runs in CI's Chromium on Linux (fallback: Arial, i.e. Liberation Sans, which is metric-identical)
    and locally on Windows (Segoe UI). This test reproduces today's bug: it fails on `main` at 1440
    for the default role.
-4. **Escalation, decided by the gate and not by preference:** if the per-platform fallbacks cannot
-   pass the gate for all roles and widths, the body face switches to `display: 'optional'`. With
-   the preload it is used whenever it arrives within the first ~100 ms, which covers repeat visits
-   and fast first visits. Otherwise that page view keeps the matched fallback, never swaps, and
-   never shifts. This is recorded in the PR with the failing cases. (It is the only remaining
-   at-the-source option: inlining 75 KB of font into every HTML response would cost more than it
-   saves, and reserving space would change the spacing.)
+4. **If the gate fails, stop (owner decision):** the font loading strategy never changes
+   automatically. `display: 'optional'` is **not** applied. If the tuned per-platform fallbacks
+   still fail the gate for some role and width, the implementer stops and reports:
+   - the failing cases (role, width, platform fallback, paragraph, line count in each face);
+   - the measured residual shift: `layout-shifts.ts` CLS at 1350×940 and 412×823, against the
+     production local build;
+   - the corrections tried.
+
+   The owner then decides between the options, each with its cost: `display: 'optional'` (first
+   slow visits keep the fallback), inlining the font (about 75 KB more in every HTML response),
+   reserving space (spacing changes), or accepting the residual shift.
 5. **The figure stays a fixed-ratio box** (already true). Its caption row gets `min-height` of one
    line, so a caption swap between roles never moves the sections below. That is a role-change
    shift, not load CLS, but it is the same class of bug.
@@ -243,7 +247,7 @@ Visual parity is required, so every encode is chosen by a measured gate, not by 
   metrics punish whatever the encoder, so the composited gate and the statistics are the binding
   criteria for it. Expected delivery: about 0.4 to 0.8 MB AV1, against 7.37 MB.
 - **Fetch only when visible.** The CRT layers are invisible until the OS shows its desktop
-  (`data-ready`), and with §7 the desktop exists only after intent. The `<source>` elements are
+  (`data-ready`), and with §7 the desktop exists only after the approach trigger. The `<source>` elements are
   attached the first time the layers turn ready, with `preload="auto"` from then on.
   `play`/`pause` keep following the figure's visibility as today.
 - **Human review gate:** an A/B page (`scripts/assets/parity/review.html`, local only) plays source
@@ -375,13 +379,18 @@ Turbopack writes `.next/diagnostics`. Instead, the plan's checkpoint lists chunk
 that the letter's initial JS contains neither `posthog-js` nor `three`, and that the `/os` boot chunk
 does not contain `eve/react`.
 
-## 7. Phase 2a: the monitor powers on with intent (2)
+## 7. Phase 2a: the monitor boots on approach (2)
+
+Owner decision: "boot on approach". With a pointer or keyboard, the OS boots when the pointer
+enters the desk/figure area or keyboard focus reaches it. On touch devices it boots when the
+monitor scrolls into view. The powered-off CRT shows only until that trigger, and **on mobile the
+screen must never sit dark while the visitor is looking at it**.
 
 ### 7.1 State machine (`features/desk/power.ts`, pure)
 
 ```ts
 export type Power = 'off' | 'booting' | 'on'
-export type IntentSource = 'pointer' | 'focus' | 'tap' | 'dwell' | 'fullscreen'
+export type IntentSource = 'pointer' | 'focus' | 'visible' | 'fullscreen'
 export type PowerEvent = { type: 'intent'; source: IntentSource } | { type: 'loaded' }
 
 export function reducePower(state: Power, event: PowerEvent): Power {
@@ -396,15 +405,19 @@ export function reducePower(state: Power, event: PowerEvent): Power {
 
 There is no transition back to `off`: once powered, the OS stays, as today.
 
-### 7.2 Intents (`features/desk/intent.ts`, `watchIntent(box, screen, onIntent)` → cleanup; fires once)
+### 7.2 Approach triggers (`features/desk/intent.ts`, `watchApproach(box, screen, touch, onApproach)` → cleanup; fires once)
 
-| Source | Signal | Why |
-|---|---|---|
-| `pointer` | `pointerenter` on the figure box with `pointerType` `mouse` or `pen` | The pointer heading to the monitor. It fires well before the pointer reaches the screen, so the OS hydrates during the approach and not during the zoom. |
-| `focus` | `focusin` on the screen element | Tab reaches the powered-off screen, which is the iframe's old tab stop |
-| `tap` | `pointerdown` with `pointerType: 'touch'` on the box | A touch visitor reaching for it |
-| `dwell` | coarse pointer only (`matchMedia('(hover: none)')`): the box ≥ 60 % visible for 800 ms continuously (IntersectionObserver + timer, reset when it leaves) | On touch there is no hover. A visitor who stops with the monitor in view is looking at it. This is a real attention signal, not a load-window dodge: it does not fire at load unless the visitor is actually looking at the figure. |
-| `fullscreen` | `Figure`'s Full screen button | Full screen exists to use the OS |
+`touch` is `matchMedia('(hover: none)').matches`, read once when the scene mounts.
+
+| Source | Mode | Signal | Why |
+|---|---|---|---|
+| `pointer` | pointer devices | `pointerenter` on the figure box with `pointerType` `mouse` or `pen` | The pointer approaching the monitor. It fires well before the pointer reaches the screen, so the OS hydrates during the approach and not during the zoom. |
+| `focus` | all | `focusin` on the screen element | Tab reaches the powered-off screen, which is the iframe's old tab stop |
+| `visible` | touch only | IntersectionObserver on the figure box: `intersectionRatio ≥ 0.5`, at once, with no dwell timer | Touch has no hover. The monitor in view means it is being looked at, so it must not stay dark. It fires at load if the figure is already half visible (a short phone viewport scrolled to it, or a reload part-way down), which is correct: the visitor is looking at it. |
+| `fullscreen` | all | `Figure`'s Full screen button | Full screen exists to use the OS |
+
+There is no tap trigger: on touch, `visible` has always fired before a tap on the monitor is
+possible.
 
 ### 7.3 Powered-off screen
 
@@ -429,12 +442,12 @@ call `iframe.focus()`**, so a keyboard visitor lands in the OS at the same tab p
   `useFullscreen(box, power)`. The Escape listener inside the iframe is then installed when the
   iframe exists, whichever came first.
 - Touch: the iframe keeps `pointer-events: none` under `(hover: none)`. The screen remains a
-  picture that now powers on from a tap or a dwell.
+  picture, and it boots as the monitor scrolls half into view.
 
 ### 7.5 Analytics semantics
 
 - `os_boot` (embedded): it still starts when `Desktop` first renders and ends at the desktop. Inside
-  the monitor that is now after intent, so the event no longer competes with the page load, and its
+  the monitor that is now after the approach trigger, so the event no longer competes with the page load, and its
   `ms` is more honest. The tracking plan's notes are updated.
 - `os_engaged` (embedded): unchanged.
 - No new event.
@@ -564,8 +577,9 @@ load failure maps to the same `load_error`. A lost context (new: today it is not
 | Risk | Mitigation |
 |---|---|
 | Worker host's ImageBitmap path changes alpha compositing (premultiplied canvas → bitmap → bitmaprenderer) and the occluder hole looks different | The occluder writes `(0,0,0,0)`, which is identical premultiplied or not. Parity shots of the monitor pose (§9) are the gate. The main host is the fallback switch (`?deskHost=main` for debugging). |
-| OS hydration during the camera zoom janks the zoom (main thread) | The `pointer` intent fires on entering the figure box, well before the screen. The OS boot chunk shrinks (§6.2). In the worker host GL rendering is off-thread, and both layers stall together, never misaligned. |
-| Touch visitors see a dark screen until tap or dwell | Deliberate (intent). `dwell` covers the visitor who stops to look. |
+| OS hydration during the camera zoom janks the zoom (main thread) | The `pointer` trigger fires on entering the figure box, well before the screen. The OS boot chunk shrinks (§6.2). In the worker host GL rendering is off-thread, and both layers stall together, never misaligned. |
+| On touch, the OS boots as the monitor scrolls into view. It can boot during load if the figure is already half visible (a short viewport or a mid-page reload), and its hydration then competes with the page | That is by design (owner: the screen never sits dark while being looked at). The boot chunk is smaller after §6.2, and Lighthouse's mobile viewport does not have the figure half in view at load. Desktop/pointer visitors who never approach the desk see the powered-off CRT. |
+| The font fallback gate cannot be met by tuning | The implementer stops and reports the residual shift for an owner decision. No automatic `display: 'optional'` (§4.1). |
 | AV1 decode cost on low-end devices | `<source>` order lets a device without AV1 hardware choose VP9 or H.264 (Chrome uses dav1d in software; at 640×480 that is light). The parity gate is per codec. |
 | `inlineCss` is experimental | Isolated in Task 1.3 with a before/after HTML check; reverting it is one line. |
 | Encoder differences between machines | Outputs are committed; `manifest.lock.json` records tool versions; `assets:check` guards drift. |
@@ -577,8 +591,11 @@ load failure maps to the same `load_error`. A lost context (new: today it is not
 - CSS/canvas noise instead of the videos (rejected by the owner).
 - KTX2/Basis textures (13× the download for UASTC; ETC1S fails parity), see §2.
 - Draco (larger decoder for tiny meshes).
-- `font-display: optional` as the first resort: it removes the shift, but first-time visitors on slow
-  links keep the fallback face. It is kept only as the measured escalation in §4.1.
+- `font-display: optional`, automatically or as a first resort: it removes the shift, but first-time
+  visitors on slow links keep the fallback face. It is only one of the options the owner may choose
+  if the gate fails (§4.1).
+- Tap or dwell triggers on touch (the owner's decision: boot as the monitor scrolls into view, so
+  it never sits dark while seen).
 - `font-display: block`: invisible text for up to 3 s, which hurts FCP and LCP.
 - `transferControlToOffscreen` (layer drift during the zoom, §2).
 - Running the rig in the worker and sending poses back (the same drift, the other way round).
