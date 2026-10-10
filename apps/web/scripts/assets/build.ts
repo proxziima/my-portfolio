@@ -15,6 +15,7 @@ import { sha256 } from './hash.ts'
 import { checkLock, LOCK_FILE, outputFile, recipeHash, writeManifest, type Lock } from './manifest.ts'
 import { RECIPES, SOURCE_DIR, type Recipe } from './recipes.ts'
 import { copyStage } from './stages/copy.ts'
+import { imageStage } from './stages/image.ts'
 import type { StageResult } from './stages/stage.ts'
 
 type Stage = (recipe: Recipe, bytes: Uint8Array) => Promise<StageResult>
@@ -22,6 +23,7 @@ type Stage = (recipe: Recipe, bytes: Uint8Array) => Promise<StageResult>
 /** Kinds without a stage yet fail loudly when asked for, rather than writing nothing. */
 const STAGES: Partial<Record<Recipe['kind'], Stage>> = {
   copy: async (recipe, bytes) => copyStage(recipe.source, bytes),
+  image: (recipe, bytes) => imageStage(recipe as Extract<Recipe, { kind: 'image' }>, bytes),
 }
 
 const { values } = parseArgs({

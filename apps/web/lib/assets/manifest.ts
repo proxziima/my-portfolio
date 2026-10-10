@@ -3,6 +3,44 @@ export type { ImageAsset, ImageVariant, TextureAsset, VideoAsset, VideoSource } 
 
 export const ASSETS = {
   desk: {
+    screen: {
+      smudges: {
+        width: 2048,
+        height: 1638,
+        variants: [
+          {
+            src: '/assets/desk/screen/smudges.2048w.b41fd36564.avif',
+            width: 2048,
+            height: 1638,
+            type: 'image/avif',
+          },
+          {
+            src: '/assets/desk/screen/smudges.2048w.40a193b510.jpg',
+            width: 2048,
+            height: 1638,
+            type: 'image/jpeg',
+          },
+        ],
+      },
+      shadow: {
+        width: 845,
+        height: 676,
+        variants: [
+          {
+            src: '/assets/desk/screen/shadow.77c0f24850.avif',
+            width: 845,
+            height: 676,
+            type: 'image/avif',
+          },
+          {
+            src: '/assets/desk/screen/shadow.98e5a41003.webp',
+            width: 845,
+            height: 676,
+            type: 'image/webp',
+          },
+        ],
+      },
+    },
     audio: {
       key1: '/assets/desk/audio/key-1.4a413b3a0d.mp3',
       key2: '/assets/desk/audio/key-2.d8663f1577.mp3',
@@ -13,6 +51,104 @@ export const ASSETS = {
       mouseDown: '/assets/desk/audio/mouse-down.454c75d237.mp3',
       mouseUp: '/assets/desk/audio/mouse-up.e06dd429c5.mp3',
       office: '/assets/desk/audio/office.fffe9677c5.mp3',
+    },
+  },
+  theme: {
+    rockerOn: {
+      width: 530,
+      height: 700,
+      variants: [
+        {
+          src: '/assets/theme-switch/rocker-on.64w.20cad66760.avif',
+          width: 64,
+          height: 85,
+          type: 'image/avif',
+        },
+        {
+          src: '/assets/theme-switch/rocker-on.128w.c6828d4352.avif',
+          width: 128,
+          height: 169,
+          type: 'image/avif',
+        },
+        {
+          src: '/assets/theme-switch/rocker-on.192w.b649078040.avif',
+          width: 192,
+          height: 254,
+          type: 'image/avif',
+        },
+        {
+          src: '/assets/theme-switch/rocker-on.64w.be5cf97abd.webp',
+          width: 64,
+          height: 85,
+          type: 'image/webp',
+        },
+        {
+          src: '/assets/theme-switch/rocker-on.128w.9223fdf87d.webp',
+          width: 128,
+          height: 169,
+          type: 'image/webp',
+        },
+        {
+          src: '/assets/theme-switch/rocker-on.192w.0127526d1d.webp',
+          width: 192,
+          height: 254,
+          type: 'image/webp',
+        },
+      ],
+    },
+    rockerOff: {
+      width: 530,
+      height: 700,
+      variants: [
+        {
+          src: '/assets/theme-switch/rocker-off.64w.f685d018ef.avif',
+          width: 64,
+          height: 85,
+          type: 'image/avif',
+        },
+        {
+          src: '/assets/theme-switch/rocker-off.128w.18de4ddb0b.avif',
+          width: 128,
+          height: 169,
+          type: 'image/avif',
+        },
+        {
+          src: '/assets/theme-switch/rocker-off.192w.ac7a0c1dee.avif',
+          width: 192,
+          height: 254,
+          type: 'image/avif',
+        },
+        {
+          src: '/assets/theme-switch/rocker-off.64w.799936f308.webp',
+          width: 64,
+          height: 85,
+          type: 'image/webp',
+        },
+        {
+          src: '/assets/theme-switch/rocker-off.128w.a2a38285f5.webp',
+          width: 128,
+          height: 169,
+          type: 'image/webp',
+        },
+        {
+          src: '/assets/theme-switch/rocker-off.192w.ef1b4748df.webp',
+          width: 192,
+          height: 254,
+          type: 'image/webp',
+        },
+      ],
+    },
+    rockerAtlas: {
+      width: 1060,
+      height: 1120,
+      variants: [
+        {
+          src: '/assets/theme-switch/rocker-atlas.86d22dc54d.webp',
+          width: 1060,
+          height: 1120,
+          type: 'image/webp',
+        },
+      ],
     },
   },
 } as const

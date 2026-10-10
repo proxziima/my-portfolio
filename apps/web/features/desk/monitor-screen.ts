@@ -1,5 +1,7 @@
 import { DoubleSide, Group, MathUtils, Mesh, MeshBasicMaterial, NoBlending, PlaneGeometry, type Object3D } from 'three'
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js'
+import { ASSETS, type ImageAsset } from '@/lib/assets/manifest'
+import { fallbackSrc, srcset } from '@/lib/assets/srcset'
 import { SCREEN, type Vec3 } from './config'
 
 type ScreenSpec = typeof SCREEN
@@ -45,7 +47,7 @@ export interface MonitorScreen {
   dispose(): void
 }
 
-/** The reference's screen layers (`MonitorScreen.createTextureLayers`), served from `public/`. */
+/** The reference's static videos (`MonitorScreen.createTextureLayers`), served from `public/` until their pipeline stage lands. */
 const LAYER_DIR = '/desk/screen'
 
 /** The OS's desktop root; absent while it shows the boot or shutdown console. */
@@ -111,15 +113,36 @@ function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement): () => void {
   }
 }
 
-/** A still layer: decorative, never dragged or announced. */
-function layerImage(className: string, file: string): HTMLImageElement {
+/** Every still layer spans the fixed 1280 px screen; CSS3D only transforms it, so this is its layout width. */
+const LAYER_SIZES = `${SCREEN.width}px`
+
+/**
+ * A still layer as `<picture>`: AVIF, else the `<img>`'s own candidates, picked by density for the
+ * screen's layout width. Decorative, never dragged or announced. The `<img>` joins the `<picture>`
+ * before it gets a source, so the AVIF `<source>` takes part in the first (and only) pick.
+ */
+function layerPicture(className: string, asset: ImageAsset): HTMLPictureElement {
+  const picture = document.createElement('picture')
+  const avif = srcset(asset, 'avif')
+  if (avif) {
+    const source = document.createElement('source')
+    source.type = 'image/avif'
+    source.srcset = avif
+    source.sizes = LAYER_SIZES
+    picture.append(source)
+  }
   const img = document.createElement('img')
+  picture.append(img)
   img.className = className
-  img.src = `${LAYER_DIR}/${file}`
   img.alt = ''
   img.decoding = 'async'
   img.draggable = false
-  return img
+  img.width = asset.width
+  img.height = asset.height
+  img.sizes = LAYER_SIZES
+  img.srcset = srcset(asset, 'fallback')
+  img.src = fallbackSrc(asset)
+  return picture
 }
 
 /** A looping static layer; not autoplay, so `play`/`pause` decide when it decodes. */
@@ -169,7 +192,7 @@ function createScreenElement(src: string, screen: ScreenSpec): {
     layerVideo('screen-static', 'static-base.mp4'),
     layerVideo('screen-static screen-static--fine', 'static-layer.mp4'),
   ]
-  fx.append(layerImage('screen-shadow', 'shadow.png'), ...videos, layerImage('screen-smudges', 'smudges.jpg'))
+  fx.append(layerPicture('screen-shadow', ASSETS.desk.screen.shadow), ...videos, layerPicture('screen-smudges', ASSETS.desk.screen.smudges))
   const stopGate = gateOnDesktop(iframe, fx)
   element.append(iframe, fx)
   return { element, iframe, videos, stopGate }

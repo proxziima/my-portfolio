@@ -1,4 +1,98 @@
 {
+  "desk.screen.smudges": {
+    "source": "40a193b51032669561dec6e10aff6e049cd9df1527a9e2cfe17fc3569933d716",
+    "recipe": "6b426ee2d0cf830ec19eca60fd740472410cb02353c66e77f56218c24763c49e",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/screen/smudges.2048w.b41fd36564.avif",
+      "/assets/desk/screen/smudges.2048w.40a193b510.jpg"
+    ],
+    "value": {
+      "width": 2048,
+      "height": 1638,
+      "variants": [
+        {
+          "src": "/assets/desk/screen/smudges.2048w.b41fd36564.avif",
+          "width": 2048,
+          "height": 1638,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/desk/screen/smudges.2048w.40a193b510.jpg",
+          "width": 2048,
+          "height": 1638,
+          "type": "image/jpeg"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.998,
+      "variants": [
+        {
+          "variant": "avif 2048w",
+          "q": 54,
+          "ssim": 0.99812
+        },
+        {
+          "variant": "jpg 2048w",
+          "q": "source",
+          "ssim": 1
+        }
+      ],
+      "dropped": [
+        "avif 1280w: 248637 bytes, not less than the 2048w variant",
+        "webp 1280w: no quality ≥ q80 passes ssim ≥ 0.998 below the source's 292727 bytes"
+      ]
+    }
+  },
+  "desk.screen.shadow": {
+    "source": "054d30f0b51b79a8a5c557cc94ea08962c7649be3363e1cc3b3f4d48ee23ad34",
+    "recipe": "b6cdfbfa50b45a027c4bd8ce4ce09488e75d9dcfd0ac8d41a0433ff861087ba2",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/screen/shadow.77c0f24850.avif",
+      "/assets/desk/screen/shadow.98e5a41003.webp"
+    ],
+    "value": {
+      "width": 845,
+      "height": 676,
+      "variants": [
+        {
+          "src": "/assets/desk/screen/shadow.77c0f24850.avif",
+          "width": 845,
+          "height": 676,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/desk/screen/shadow.98e5a41003.webp",
+          "width": 845,
+          "height": 676,
+          "type": "image/webp"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "avif 845w",
+          "q": 50,
+          "ssim": 0.99965
+        },
+        {
+          "variant": "webp 845w",
+          "q": 82,
+          "ssim": 1
+        }
+      ]
+    }
+  },
   "desk.audio.key1": {
     "source": "4a413b3a0d4e0f95a60a0b76e9cb7a43ad756f744fadcfcf64b53b723dc854da",
     "recipe": "f9405693250973ec524418d14615bb23efc336846c6081312cc8fc2a6e2e3b7a",
@@ -79,5 +173,224 @@
       "/assets/desk/audio/office.fffe9677c5.mp3"
     ],
     "value": "/assets/desk/audio/office.fffe9677c5.mp3"
+  },
+  "theme.rockerOn": {
+    "source": "5c8e20dfd15bfba6f01f01034ef3a7a58512adec31b02e87af9a5ad6c8ceafaf",
+    "recipe": "0ff910f001338b2b445d20113a9e5a20d2603e5fe358ace4e1a0f60ff04e735b",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/theme-switch/rocker-on.64w.20cad66760.avif",
+      "/assets/theme-switch/rocker-on.128w.c6828d4352.avif",
+      "/assets/theme-switch/rocker-on.192w.b649078040.avif",
+      "/assets/theme-switch/rocker-on.64w.be5cf97abd.webp",
+      "/assets/theme-switch/rocker-on.128w.9223fdf87d.webp",
+      "/assets/theme-switch/rocker-on.192w.0127526d1d.webp"
+    ],
+    "value": {
+      "width": 530,
+      "height": 700,
+      "variants": [
+        {
+          "src": "/assets/theme-switch/rocker-on.64w.20cad66760.avif",
+          "width": 64,
+          "height": 85,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.128w.c6828d4352.avif",
+          "width": 128,
+          "height": 169,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.192w.b649078040.avif",
+          "width": 192,
+          "height": 254,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.64w.be5cf97abd.webp",
+          "width": 64,
+          "height": 85,
+          "type": "image/webp"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.128w.9223fdf87d.webp",
+          "width": 128,
+          "height": 169,
+          "type": "image/webp"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.192w.0127526d1d.webp",
+          "width": 192,
+          "height": 254,
+          "type": "image/webp"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.99,
+      "variants": [
+        {
+          "variant": "avif 64w",
+          "q": 58,
+          "ssim": 0.99232
+        },
+        {
+          "variant": "avif 128w",
+          "q": 50,
+          "ssim": 0.99106
+        },
+        {
+          "variant": "avif 192w",
+          "q": 50,
+          "ssim": 0.99281
+        },
+        {
+          "variant": "webp 64w",
+          "q": 82,
+          "ssim": 0.99289
+        },
+        {
+          "variant": "webp 128w",
+          "q": 82,
+          "ssim": 0.99341
+        },
+        {
+          "variant": "webp 192w",
+          "q": 82,
+          "ssim": 0.99337
+        }
+      ]
+    }
+  },
+  "theme.rockerOff": {
+    "source": "2d6c1ff7f5ab03c8d106ab362c923a0ce24f2c9bf7c56e158856ed83e348adc0",
+    "recipe": "b5129d1d1868d43de393daa44aae6e929c339855a89629ca4c514b030c71b507",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/theme-switch/rocker-off.64w.f685d018ef.avif",
+      "/assets/theme-switch/rocker-off.128w.18de4ddb0b.avif",
+      "/assets/theme-switch/rocker-off.192w.ac7a0c1dee.avif",
+      "/assets/theme-switch/rocker-off.64w.799936f308.webp",
+      "/assets/theme-switch/rocker-off.128w.a2a38285f5.webp",
+      "/assets/theme-switch/rocker-off.192w.ef1b4748df.webp"
+    ],
+    "value": {
+      "width": 530,
+      "height": 700,
+      "variants": [
+        {
+          "src": "/assets/theme-switch/rocker-off.64w.f685d018ef.avif",
+          "width": 64,
+          "height": 85,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.128w.18de4ddb0b.avif",
+          "width": 128,
+          "height": 169,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.192w.ac7a0c1dee.avif",
+          "width": 192,
+          "height": 254,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.64w.799936f308.webp",
+          "width": 64,
+          "height": 85,
+          "type": "image/webp"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.128w.a2a38285f5.webp",
+          "width": 128,
+          "height": 169,
+          "type": "image/webp"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.192w.ef1b4748df.webp",
+          "width": 192,
+          "height": 254,
+          "type": "image/webp"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.99,
+      "variants": [
+        {
+          "variant": "avif 64w",
+          "q": 54,
+          "ssim": 0.99147
+        },
+        {
+          "variant": "avif 128w",
+          "q": 50,
+          "ssim": 0.99184
+        },
+        {
+          "variant": "avif 192w",
+          "q": 50,
+          "ssim": 0.99266
+        },
+        {
+          "variant": "webp 64w",
+          "q": 82,
+          "ssim": 0.99306
+        },
+        {
+          "variant": "webp 128w",
+          "q": 82,
+          "ssim": 0.99264
+        },
+        {
+          "variant": "webp 192w",
+          "q": 82,
+          "ssim": 0.99315
+        }
+      ]
+    }
+  },
+  "theme.rockerAtlas": {
+    "source": "f5080ddde2787a679e13dec596c5f67eaba4ced5ccbd833f190f514e3c6efb8e",
+    "recipe": "595d586991e3e22e4da4acc80f7c9835e02141ed39e57f83c38c4b2f77be2d13",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/theme-switch/rocker-atlas.86d22dc54d.webp"
+    ],
+    "value": {
+      "width": 1060,
+      "height": 1120,
+      "variants": [
+        {
+          "src": "/assets/theme-switch/rocker-atlas.86d22dc54d.webp",
+          "width": 1060,
+          "height": 1120,
+          "type": "image/webp"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "webp 1060w",
+          "q": 82,
+          "ssim": 0.99645
+        }
+      ]
+    }
   }
 }

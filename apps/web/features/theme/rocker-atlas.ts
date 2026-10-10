@@ -1,4 +1,7 @@
-export const ATLAS = { src: '/theme-switch/rocker-atlas.webp', frames: 17, columns: 5, width: 212, height: 280 } as const
+import { ASSETS } from '@/lib/assets/manifest'
+
+/** The canvas loads the atlas with `new Image()` (no <picture>), so it ships as one WebP. */
+export const ATLAS = { src: ASSETS.theme.rockerAtlas.variants[0].src, frames: 17, columns: 5, width: 212, height: 280 } as const
 
 export const isValidAtlas = (w: number, h: number) =>
   w === ATLAS.width * ATLAS.columns && h === ATLAS.height * Math.ceil(ATLAS.frames / ATLAS.columns)

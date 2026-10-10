@@ -4,10 +4,15 @@ export interface ImageVariant {
   src: string
   width: number
   height: number
-  type: 'image/avif' | 'image/webp'
+  /** JPEG/PNG only where no re-encode beat the source's own bytes, which are then served as they are. */
+  type: 'image/avif' | 'image/webp' | 'image/jpeg' | 'image/png'
 }
 
-/** A still for `<picture>`: the source's size, and every encoded variant (AVIF first, then WebP, each by width). */
+/**
+ * A still for `<picture>`: the source's size, and every variant by width, AVIF first. AVIF is all or
+ * nothing (every width or none), so a browser on the AVIF `<source>` always finds its density; the
+ * rest are the `<img>`'s own candidates.
+ */
 export interface ImageAsset {
   width: number
   height: number
