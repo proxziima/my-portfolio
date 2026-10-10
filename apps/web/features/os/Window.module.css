@@ -69,6 +69,13 @@
   -webkit-user-select: text;
 }
 
+/* the content while an app's code loads: an empty panel in the window's face colour */
+.loading {
+  width: 100%;
+  height: 100%;
+  background: var(--os-face);
+}
+
 .status {
   display: flex;
   gap: 2px;

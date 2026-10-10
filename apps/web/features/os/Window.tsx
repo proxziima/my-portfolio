@@ -1,5 +1,5 @@
 'use client'
-import type { ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import bevel from './bevel.module.css'
 import { Icon, type IconName } from './icons'
 import { useWindowGeometry } from './use-window-geometry'
@@ -51,7 +51,10 @@ export function Window({ title, status, icon, barColor, active, zIndex, hidden, 
           <button type="button" className={bevel.raised} aria-label={`Close ${title}`} onClick={onClose}><Icon name="close" size={12} /></button>
         </span>
       </header>
-      <div className={`${styles.content} ${bevel.sunken}`}>{children}</div>
+      <div className={`${styles.content} ${bevel.sunken}`}>
+        {/* an app's code loads with its first window: the chrome draws at once, the content follows */}
+        <Suspense fallback={<div className={styles.loading} />}>{children}</Suspense>
+      </div>
       <footer className={styles.status}>
         <span className={bevel.sunken}>{status ?? title}</span>
         <span className={`${styles.grip} ${bevel.sunken}`} onPointerDown={onResizeStart} aria-hidden="true" />

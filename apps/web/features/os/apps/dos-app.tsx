@@ -1,7 +1,10 @@
 'use client'
-import type { ComponentType } from 'react'
+import { lazy, Suspense, type ComponentType } from 'react'
 import type { OsAppProps } from '../apps'
-import { DosPlayer } from './dos/DosPlayer'
+import styles from './dos/DosPlayer.module.css'
+
+// the player loads with the first DOS window; until then the window shows the player's own loading line
+const DosPlayer = lazy(() => import('./dos/DosPlayer').then((m) => ({ default: m.DosPlayer })))
 
 /**
  * A DOS program as an OS app: its js-dos bundle in the player, on black so the letterbox matches the
@@ -12,7 +15,9 @@ export function dosApp(app: string, bundleUrl: string, displayName: string): Com
   function DosApp() {
     return (
       <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000' }}>
-        <DosPlayer app={app} bundleUrl={bundleUrl} />
+        <Suspense fallback={<p className={styles.message}>Loading DOS…</p>}>
+          <DosPlayer app={app} bundleUrl={bundleUrl} />
+        </Suspense>
       </div>
     )
   }
