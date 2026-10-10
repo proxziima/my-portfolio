@@ -97,6 +97,51 @@ test.describe('analytics and SEO', () => {
     expect(ready.properties.ms).toBeGreaterThan(0)
   })
 
+  test('the desk monitor boots its OS on approach and only then reports the embedded boot', async ({ page }) => {
+    test.setTimeout(90_000)
+    const events = await captureRelay(page)
+    await page.route('**/*.glb', (route) => route.continue())
+    await openPortfolio(page)
+    await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
+    const scene = page.locator('[data-anchor="desk-scene"]')
+    await expect(scene).toHaveAttribute('data-loaded', 'true', { timeout: 30_000 })
+    await expect.poll(() => events.find((e) => e.event === 'experience_ready' && e.properties.experience === 'desk_scene'), { timeout: 15_000 }).toBeTruthy()
+    const embeddedBoot = () => events.find((e) => e.event === 'experience_ready' && e.properties.experience === 'os_boot' && e.properties.embedded === true)
+    // powered off: no OS document, so no embedded boot at all
+    await page.waitForTimeout(1500)
+    expect(embeddedBoot()).toBeUndefined()
+    await page.locator('[data-anchor="figure-box"]').hover({ position: { x: 5, y: 5 } })
+    await expect.poll(embeddedBoot, { timeout: 20_000 }).toBeTruthy()
+    expect(Number.isInteger(embeddedBoot()!.properties.ms)).toBe(true)
+    // the visitor never used the OS: hiding the tab reports no embedded engaged time
+    await page.mouse.move(0, 0)
+    await page.waitForTimeout(1500)
+    // the tab hiding and returning, in the page and in the OS's own document
+    const setVisibility = async (state: 'hidden' | 'visible') => {
+      for (const frame of page.frames()) {
+        await frame.evaluate((s) => {
+          Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => s })
+          document.dispatchEvent(new Event('visibilitychange'))
+        }, state)
+      }
+    }
+    const embeddedEngaged = () => events.find((e) => e.event === 'os_engaged' && e.properties.embedded === true)
+    await setVisibility('hidden')
+    await page.waitForTimeout(1500)
+    expect(embeddedEngaged()).toBeUndefined()
+    // control: real use inside the OS is counted and reported
+    await setVisibility('visible')
+    const os = page.frameLocator('iframe[title="Desktop"]')
+    await expect(os.locator('[data-anchor="desktop"]')).toBeAttached({ timeout: 20_000 })
+    for (let i = 0; i < 3; i++) {
+      await os.locator('[data-anchor="desktop"]').dispatchEvent('pointerdown')
+      await page.waitForTimeout(600)
+    }
+    await setVisibility('hidden')
+    await expect.poll(embeddedEngaged, { timeout: 15_000 }).toBeTruthy()
+    expect(embeddedEngaged()!.properties.seconds).toBeGreaterThanOrEqual(1)
+  })
+
   test('home has canonical, JSON-LD, and robots/sitemap are served', async ({ page, request }) => {
     await page.goto('/')
     // Next prints the root canonical as the bare origin; for http(s) that is the same URL as `<origin>/`

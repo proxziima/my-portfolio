@@ -24,12 +24,24 @@ async function freeze(page: Page) {
   })
 }
 
-async function ready(page: Page) {
+/** The scene drawn with the models, the pointer never having entered the box: the monitor powered off. */
+async function poweredOff(page: Page) {
   const scene = page.locator('[data-anchor="desk-scene"]')
   await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
   await expect(scene).toHaveAttribute('data-loaded', 'true', { timeout: 60_000 })
-  // let the OS reach its desktop so the CRT layers are on (power it on first where Phase 2 applies)
+  await expect(scene).toHaveAttribute('data-power', 'off')
+  await expect(scene.locator('iframe')).toHaveCount(0)
+}
+
+/**
+ * The baselines were taken with the OS booted at load. The monitor now boots on approach: the
+ * pointer entering the box (at a corner, off the screen) powers it on, then the OS reaches its
+ * desktop so the CRT layers are on, and the pointer goes back to rest.
+ */
+async function ready(page: Page) {
+  const scene = page.locator('[data-anchor="desk-scene"]')
   await page.locator('[data-anchor="figure-box"]').hover({ position: { x: 5, y: 5 } })
+  await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached()
   await expect(scene.locator('.screen-fx')).toHaveAttribute('data-ready', 'true', { timeout: 30_000 })
   await page.mouse.move(0, 0)
   await page.waitForTimeout(2500) // the rig settles back to rest
@@ -59,6 +71,9 @@ for (const { width, height } of [{ width: 1440, height: 900 }, { width: 390, hei
       await page.setViewportSize({ width, height })
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'no-preference' })
       await openPortfolio(page)
+      await poweredOff(page)
+      // new with boot-on-approach, so no pre-Phase-1 baseline: the first run records it for review
+      await shoot(page, `desk-powered-off-${width}-${scheme}`)
       await ready(page)
       await shoot(page, `desk-${width}-${scheme}`)
       // the monitor pose: hover the screen's centre and let the 2 s tween land

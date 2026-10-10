@@ -46,7 +46,7 @@ describe('the static videos', () => {
     document.body.append(screen.css.element)
     // the OS's document, as the same-origin iframe exposes it
     osDoc = document.implementation.createHTMLDocument('os')
-    Object.defineProperty(screen.iframe, 'contentDocument', { get: () => osDoc })
+    Object.defineProperty(screen.powerOn(), 'contentDocument', { get: () => osDoc })
   })
 
   afterEach(() => {
@@ -65,7 +65,7 @@ describe('the static videos', () => {
   }
   const showDesktop = () => {
     addDesktop()
-    screen.iframe.dispatchEvent(new Event('load'))
+    screen.iframe!.dispatchEvent(new Event('load'))
   }
 
   it('have no sources and preload nothing until the layers can show', () => {
@@ -92,7 +92,7 @@ describe('the static videos', () => {
   })
 
   it('stay unattached while the OS boots, and attach when the desktop appears', async () => {
-    screen.iframe.dispatchEvent(new Event('load'))
+    screen.iframe!.dispatchEvent(new Event('load'))
     expect(fx().dataset.ready).toBe('false')
     expect(videos()[0]!.querySelectorAll('source')).toHaveLength(0)
     addDesktop()
@@ -134,5 +134,64 @@ describe('the static videos', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+})
+
+describe('the power', () => {
+  let screen: MonitorScreen
+
+  beforeEach(() => {
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    screen = createMonitorScreen('/os')
+    document.body.append(screen.css.element)
+  })
+
+  afterEach(() => {
+    screen.dispose()
+    vi.restoreAllMocks()
+  })
+
+  it('starts powered off: a focusable picture of a dark tube, no iframe', () => {
+    expect(screen.iframe).toBeNull()
+    expect(screen.element.querySelector('iframe')).toBeNull()
+    expect(screen.element.tabIndex).toBe(0)
+    expect(screen.element.getAttribute('role')).toBe('img')
+    expect(screen.element.getAttribute('aria-label')).toBe('Desktop (powered off)')
+  })
+
+  it('powers on once: one iframe of the OS, the same on a second call', () => {
+    const iframe = screen.powerOn()
+    expect(screen.element.querySelectorAll('iframe')).toHaveLength(1)
+    expect(iframe.getAttribute('src')).toBe('/os')
+    expect(iframe.title).toBe('Desktop')
+    expect(screen.iframe).toBe(iframe)
+    expect(screen.powerOn()).toBe(iframe)
+    expect(screen.element.querySelectorAll('iframe')).toHaveLength(1)
+    // under the CRT layers, as before
+    expect(iframe.nextElementSibling?.classList.contains('screen-fx')).toBe(true)
+  })
+
+  it('on load, drops the tab stop and the label and reports loaded once', () => {
+    const loaded = vi.fn()
+    screen.onLoaded(loaded)
+    const iframe = screen.powerOn()
+    const focus = vi.spyOn(iframe, 'focus')
+    iframe.dispatchEvent(new Event('load'))
+    iframe.dispatchEvent(new Event('load')) // the OS reloading is not a second power-on
+    expect(screen.element.tabIndex).toBe(-1)
+    expect(screen.element.hasAttribute('role')).toBe(false)
+    expect(screen.element.hasAttribute('aria-label')).toBe(false)
+    expect(focus).not.toHaveBeenCalled()
+    expect(loaded).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands keyboard focus over to the OS when the screen still has it', () => {
+    screen.element.focus()
+    expect(document.activeElement).toBe(screen.element)
+    const iframe = screen.powerOn()
+    const focus = vi.spyOn(iframe, 'focus')
+    iframe.dispatchEvent(new Event('load'))
+    expect(focus).toHaveBeenCalledTimes(1)
   })
 })

@@ -8,16 +8,20 @@ export interface ScreenInput {
 }
 
 /**
- * Feeds `monitor-focus` from the screen's iframe and calls `onChange` whenever the answer flips.
- * Pointer enter/leave and focus come from the iframe element itself (they fire in the parent
- * document even for a cross-origin frame). Presses are only visible inside the frame's own window,
- * which is reachable because the OS is same-origin; a cross-origin frame simply loses the drag guard.
- * A cancelled press (native drag, context menu) fires `pointercancel` instead of `pointerup` and
- * releases as well. The same inner window also feeds `onInput` with presses and keys, so the scene
- * can play its keyboard and mouse sounds for what happens inside the OS.
+ * Feeds `monitor-focus` from the screen and calls `onChange` whenever the answer flips. Pointer
+ * enter/leave and focus come from the screen slab, which exists before the OS does (powered off, it
+ * is the tab stop; hovering it zooms as hovering the OS does), and keep coming from it once the
+ * iframe is inside: they fire in the parent document even for a cross-origin frame. Focus moving
+ * from the slab into its own iframe (the hand-over when the OS loads) is one stay, not a leave.
+ * Presses are only visible inside the frame's own window, which is reachable because the OS is
+ * same-origin; a cross-origin frame simply loses the drag guard. That window is bound on every load
+ * of an iframe in the slab, so an OS that powers on later is heard too. A cancelled press (native
+ * drag, context menu) fires `pointercancel` instead of `pointerup` and releases as well. The same
+ * inner window also feeds `onInput` with presses and keys, so the scene can play its keyboard and
+ * mouse sounds for what happens inside the OS.
  */
 export function watchScreen(
-  iframe: HTMLIFrameElement,
+  element: HTMLElement,
   onChange: (wantsMonitor: boolean) => void,
   onInput?: (input: ScreenInput) => void,
 ): () => void {
@@ -47,38 +51,66 @@ export function watchScreen(
     onInput?.({ type, key, repeat })
   }
 
-  const watchInner = () => {
+  /** Per iframe, the listeners on its current window: a load replaces them, so none is bound twice. */
+  const inners = new Map<HTMLIFrameElement, () => void>()
+  const watchInner = (iframe: HTMLIFrameElement) => {
+    inners.get(iframe)?.()
+    inners.delete(iframe)
     const inner = iframe.contentWindow
     if (!inner) return
+    const bound: (() => void)[] = []
+    const onInner = (type: string, handler: (e: Event) => void) => {
+      inner.addEventListener(type, handler)
+      bound.push(() => {
+        try {
+          inner.removeEventListener(type, handler)
+        } catch {
+          /* the window is gone */
+        }
+      })
+    }
     try {
-      on(inner, 'pointerdown', () => {
+      onInner('pointerdown', () => {
         send('press')
         onInput?.({ type: 'pointerdown', key: '', repeat: false })
       })
-      on(inner, 'pointerup', () => {
+      onInner('pointerup', () => {
         send('release')
         onInput?.({ type: 'pointerup', key: '', repeat: false })
       })
-      on(inner, 'pointercancel', () => send('release'))
-      on(inner, 'keydown', keyInput('keydown'))
-      on(inner, 'keyup', keyInput('keyup'))
+      onInner('pointercancel', () => send('release'))
+      onInner('keydown', keyInput('keydown'))
+      onInner('keyup', keyInput('keyup'))
     } catch {
       /* cross-origin: no drag guard */
     }
+    inners.set(iframe, () => bound.forEach((off) => off()))
   }
 
-  on(iframe, 'pointerenter', () => send('enter'))
-  on(iframe, 'pointerleave', () => send('leave'))
-  on(iframe, 'focus', () => {
+  on(element, 'pointerenter', () => send('enter'))
+  on(element, 'pointerleave', () => send('leave'))
+  on(element, 'focusin', () => {
     if (keyboardFocus()) send('focus')
   })
-  on(iframe, 'blur', () => send('blur'))
+  on(element, 'focusout', (e) => {
+    // still inside the screen (the slab handing focus to the OS it holds): not a blur
+    const next = (e as FocusEvent).relatedTarget
+    if (next instanceof Node && element.contains(next)) return
+    send('blur')
+  })
   on(window, 'pointerup', () => send('release'))
   on(window, 'pointercancel', () => send('release'))
-  on(iframe, 'load', watchInner)
+  // `load` does not bubble, but it passes the slab while capturing: every iframe load inside, now or later
+  const onLoad = (e: Event) => {
+    if (e.target instanceof HTMLIFrameElement) watchInner(e.target)
+  }
+  element.addEventListener('load', onLoad, true)
+  offs.push(() => element.removeEventListener('load', onLoad, true))
 
   return () => {
     for (const off of offs) off()
     offs.length = 0
+    for (const off of inners.values()) off()
+    inners.clear()
   }
 }

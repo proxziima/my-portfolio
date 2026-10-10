@@ -19,8 +19,16 @@ export interface DeskEngineOptions {
   onFrame?: (cameraDistance: number) => void
 }
 
+/** The monitor's screen as the scene's owner drives it: powered off until `powerOn` (see `MonitorScreen`). */
+export interface DeskScreen {
+  readonly element: HTMLElement
+  readonly iframe: HTMLIFrameElement | null
+  powerOn(): void
+  onLoaded(cb: () => void): () => void
+}
+
 export interface DeskEngine {
-  readonly iframe: HTMLIFrameElement
+  readonly screen: DeskScreen
   /** Fetches the models; rejects on any failure. The screen renders before this resolves. */
   load(): Promise<void>
   start(): void
@@ -123,7 +131,14 @@ export function createDeskEngine({
   }
 
   return {
-    iframe: screen.iframe,
+    screen: {
+      element: screen.element,
+      get iframe() {
+        return screen.iframe
+      },
+      powerOn: () => void screen.powerOn(),
+      onLoaded: (cb) => screen.onLoaded(cb),
+    },
     async load() {
       const loaded = await loadDesk(DESK_ASSETS, await textureFormat())
       if (disposed) {

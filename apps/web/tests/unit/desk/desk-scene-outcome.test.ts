@@ -15,6 +15,9 @@ interface EngineOptions {
 const engine = vi.hoisted(() => ({
   options: undefined as EngineOptions | undefined,
   create: undefined as unknown as (options: EngineOptions) => unknown,
+  /** The last fake's screen, and the callback the scene gave its `onLoaded`. */
+  screen: undefined as { element: HTMLElement; iframe: null; powerOn: ReturnType<typeof vi.fn>; onLoaded: ReturnType<typeof vi.fn> } | undefined,
+  loaded: undefined as (() => void) | undefined,
 }))
 
 vi.mock('@/features/desk/engine', () => ({ createDeskEngine: (options: EngineOptions) => engine.create(options) }))
@@ -30,8 +33,18 @@ const { DeskScene } = await import('@/features/desk/DeskScene')
 /** A stand-in engine whose `load` settles as the test decides. */
 const fakeEngine = (load: () => Promise<void>) => (options: EngineOptions) => {
   engine.options = options
+  engine.loaded = undefined
+  engine.screen = {
+    element: document.createElement('div'),
+    iframe: null,
+    powerOn: vi.fn(),
+    onLoaded: vi.fn((cb: () => void) => {
+      engine.loaded = cb
+      return () => {}
+    }),
+  }
   return {
-    iframe: document.createElement('iframe'),
+    screen: engine.screen,
     load,
     start: vi.fn(),
     stop: vi.fn(),
@@ -48,15 +61,24 @@ let host: HTMLElement
 let root: Root
 const onFail = vi.fn()
 const onReady = vi.fn()
+const onPower = vi.fn()
 
-const mount = async () => {
-  await act(async () => root.render(createElement(DeskScene, { onFail, onReady, muted: true })))
+const mount = async (fullscreen = false) => {
+  await act(async () => root.render(createElement(DeskScene, { onFail, onReady, muted: true, fullscreen, onPower })))
+}
+
+/** jsdom has no PointerEvent constructor: a plain event carrying `pointerType`. */
+function pointer(type: string, pointerType: string): Event {
+  const e = new Event(type)
+  Object.defineProperty(e, 'pointerType', { value: pointerType })
+  return e
 }
 
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   onFail.mockClear()
   onReady.mockClear()
+  onPower.mockClear()
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
   host = document.createElement('div')
@@ -90,5 +112,43 @@ describe('DeskScene outcome', () => {
     engine.create = fakeEngine(() => Promise.reject(new Error('404')))
     await mount()
     expect(onFail).toHaveBeenCalledWith('load_error')
+  })
+})
+
+describe('DeskScene power', () => {
+  beforeEach(() => {
+    engine.create = fakeEngine(async () => {})
+  })
+
+  it('leaves the monitor off at mount', async () => {
+    await mount()
+    expect(engine.screen?.powerOn).not.toHaveBeenCalled()
+    expect(onPower).not.toHaveBeenCalledWith('booting')
+  })
+
+  it('boots when a mouse enters the figure box, and reports booting then on', async () => {
+    await mount()
+    act(() => {
+      host.dispatchEvent(pointer('pointerenter', 'mouse'))
+    })
+    expect(engine.screen?.powerOn).toHaveBeenCalledTimes(1)
+    expect(onPower).toHaveBeenLastCalledWith('booting')
+    act(() => engine.loaded?.())
+    expect(onPower).toHaveBeenLastCalledWith('on')
+  })
+
+  it('boots on full screen', async () => {
+    await mount()
+    await mount(true)
+    expect(engine.screen?.powerOn).toHaveBeenCalled()
+    expect(onPower).toHaveBeenCalledWith('booting')
+  })
+
+  it('boots when keyboard focus reaches the powered-off screen', async () => {
+    await mount()
+    act(() => {
+      engine.screen?.element.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    })
+    expect(engine.screen?.powerOn).toHaveBeenCalled()
   })
 })

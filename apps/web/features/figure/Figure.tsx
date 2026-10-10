@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { OS_PATH } from '@/features/desk/config'
 import type { DeskFailure } from '@/features/desk/DeskScene'
+import type { Power } from '@/features/desk/power'
 import { useMuted } from '@/features/desk/use-muted'
 import { useFullscreen } from '@/lib/dom/use-fullscreen'
 import { useInView } from '@/lib/dom/use-in-view'
@@ -27,7 +28,9 @@ export function Figure() {
   const { current } = useRole()
   const box = useRef<HTMLDivElement>(null)
   const near = useInView(box, { rootMargin: NEAR_MARGIN, once: true })
-  const full = useFullscreen(box)
+  // the monitor's iframe appears when it powers on, possibly after full screen began: rebind to it
+  const [power, setPower] = useState<Power>('off')
+  const full = useFullscreen(box, power)
   // timed from the near-viewport mount (when the scene's code starts loading) to its first frame
   const timing = useExperience('desk_scene', { active: near })
   const [failed, setFailed] = useState(false)
@@ -55,7 +58,7 @@ export function Figure() {
     <figure className={styles.plate} data-anchor="figure">
       {!failed && (
         <div ref={box} className={styles.box} data-anchor="figure-box" data-full={full.on}>
-          {near && <DeskScene onFail={fail} onReady={timing.ready} muted={muted} />}
+          {near && <DeskScene onFail={fail} onReady={timing.ready} muted={muted} fullscreen={full.on} onPower={setPower} />}
           {full.on && (
             <span className={styles.bar}>
               <button type="button" className={styles.barButton} aria-pressed={muted} onClick={toggleMuted}>

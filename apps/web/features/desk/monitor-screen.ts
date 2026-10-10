@@ -35,7 +35,14 @@ export function screenPlanes(screen: ScreenSpec): { occluder: PlaneSpec; bezels:
 }
 
 export interface MonitorScreen {
-  iframe: HTMLIFrameElement
+  /** The screen slab: powered off it is the dark tube and the tab stop; powered on it holds the OS. */
+  element: HTMLDivElement
+  /** The OS's iframe, once powered on. */
+  readonly iframe: HTMLIFrameElement | null
+  /** Boots the OS: appends its iframe under the CRT layers. Idempotent; returns the iframe. */
+  powerOn(): HTMLIFrameElement
+  /** `cb` runs once, when the OS's first document has loaded. Returns the unsubscribe. */
+  onLoaded(cb: () => void): () => void
   /** Add to the CSS scene. */
   css: CSS3DObject
   /** Add to the GL scene. */
@@ -183,33 +190,26 @@ const LAYERS: ReadonlyArray<{ className: string; asset: VideoAsset }> = [
   { className: 'screen-static screen-static--fine', asset: ASSETS.desk.screen.staticLayer },
 ]
 
+/** The powered-off screen's accessible name; the OS's iframe takes over as "Desktop" once it loads. */
+const POWERED_OFF_LABEL = 'Desktop (powered off)'
+
 /**
- * The DOM the CSS3D object carries: a fixed-size slab shaded like a powered-off tube, the iframe
- * inset by `padding`, and over both the reference's CRT layers in its stacking order (inner shadow,
- * two static videos, smudges; blended in `screen-fx.css`), which let the pointer through to the
- * iframe and fade in only while the OS shows its desktop (`gateOnDesktop`).
+ * The DOM the CSS3D object carries: a fixed-size slab shaded like a powered-off tube and, over it,
+ * the reference's CRT layers in its stacking order (inner shadow, two static videos, smudges; blended
+ * in `screen-fx.css`), which let the pointer through and fade in only while the OS shows its desktop.
+ * Powered off, the slab is the screen's tab stop, announced as a picture. The OS's iframe joins it
+ * only on power-on (`createOsFrame`).
  */
-function createScreenElement(
-  src: string,
-  screen: ScreenSpec,
-  onFirstReady: () => void,
-): {
-  element: HTMLDivElement
-  iframe: HTMLIFrameElement
-  videos: HTMLVideoElement[]
-  stopGate: () => void
-} {
+function createScreenElement(screen: ScreenSpec): { element: HTMLDivElement; fx: HTMLDivElement; videos: HTMLVideoElement[] } {
   const element = document.createElement('div')
   Object.assign(element.style, {
     width: `${screen.width}px`,
     height: `${screen.height}px`,
     background: 'radial-gradient(ellipse at center, #243436 0%, #121a1b 70%, #0b0f10 100%)',
   })
-  const iframe = document.createElement('iframe')
-  iframe.src = src
-  iframe.title = 'Desktop'
-  iframe.className = 'screen-jitter'
-  Object.assign(iframe.style, { display: 'block', width: '100%', height: '100%', border: '0', padding: `${screen.padding}px`, boxSizing: 'border-box' })
+  element.tabIndex = 0
+  element.setAttribute('role', 'img')
+  element.setAttribute('aria-label', POWERED_OFF_LABEL)
   const fx = document.createElement('div')
   fx.className = 'screen-fx'
   fx.setAttribute('aria-hidden', 'true')
@@ -217,9 +217,18 @@ function createScreenElement(
   fx.dataset.ready = 'false'
   const videos = LAYERS.map((l) => layerVideo(l.className))
   fx.append(layerPicture('screen-shadow', ASSETS.desk.screen.shadow), ...videos, layerPicture('screen-smudges', ASSETS.desk.screen.smudges))
-  const stopGate = gateOnDesktop(iframe, fx, onFirstReady)
-  element.append(iframe, fx)
-  return { element, iframe, videos, stopGate }
+  element.append(fx)
+  return { element, fx, videos }
+}
+
+/** The OS's iframe, inset by `padding` in the slab. */
+function createOsFrame(src: string, screen: ScreenSpec): HTMLIFrameElement {
+  const iframe = document.createElement('iframe')
+  iframe.src = src
+  iframe.title = 'Desktop'
+  iframe.className = 'screen-jitter'
+  Object.assign(iframe.style, { display: 'block', width: '100%', height: '100%', border: '0', padding: `${screen.padding}px`, boxSizing: 'border-box' })
+  return iframe
 }
 
 const prefersReducedMotion = () =>
@@ -231,9 +240,10 @@ const place = (object: Object3D, spec: PlaneSpec) => {
 }
 
 /**
- * The screen as the camera sees it: a CSS3D object holding the iframe, and a GL group at the same
- * transform whose occluder plane writes transparent pixels with `NoBlending`, so the models in front
- * of the glass cover the iframe and the glass itself shows the DOM beneath the canvas.
+ * The screen as the camera sees it: a CSS3D object holding the slab (and, once powered on, the OS's
+ * iframe), and a GL group at the same transform whose occluder plane writes transparent pixels with
+ * `NoBlending`, so the models in front of the glass cover the iframe and the glass itself shows the
+ * DOM beneath the canvas. It starts powered off, a dark tube, and boots the OS on `powerOn`.
  */
 export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): MonitorScreen {
   /** Whether the figure wants the static running (`play` since the last `pause`). */
@@ -248,11 +258,27 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
     // a rejected play (autoplay policy, a pause racing it) leaves the static still, nothing worse
     for (const v of videos) v.play().catch(() => {})
   }
-  const { element, iframe, videos, stopGate } = createScreenElement(src, screen, () => {
+  const { element, fx, videos } = createScreenElement(screen)
+  let iframe: HTMLIFrameElement | null = null
+  let stopGate = () => {}
+  let loaded = false
+  const loadedCallbacks = new Set<() => void>()
+  const onFirstReady = () => {
     shown = true
     if (!prefersReducedMotion()) attachAll()
     start()
-  })
+  }
+  /** The OS's first document is in: the iframe becomes the tab stop, and keyboard focus follows it there. */
+  const handOver = (frame: HTMLIFrameElement) => {
+    const hadFocus = document.activeElement === element
+    element.tabIndex = -1
+    element.removeAttribute('role')
+    element.removeAttribute('aria-label')
+    if (hadFocus) frame.focus()
+    loaded = true
+    for (const cb of [...loadedCallbacks]) cb()
+    loadedCallbacks.clear()
+  }
   const tilt = MathUtils.degToRad(screen.tiltDeg)
 
   const css = new CSS3DObject(element)
@@ -279,7 +305,28 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
   for (const bezel of bezels) add(bezel, bezelMaterial)
 
   return {
-    iframe,
+    element,
+    get iframe() {
+      return iframe
+    },
+    powerOn() {
+      if (iframe) return iframe
+      const frame = createOsFrame(src, screen)
+      iframe = frame
+      // the gate keeps its own load listener, for the OS's later reloads
+      stopGate = gateOnDesktop(frame, fx, onFirstReady)
+      frame.addEventListener('load', () => handOver(frame), { once: true })
+      element.insertBefore(frame, fx)
+      return frame
+    },
+    onLoaded(cb) {
+      if (loaded) {
+        cb()
+        return () => {}
+      }
+      loadedCallbacks.add(cb)
+      return () => loadedCallbacks.delete(cb)
+    },
     css,
     gl,
     play() {
@@ -302,6 +349,7 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
       occluderMaterial.dispose()
       bezelMaterial.dispose()
       stopGate()
+      loadedCallbacks.clear()
       element.remove()
     },
   }

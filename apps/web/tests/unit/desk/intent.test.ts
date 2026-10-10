@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { VISIBLE_RATIO, watchApproach } from '@/features/desk/intent'
+import type { IntentSource } from '@/features/desk/power'
 
 /** Records its options and target, and lets the test report an intersection ratio. */
 class FakeIntersectionObserver {
@@ -37,7 +38,7 @@ const focusIn = () => new FocusEvent('focusin', { bubbles: true })
 
 let box: HTMLDivElement
 let screen: HTMLDivElement
-let onApproach: ReturnType<typeof vi.fn>
+let onApproach: ReturnType<typeof vi.fn<(source: IntentSource) => void>>
 
 beforeEach(() => {
   FakeIntersectionObserver.instances = []
@@ -47,7 +48,7 @@ beforeEach(() => {
   screen.tabIndex = 0
   box.append(screen)
   document.body.append(box)
-  onApproach = vi.fn()
+  onApproach = vi.fn<(source: IntentSource) => void>()
 })
 
 afterEach(() => {
