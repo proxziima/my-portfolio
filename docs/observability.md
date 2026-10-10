@@ -100,6 +100,7 @@ Open LLM analytics, Traces, and filter by person. The tree is:
 ## Privacy
 
 - Prompts and replies are redacted with the twin's redaction rules before export. eve's `exportPolicy` on the PostHog integration plus a redacting processor on events and status handle it; the prompt canary is scrubbed first, identity ids are allowlisted, and content is held back until the rules have loaded and whenever they are older than one hour.
+- The twin chat transcript and message box carry PostHog's `ph-no-capture` class (`History.tsx`, `Conversation.tsx`), so session replay and autocapture skip them. This matters because the parent page's recorder also captures the same-origin `/os` iframe on the desk monitor.
 - `/relay` strips the `cookie` header before forwarding to PostHog.
 - `respect_dnt` is on, inputs are masked, and there are no identify calls (`person_profiles: 'identified_only'`).
 - The switch for a consent banner is `cookieless_mode: 'on_reject'` in `apps/web/lib/analytics/init.ts`.

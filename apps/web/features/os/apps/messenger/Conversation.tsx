@@ -92,8 +92,9 @@ export function Conversation({ data }: OsAppProps) {
           <p className={styles.refusal} role="status">
             {refusal ? labels[refusalLabel[refusal]] : ''}
           </p>
+          {/* ph-no-capture: the draft never reaches session replay or autocapture (see History) */}
           <form
-            className={styles.compose}
+            className={`${styles.compose} ph-no-capture`}
             onSubmit={(e) => {
               e.preventDefault()
               submit()

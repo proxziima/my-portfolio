@@ -107,6 +107,13 @@ describe('Conversation', () => {
     expect(host.querySelector('[role="log"]')?.textContent).toBe('Call booked for ')
   })
 
+  it('keeps the transcript and the message box out of session replay and autocapture', () => {
+    render()
+    // PostHog skips any element with this class (and its subtree) in rrweb and autocapture
+    expect(host.querySelector('[role="log"]')?.classList.contains('ph-no-capture')).toBe(true)
+    expect(host.querySelector('form')?.classList.contains('ph-no-capture')).toBe(true)
+  })
+
   it('shows the privacy note with no erase control', () => {
     render()
     expect(host.querySelector('footer')?.textContent).toBe(data.messenger.labels.privacy)
