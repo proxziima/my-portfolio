@@ -1,5 +1,6 @@
 'use client'
 import type { ScheduleCallRendered } from '@repo/twin/contract'
+import { track } from '@/lib/analytics/events'
 
 /** One queued call: the method name, then its arguments, as embed.js replays it. */
 type CalCommand = unknown[]
@@ -90,4 +91,6 @@ export function mountInline(
   if (!api) throw new Error(`Cal.com namespace "${ns}" was not registered`)
   api('inline', { elementOrSelector: el, calLink: booking.calLink, config: embedConfig(booking) })
   api('ui', { hideEventTypeDetails: false, layout: 'month_view' })
+  api('on', { action: 'bookingSuccessful', callback: () => track('booking_completed', {}) })
+  track('booking_opened', {})
 }

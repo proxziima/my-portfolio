@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ClientError } from 'eve/client'
 import { useEveAgent } from 'eve/react'
 import { REFUSAL_STATUS, type TwinRefusal } from '@repo/twin/contract'
+import { track } from '@/lib/analytics/events'
+import { messageSentProps } from './twin-analytics'
 import { hasFailed, isParked, toLines, type Line } from './parts'
 
 const SESSION_KEY = 'twin-session'
@@ -62,6 +64,9 @@ function acknowledged(messages: readonly MessageLike[], text: string): boolean {
  */
 export function useTwin() {
   const [initial] = useState(savedSession)
+  useEffect(() => {
+    track('twin_session_started', { resumed: initial !== undefined })
+  }, [initial])
   const [refusal, setRefusal] = useState<Refusal | null>(null)
   const agent = useEveAgent({
     host: `${window.location.origin}/api/twin`,
@@ -91,6 +96,7 @@ export function useTwin() {
   const held = useRef<string | null>(null)
   const reset = useCallback(() => {
     setRefusal(null)
+    track('twin_reset', {})
     resetAgent()
   }, [resetAgent])
 
@@ -109,7 +115,9 @@ export function useTwin() {
   const fail = useCallback(
     (error: unknown): boolean => {
       if (isGone(error) && renew()) return true
-      setRefusal(refusalOf(error))
+      const reason = refusalOf(error)
+      setRefusal(reason)
+      track('twin_refusal', { reason })
       return false
     },
     [renew],
@@ -145,6 +153,7 @@ export function useTwin() {
         return
       }
       lastSent.current = text
+      track('twin_message_sent', messageSentProps(text, messages.current.filter((m) => m.role === 'user').length))
       // A first turn's HTTP failure lands in `agent.error`; a follow-up sent mid-turn rejects instead.
       try {
         await sendTurn(text)
@@ -167,6 +176,7 @@ export function useTwin() {
     const text = lastSent.current
     if (!renew()) {
       setRefusal('offline')
+      track('twin_refusal', { reason: 'offline' })
       return
     }
     lastSent.current = null
@@ -191,7 +201,9 @@ export function useTwin() {
   useEffect(() => {
     if (agent.status !== 'resuming') return
     const timer = setTimeout(() => {
-      if (!renew()) setRefusal('offline')
+      if (renew()) return
+      setRefusal('offline')
+      track('twin_refusal', { reason: 'offline' })
     }, RESUME_STALL_MS)
     return () => clearTimeout(timer)
   }, [agent.status, renew])

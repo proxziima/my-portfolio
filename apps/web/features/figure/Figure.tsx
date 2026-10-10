@@ -65,16 +65,16 @@ export function Figure() {
         <span key={current.slug} className={styles.captionText}>{current.caption}</span>
         <span className={styles.actions}>
           {!failed && (
-            <button type="button" className={styles.action} aria-pressed={muted} onClick={toggleMuted}>
+            <button type="button" className={styles.action} aria-pressed={muted} data-track="desk_mute" onClick={toggleMuted}>
               {muted ? 'Unmute' : 'Mute'}
             </button>
           )}
           {!failed && (
-            <button ref={trigger} type="button" className={styles.action} onClick={full.enter}>
+            <button ref={trigger} type="button" className={styles.action} data-track="desk_fullscreen" onClick={full.enter}>
               Full screen
             </button>
           )}
-          <a className={styles.action} href={OS_PATH}>Open the desktop →</a>
+          <a className={styles.action} href={OS_PATH} data-track="open_desktop">Open the desktop →</a>
         </span>
       </figcaption>
     </figure>
