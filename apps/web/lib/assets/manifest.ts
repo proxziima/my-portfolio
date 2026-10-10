@@ -67,6 +67,30 @@ export const ASSETS = {
           },
         ],
       },
+      staticBase: {
+        width: 640,
+        height: 480,
+        sources: [
+          {
+            src: '/assets/desk/screen/static-base.h264.27348f3593.mp4',
+            type: 'video/mp4; codecs="avc1.4D401E"',
+          },
+        ],
+      },
+      staticLayer: {
+        width: 640,
+        height: 480,
+        sources: [
+          {
+            src: '/assets/desk/screen/static-layer.av1.6bf255df22.webm',
+            type: 'video/webm; codecs="av01.0.04M.08"',
+          },
+          {
+            src: '/assets/desk/screen/static-layer.h264.abb75bf968.mp4',
+            type: 'video/mp4; codecs="avc1.4D401E"',
+          },
+        ],
+      },
     },
     audio: {
       key1: '/assets/desk/audio/key-1.4a413b3a0d.mp3',

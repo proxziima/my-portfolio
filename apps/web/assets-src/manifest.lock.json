@@ -270,6 +270,519 @@
       ]
     }
   },
+  "desk.screen.staticBase": {
+    "source": "7e2c02e975ac5e7871767fac085f07fb1fbfdca639a80f2d2eac7d606946e9d0",
+    "recipe": "756693d98b667c563c785a862b225405ced08b85c5cf6b1bd1cdff9bc59513de",
+    "tools": {
+      "ffmpeg": "8.1.1-full_build-www.gyan.dev"
+    },
+    "outputs": [
+      "/assets/desk/screen/static-base.h264.27348f3593.mp4"
+    ],
+    "value": {
+      "width": 640,
+      "height": 480,
+      "sources": [
+        {
+          "src": "/assets/desk/screen/static-base.h264.27348f3593.mp4",
+          "type": "video/mp4; codecs=\"avc1.4D401E\""
+        }
+      ]
+    },
+    "parity": {
+      "gate": {
+        "ssim": 0.995,
+        "vmaf": 95,
+        "lumaMean": 0.02,
+        "lumaStd": 0.97,
+        "hf": 0.95,
+        "composite": {
+          "opacity": 0.5,
+          "crop": "600x480+20+0"
+        }
+      },
+      "sourceBytes": 2876621,
+      "seam": 0.98057,
+      "variants": [
+        {
+          "codec": "h264",
+          "setting": "crf 17",
+          "bytes": 2069836,
+          "frames": {
+            "source": 182,
+            "encode": 182
+          },
+          "ssim": 0.997292,
+          "vmaf": 97.934,
+          "lumaMean": 1.0002,
+          "lumaStd": 0.9982,
+          "hf": 0.989
+        }
+      ],
+      "dropped": [
+        "vp9: no crf passes below h264's 2069836 bytes; left out",
+        "av1: no crf passes below h264's 2069836 bytes; left out"
+      ],
+      "trials": {
+        "h264": [
+          {
+            "crf": 14,
+            "bytes": 3105902,
+            "pass": true
+          },
+          {
+            "crf": 21,
+            "bytes": 746732,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8824582293750396 < 0.97",
+              "hf energy ×0.6301164363076851 < 0.95"
+            ]
+          },
+          {
+            "crf": 17,
+            "bytes": 2069836,
+            "pass": true
+          },
+          {
+            "crf": 19,
+            "bytes": 1293154,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9386661149780108 < 0.97",
+              "hf energy ×0.7823479582490979 < 0.95"
+            ]
+          },
+          {
+            "crf": 18,
+            "bytes": 1662966,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9101980829828459 < 0.95"
+            ]
+          }
+        ],
+        "vp9": [
+          {
+            "crf": 16,
+            "bytes": 470554,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8516910186492659 < 0.97",
+              "hf energy ×0.5042784689837642 < 0.95"
+            ]
+          },
+          {
+            "crf": 15,
+            "bytes": 535612,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8611468295033297 < 0.97",
+              "hf energy ×0.5330881643315277 < 0.95"
+            ]
+          },
+          {
+            "crf": 14,
+            "bytes": 602111,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8698424484364538 < 0.97",
+              "hf energy ×0.5566044685008974 < 0.95"
+            ]
+          },
+          {
+            "crf": 13,
+            "bytes": 678534,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8766441963290729 < 0.97",
+              "hf energy ×0.5781934198009322 < 0.95"
+            ]
+          },
+          {
+            "crf": 12,
+            "bytes": 767411,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8841856863718431 < 0.97",
+              "hf energy ×0.6027292240886991 < 0.95"
+            ]
+          },
+          {
+            "crf": 11,
+            "bytes": 882979,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8928985941248361 < 0.97",
+              "hf energy ×0.6297803946331509 < 0.95"
+            ]
+          },
+          {
+            "crf": 10,
+            "bytes": 1022353,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9002589615188211 < 0.97",
+              "hf energy ×0.6567090636786527 < 0.95"
+            ]
+          },
+          {
+            "crf": 9,
+            "bytes": 1207301,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9114441646456733 < 0.97",
+              "hf energy ×0.6910627095210602 < 0.95"
+            ]
+          },
+          {
+            "crf": 8,
+            "bytes": 1381211,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9192884845522231 < 0.97",
+              "hf energy ×0.7148092728847518 < 0.95"
+            ]
+          },
+          {
+            "crf": 7,
+            "bytes": 1666237,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9303507317563976 < 0.97",
+              "hf energy ×0.7528963224556215 < 0.95"
+            ]
+          },
+          {
+            "crf": 6,
+            "bytes": 2007844,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9423258943278168 < 0.97",
+              "hf energy ×0.7903824459344437 < 0.95"
+            ]
+          },
+          {
+            "crf": 5,
+            "bytes": 2492081,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9544022650372017 < 0.97",
+              "hf energy ×0.8376231702142489 < 0.95"
+            ]
+          }
+        ],
+        "av1": [
+          {
+            "crf": 16,
+            "bytes": 230082,
+            "pass": false,
+            "misses": [
+              "luma std ×0.847808565401527 < 0.97",
+              "hf energy ×0.466922701115469 < 0.95"
+            ]
+          },
+          {
+            "crf": 15,
+            "bytes": 290233,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8638379389109616 < 0.97",
+              "hf energy ×0.5075284308261111 < 0.95"
+            ]
+          },
+          {
+            "crf": 14,
+            "bytes": 330816,
+            "pass": false,
+            "misses": [
+              "luma std ×0.870736749815065 < 0.97",
+              "hf energy ×0.5287984750841236 < 0.95"
+            ]
+          },
+          {
+            "crf": 13,
+            "bytes": 374486,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8779137722324833 < 0.97",
+              "hf energy ×0.5481118745806257 < 0.95"
+            ]
+          },
+          {
+            "crf": 12,
+            "bytes": 430909,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8847214900961536 < 0.97",
+              "hf energy ×0.5680805797274613 < 0.95"
+            ]
+          },
+          {
+            "crf": 11,
+            "bytes": 555719,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8936377700254354 < 0.97",
+              "hf energy ×0.5832567948156481 < 0.95"
+            ]
+          },
+          {
+            "crf": 10,
+            "bytes": 663275,
+            "pass": false,
+            "misses": [
+              "luma std ×0.899640604869983 < 0.97",
+              "hf energy ×0.5994773784653984 < 0.95"
+            ]
+          },
+          {
+            "crf": 9,
+            "bytes": 802162,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9072551141010127 < 0.97",
+              "hf energy ×0.6216654418748105 < 0.95"
+            ]
+          },
+          {
+            "crf": 8,
+            "bytes": 985165,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9194718850762366 < 0.97",
+              "hf energy ×0.6623860473818254 < 0.95"
+            ]
+          },
+          {
+            "crf": 7,
+            "bytes": 1151124,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9285311339942696 < 0.97",
+              "hf energy ×0.6923523947488074 < 0.95"
+            ]
+          },
+          {
+            "crf": 6,
+            "bytes": 1495690,
+            "pass": false,
+            "misses": [
+              "luma std ×0.941474626213265 < 0.97",
+              "hf energy ×0.7405090355874567 < 0.95"
+            ]
+          },
+          {
+            "crf": 5,
+            "bytes": 1835364,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9523814138808934 < 0.97",
+              "hf energy ×0.7859335482120137 < 0.95"
+            ]
+          },
+          {
+            "crf": 4,
+            "bytes": 2371694,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9672516441227468 < 0.97",
+              "hf energy ×0.8488636732909649 < 0.95"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "desk.screen.staticLayer": {
+    "source": "07bb7569c2b460a06e09c6832e010966405d6a3848e83df8168212f97937fbb9",
+    "recipe": "ac10609dfe16857b7e11940843c756136f09c94289440c633201aab945636de5",
+    "tools": {
+      "ffmpeg": "8.1.1-full_build-www.gyan.dev"
+    },
+    "outputs": [
+      "/assets/desk/screen/static-layer.av1.6bf255df22.webm",
+      "/assets/desk/screen/static-layer.h264.abb75bf968.mp4"
+    ],
+    "value": {
+      "width": 640,
+      "height": 480,
+      "sources": [
+        {
+          "src": "/assets/desk/screen/static-layer.av1.6bf255df22.webm",
+          "type": "video/webm; codecs=\"av01.0.04M.08\""
+        },
+        {
+          "src": "/assets/desk/screen/static-layer.h264.abb75bf968.mp4",
+          "type": "video/mp4; codecs=\"avc1.4D401E\""
+        }
+      ]
+    },
+    "parity": {
+      "gate": {
+        "ssim": 0.995,
+        "vmaf": 95,
+        "lumaMean": 0.02,
+        "lumaStd": 0.97,
+        "hf": 0.95,
+        "composite": {
+          "opacity": 0.1,
+          "crop": "600x480+20+0"
+        }
+      },
+      "sourceBytes": 4492461,
+      "seam": 0.90268,
+      "variants": [
+        {
+          "codec": "av1",
+          "setting": "crf 11",
+          "bytes": 913307,
+          "frames": {
+            "source": 900,
+            "encode": 900
+          },
+          "ssim": 0.999855,
+          "vmaf": 97.711,
+          "lumaMean": 1.0006,
+          "lumaStd": 0.997,
+          "hf": 0.952
+        },
+        {
+          "codec": "h264",
+          "setting": "crf 22",
+          "bytes": 1018117,
+          "frames": {
+            "source": 900,
+            "encode": 900
+          },
+          "ssim": 0.999902,
+          "vmaf": 97.718,
+          "lumaMean": 0.9999,
+          "lumaStd": 0.9982,
+          "hf": 0.9599
+        }
+      ],
+      "dropped": [
+        "vp9: no crf passes below h264's 1018117 bytes; left out"
+      ],
+      "trials": {
+        "h264": [
+          {
+            "crf": 14,
+            "bytes": 2161291,
+            "pass": true
+          },
+          {
+            "crf": 21,
+            "bytes": 1126257,
+            "pass": true
+          },
+          {
+            "crf": 25,
+            "bytes": 695664,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.8046342211794448 < 0.95"
+            ]
+          },
+          {
+            "crf": 23,
+            "bytes": 897983,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9115519684353661 < 0.95"
+            ]
+          },
+          {
+            "crf": 22,
+            "bytes": 1018117,
+            "pass": true
+          }
+        ],
+        "vp9": [
+          {
+            "crf": 16,
+            "bytes": 894439,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.8749151606144161 < 0.95"
+            ]
+          },
+          {
+            "crf": 15,
+            "bytes": 965281,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.8897882946344701 < 0.95"
+            ]
+          },
+          {
+            "crf": 14,
+            "bytes": 1017385,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.8990588815519767 < 0.95"
+            ]
+          },
+          {
+            "crf": 13,
+            "bytes": 1076811,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9106787052818628 < 0.95"
+            ]
+          }
+        ],
+        "av1": [
+          {
+            "crf": 16,
+            "bytes": 612077,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9057640213126404 < 0.95"
+            ]
+          },
+          {
+            "crf": 15,
+            "bytes": 677599,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9219579397758024 < 0.95"
+            ]
+          },
+          {
+            "crf": 14,
+            "bytes": 719078,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9332283973640709 < 0.95"
+            ]
+          },
+          {
+            "crf": 13,
+            "bytes": 771771,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9381162471269524 < 0.95"
+            ]
+          },
+          {
+            "crf": 12,
+            "bytes": 829169,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9431388516269108 < 0.95"
+            ]
+          },
+          {
+            "crf": 11,
+            "bytes": 913307,
+            "pass": true
+          }
+        ]
+      }
+    }
+  },
   "desk.audio.key1": {
     "source": "4a413b3a0d4e0f95a60a0b76e9cb7a43ad756f744fadcfcf64b53b723dc854da",
     "recipe": "f9405693250973ec524418d14615bb23efc336846c6081312cc8fc2a6e2e3b7a",

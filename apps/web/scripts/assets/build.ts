@@ -18,6 +18,7 @@ import { copyStage } from './stages/copy.ts'
 import { imageStage, textureStage } from './stages/image.ts'
 import { modelStage } from './stages/model.ts'
 import type { StageResult } from './stages/stage.ts'
+import { videoStage } from './stages/video.ts'
 
 type Stage = (recipe: Recipe, bytes: Uint8Array) => Promise<StageResult>
 
@@ -27,6 +28,7 @@ const STAGES: Partial<Record<Recipe['kind'], Stage>> = {
   image: (recipe, bytes) => imageStage(recipe as Extract<Recipe, { kind: 'image' }>, bytes),
   texture: (recipe, bytes) => textureStage(recipe as Extract<Recipe, { kind: 'texture' }>, bytes),
   model: (recipe, bytes) => modelStage(recipe as Extract<Recipe, { kind: 'model' }>, bytes),
+  video: (recipe, bytes) => videoStage(recipe as Extract<Recipe, { kind: 'video' }>, bytes),
 }
 
 const { values } = parseArgs({
