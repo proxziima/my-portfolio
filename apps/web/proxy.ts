@@ -11,6 +11,8 @@ export function proxy(request: NextRequest) {
   if (!target) return new NextResponse(null, { status: 404 })
   const headers = new Headers(request.headers)
   headers.set('host', target.host)
+  // PostHog ingestion needs no cookies; never leak the site's own (e.g. the signed visitor id).
+  headers.delete('cookie')
   return NextResponse.rewrite(target, { request: { headers } })
 }
 
