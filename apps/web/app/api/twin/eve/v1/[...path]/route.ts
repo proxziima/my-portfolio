@@ -1,7 +1,9 @@
+import { captureServerError } from '@repo/observability/server'
 import { REFUSAL_STATUS, TwinRefusal } from '@repo/twin/contract'
 import { createConversation, ownsSession, touchVisitor, updateConversation } from '@repo/twin/db'
 import { fetchRedactionRules } from '@repo/twin/redact'
 import { z } from 'zod'
+import { posthogIdsFromRequest } from '@/lib/analytics/request'
 import { twinDb } from '@/lib/twin/db'
 import { twinEnv } from '@/lib/twin/env'
 import { createEventFilter, filterStream } from '@/lib/twin/filter'
@@ -56,6 +58,7 @@ const failSafe =
       return await handler(request, context)
     } catch (error) {
       console.error(`[twin] ${name} failed`, error)
+      captureServerError(error, { distinctId: posthogIdsFromRequest(request)?.distinctId, properties: { handler: `twin.${name}` } })
       return refuse('offline')
     }
   }
