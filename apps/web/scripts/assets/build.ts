@@ -15,7 +15,8 @@ import { sha256 } from './hash.ts'
 import { checkLock, LOCK_FILE, outputFile, recipeHash, writeManifest, type Lock } from './manifest.ts'
 import { RECIPES, SOURCE_DIR, type Recipe } from './recipes.ts'
 import { copyStage } from './stages/copy.ts'
-import { imageStage } from './stages/image.ts'
+import { imageStage, textureStage } from './stages/image.ts'
+import { modelStage } from './stages/model.ts'
 import type { StageResult } from './stages/stage.ts'
 
 type Stage = (recipe: Recipe, bytes: Uint8Array) => Promise<StageResult>
@@ -24,6 +25,8 @@ type Stage = (recipe: Recipe, bytes: Uint8Array) => Promise<StageResult>
 const STAGES: Partial<Record<Recipe['kind'], Stage>> = {
   copy: async (recipe, bytes) => copyStage(recipe.source, bytes),
   image: (recipe, bytes) => imageStage(recipe as Extract<Recipe, { kind: 'image' }>, bytes),
+  texture: (recipe, bytes) => textureStage(recipe as Extract<Recipe, { kind: 'texture' }>, bytes),
+  model: (recipe, bytes) => modelStage(recipe as Extract<Recipe, { kind: 'model' }>, bytes),
 }
 
 const { values } = parseArgs({

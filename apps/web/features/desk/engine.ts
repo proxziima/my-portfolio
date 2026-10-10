@@ -1,5 +1,6 @@
 import { PerspectiveCamera, Scene, WebGLRenderer } from 'three'
 import { CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js'
+import { textureFormat } from '@/lib/assets/texture-format'
 import { loadDesk, type LoadedDesk } from './assets'
 import { CameraRig, type CameraKey } from './camera-rig'
 import { CAMERA, DESK_ASSETS } from './config'
@@ -124,7 +125,7 @@ export function createDeskEngine({
   return {
     iframe: screen.iframe,
     async load() {
-      const loaded = await loadDesk(DESK_ASSETS)
+      const loaded = await loadDesk(DESK_ASSETS, await textureFormat())
       if (disposed) {
         loaded.dispose()
         return

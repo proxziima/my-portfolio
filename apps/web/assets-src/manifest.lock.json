@@ -1,4 +1,181 @@
 {
+  "desk.computer.model": {
+    "source": "5b7ecb5d0d1c21ab1253fc57b64f235f4040ba0751cfe0ff204141deb1dbc236",
+    "recipe": "26601e406dc5e6e4f6497cfe8fcc53bcf39652dedb470b0a8e70adcf552f65ba",
+    "tools": {
+      "gltf-transform": "4.5.1",
+      "meshoptimizer": "1.3.0"
+    },
+    "outputs": [
+      "/assets/desk/computer.d460259735.glb"
+    ],
+    "value": "/assets/desk/computer.d460259735.glb",
+    "parity": {
+      "quantize": {
+        "position": 16,
+        "texcoord": 16
+      },
+      "nodes": [
+        "monitor_base",
+        "computer",
+        "keyboard",
+        "mouse",
+        "cables"
+      ]
+    }
+  },
+  "desk.decor.model": {
+    "source": "b25f99d3fbf42cb54009c398b61eed86b78679f426800237daa5077c7a46c832",
+    "recipe": "9635e07d3d482b25b52fd1b4145a92385490d6030a0757ca5f85d2f6b78db05d",
+    "tools": {
+      "gltf-transform": "4.5.1",
+      "meshoptimizer": "1.3.0"
+    },
+    "outputs": [
+      "/assets/desk/decor.05f19c1c50.glb"
+    ],
+    "value": "/assets/desk/decor.05f19c1c50.glb",
+    "parity": {
+      "quantize": {
+        "position": 16,
+        "texcoord": 16
+      },
+      "nodes": [
+        "binder_1",
+        "coffee",
+        "paper",
+        "paper_holder_bottom",
+        "paper_stack_1",
+        "paper_stack_2",
+        "plant",
+        "paper_holder_top",
+        "binder_2"
+      ]
+    }
+  },
+  "desk.environment.model": {
+    "source": "817a3daf8da639268bcd57327277919888432e6e53a75a4201e7c2788b329672",
+    "recipe": "996fa54648a4a46c1aa4fafbd576946d2533689c24386a2b7e5a73aa9ba700f3",
+    "tools": {
+      "gltf-transform": "4.5.1",
+      "meshoptimizer": "1.3.0"
+    },
+    "outputs": [
+      "/assets/desk/environment.e2f9334272.glb"
+    ],
+    "value": "/assets/desk/environment.e2f9334272.glb",
+    "parity": {
+      "quantize": {
+        "position": 16,
+        "texcoord": 16
+      },
+      "nodes": [
+        "Background",
+        "desk",
+        "chair_base",
+        "chair_seat"
+      ]
+    }
+  },
+  "desk.computer.texture": {
+    "source": "276c0573e3b9c8e0cdcaf27bed04fc482f247ad32e7c923dc24f8027dd9a531a",
+    "recipe": "77db5f0bc4b98b0af8d17bc3da8fba7878197f4e7acfc792cb664cedea5c933f",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/computer.253a711d73.avif",
+      "/assets/desk/computer.ab91da5774.webp"
+    ],
+    "value": {
+      "avif": "/assets/desk/computer.253a711d73.avif",
+      "webp": "/assets/desk/computer.ab91da5774.webp",
+      "width": 2048,
+      "height": 2048
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "avif",
+          "q": 62,
+          "ssim": 0.99538
+        },
+        {
+          "variant": "webp",
+          "q": 82,
+          "ssim": 0.99561
+        }
+      ]
+    }
+  },
+  "desk.decor.texture": {
+    "source": "8d10fe92fe4583d369979dc9d9e00de55b2378c84e379577586a300403fba903",
+    "recipe": "937e1e00c4458a0723eac3079d122fc11989552059b775eb4e2dd6188c1a945c",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/decor.705a7bcd50.avif",
+      "/assets/desk/decor.724c5357e3.webp"
+    ],
+    "value": {
+      "avif": "/assets/desk/decor.705a7bcd50.avif",
+      "webp": "/assets/desk/decor.724c5357e3.webp",
+      "width": 2048,
+      "height": 2048
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "avif",
+          "q": 54,
+          "ssim": 0.99511
+        },
+        {
+          "variant": "webp",
+          "q": 82,
+          "ssim": 0.99612
+        }
+      ]
+    }
+  },
+  "desk.environment.texture": {
+    "source": "20ed3e935b9135497b0ecd3b742b1579dffce5a705b972b291d4a9a5959b60be",
+    "recipe": "a07a044351314820da90192230d47f6afce9235935ef41476df1c373ca4d089a",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/environment.fa7839018b.avif",
+      "/assets/desk/environment.23741d6cd3.webp"
+    ],
+    "value": {
+      "avif": "/assets/desk/environment.fa7839018b.avif",
+      "webp": "/assets/desk/environment.23741d6cd3.webp",
+      "width": 2048,
+      "height": 2048
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "avif",
+          "q": 50,
+          "ssim": 0.99507
+        },
+        {
+          "variant": "webp",
+          "q": 82,
+          "ssim": 0.99636
+        }
+      ]
+    }
+  },
   "desk.screen.smudges": {
     "source": "40a193b51032669561dec6e10aff6e049cd9df1527a9e2cfe17fc3569933d716",
     "recipe": "6b426ee2d0cf830ec19eca60fd740472410cb02353c66e77f56218c24763c49e",

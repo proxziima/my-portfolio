@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import sharp, { type Sharp } from 'sharp'
-import type { ImageAsset, ImageVariant } from '../../../lib/assets/types.ts'
+import type { ImageAsset, ImageVariant, TextureAsset } from '../../../lib/assets/types.ts'
 import { hashedName } from '../hash.ts'
 import { composite, onSolid, ssim, type RawImage } from '../parity/image.ts'
 import type { ImageFormat, Recipe } from '../recipes.ts'
@@ -168,6 +168,57 @@ export async function imageStage(recipe: ImageRecipe, bytes: Uint8Array): Promis
   }
 
   const value: ImageAsset = { width: srcW, height: srcH, variants }
+  return {
+    outputs,
+    value: value as unknown as StageResult['value'],
+    parity: { gate: recipe.parity.ssim, variants: parity, ...(dropped.length ? { dropped } : {}) },
+    tools: { sharp: sharp.versions.sharp ?? 'unknown', libvips: sharp.versions.vips },
+  }
+}
+
+type TextureRecipe = Extract<Recipe, { kind: 'texture' }>
+
+/**
+ * A GL texture at the source size (2048², what the full-screen monitor samples): AVIF and WebP, each
+ * at the lowest quality (not below the encoder's default) whose SSIM against the source holds the
+ * gate. The source is already lossy, so generation loss is the risk: AVIF is kept only when a passing
+ * encode is smaller than the source WebP, and the WebP is the source bytes, hashed, unless a passing
+ * re-encode beats them.
+ */
+export async function textureStage(recipe: TextureRecipe, bytes: Uint8Array): Promise<StageResult> {
+  const meta = await sharp(bytes).metadata()
+  const { width, height } = meta
+  const srcExt = recipe.source.split('.').at(-1)!.toLowerCase()
+  if (srcExt !== 'webp') throw new Error(`${recipe.id}: texture sources are WebP (the fallback every context decodes), got .${srcExt}`)
+  const views = (img: RawImage) => (meta.hasAlpha ? [onSolid(img, [0, 0, 0]), onSolid(img, [255, 255, 255])] : [img])
+  const refViews = views(await raw(bytes))
+  const score = async (b: Uint8Array) => {
+    const cand = views(await raw(b))
+    return Math.min(...cand.map((v, i) => ssim(refViews[i]!, v)))
+  }
+
+  const picked: Partial<Record<ImageFormat, Candidate>> = {}
+  const dropped: string[] = []
+  for (const format of ['avif', 'webp'] as const) {
+    const candidate = await search((q) => encode(bytes, width, format, q), score, recipe.parity.ssim, MIN_Q[format], bytes.byteLength)
+    if (candidate && candidate.bytes.byteLength < bytes.byteLength) picked[format] = candidate
+    else dropped.push(`${format}: no quality ≥ q${MIN_Q[format]} passes ssim ≥ ${recipe.parity.ssim} below the source's ${bytes.byteLength} bytes`)
+  }
+  picked.webp ??= { bytes, q: 'source', ssim: 1 }
+
+  const outputs: StageOutput[] = []
+  const paths: Partial<Record<ImageFormat, string>> = {}
+  const parity: Array<{ variant: string; q: Quality | 'source'; ssim: number }> = []
+  for (const format of ['avif', 'webp'] as const) {
+    const candidate = picked[format]
+    if (!candidate) continue
+    const path = assetPath(hashedName(recipe.source, candidate.bytes, format))
+    paths[format] = path
+    outputs.push({ path, bytes: candidate.bytes, label: `${format} q${candidate.q} ssim ${round(candidate.ssim)}` })
+    parity.push({ variant: format, q: candidate.q, ssim: round(candidate.ssim) })
+  }
+
+  const value: TextureAsset = { ...(paths.avif ? { avif: paths.avif } : {}), webp: paths.webp!, width, height }
   return {
     outputs,
     value: value as unknown as StageResult['value'],

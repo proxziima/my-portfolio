@@ -3,6 +3,33 @@ export type { ImageAsset, ImageVariant, TextureAsset, VideoAsset, VideoSource } 
 
 export const ASSETS = {
   desk: {
+    computer: {
+      model: '/assets/desk/computer.d460259735.glb',
+      texture: {
+        avif: '/assets/desk/computer.253a711d73.avif',
+        webp: '/assets/desk/computer.ab91da5774.webp',
+        width: 2048,
+        height: 2048,
+      },
+    },
+    decor: {
+      model: '/assets/desk/decor.05f19c1c50.glb',
+      texture: {
+        avif: '/assets/desk/decor.705a7bcd50.avif',
+        webp: '/assets/desk/decor.724c5357e3.webp',
+        width: 2048,
+        height: 2048,
+      },
+    },
+    environment: {
+      model: '/assets/desk/environment.e2f9334272.glb',
+      texture: {
+        avif: '/assets/desk/environment.fa7839018b.avif',
+        webp: '/assets/desk/environment.23741d6cd3.webp',
+        width: 2048,
+        height: 2048,
+      },
+    },
     screen: {
       smudges: {
         width: 2048,
