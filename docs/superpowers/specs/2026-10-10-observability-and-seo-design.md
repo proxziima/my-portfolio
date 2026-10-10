@@ -2,6 +2,8 @@
 
 Date: 2026-10-10 · Branch: `feat/observability` · Status: approved (owner asked for no question gates)
 
+> **Status note:** implemented with deviations. See [Deviations from the spec](../../observability.md#deviations-from-the-spec) in `docs/observability.md`.
+
 ## Goal
 
 One PostHog project answers four questions for the portfolio:
