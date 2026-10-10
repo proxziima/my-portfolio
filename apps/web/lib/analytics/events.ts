@@ -1,4 +1,4 @@
-import posthog from 'posthog-js'
+import type { PostHog } from 'posthog-js'
 
 /** Where a link leads, for the outbound and conversion insights. */
 export type LinkChannel = 'github' | 'linkedin' | 'email' | 'calendar' | 'other'
@@ -33,17 +33,50 @@ export interface AnalyticsEvents {
 export type AnalyticsEvent = keyof AnalyticsEvents
 export type Track = <E extends AnalyticsEvent>(event: E, properties: AnalyticsEvents[E]) => void
 
-const ready = () => typeof window !== 'undefined' && posthog.__loaded
+/** What the senders need from posthog; handed over by `initPostHog` once the library has loaded. */
+type Client = Pick<PostHog, 'capture' | 'captureException'>
+type Send = (client: Client) => void
 
-/** Sends one catalog event; a no-op until PostHog is initialised (no token, tests, SSR). */
+/** Enough for everything a visit does before the library arrives; beyond it the oldest go first. */
+const QUEUE_MAX = 100
+let client: Client | null = null
+const queue: Send[] = []
+
+/** Sends now, or once the client is attached; nothing leaves without a token (no attach, then a discard). */
+function send(fn: Send): void {
+  if (typeof window === 'undefined') return
+  if (client) return fn(client)
+  queue.push(fn)
+  if (queue.length > QUEUE_MAX) queue.shift()
+}
+
+/** Hands the loaded client over and flushes, in order, what was sent before it existed. */
+export function attach(next: Client): void {
+  client = next
+  for (const fn of queue.splice(0)) fn(next)
+}
+
+/** Analytics is off for this document (no token): drop what waited for a client that never comes. */
+export function discardQueue(): void {
+  queue.length = 0
+}
+
+/** Sends one catalog event; before posthog-js has loaded it waits in a short in-memory queue. */
 export const track: Track = (event, properties) => {
-  if (ready()) posthog.capture(event, properties)
+  send((c) => c.capture(event, properties))
 }
 
 /**
  * `track` for the moment the page hides or unloads: sent at once (the batch queue may never drain)
  * over a beacon, which the browser delivers after the page is gone. A beacon cannot be retried.
+ * Before posthog-js has loaded it is queued like any event: a hidden tab often comes back, and the
+ * flush still goes out as a beacon; a page that truly unloads first loses it, as no code is left.
  */
 export const trackOnExit: Track = (event, properties) => {
-  if (ready()) posthog.capture(event, properties, { transport: 'sendBeacon', send_instantly: true })
+  send((c) => c.capture(event, properties, { transport: 'sendBeacon', send_instantly: true }))
+}
+
+/** Reports an error an error boundary caught; queued like an event until posthog-js has loaded. */
+export function captureException(error: unknown): void {
+  send((c) => c.captureException(error))
 }

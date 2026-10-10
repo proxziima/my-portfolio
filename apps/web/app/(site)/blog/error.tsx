@@ -1,13 +1,13 @@
 'use client'
 
-import posthog from 'posthog-js'
 import { useEffect } from 'react'
+import { captureException } from '@/lib/analytics/events'
 import { PreviewNotice } from '@/features/blog/PreviewNotice'
 
 // Only reachable in draft mode (the page 404s otherwise), so this always talks to an editor.
 export default function PreviewError({ error }: { error: Error & { digest?: string } }) {
   useEffect(() => {
-    posthog.captureException(error)
+    captureException(error)
   }, [error])
   return (
     <PreviewNotice title="Preview couldn't load">
