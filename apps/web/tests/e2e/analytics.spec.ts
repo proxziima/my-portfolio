@@ -4,7 +4,10 @@ import { openPortfolio, test } from './support'
 
 type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
-/** posthog-js posts `/e/` either gzipped (`compression=gzip-js`) or as plain JSON; both decode to an array or `{ batch }`. */
+/**
+ * posthog-js posts `/e/` gzipped (`compression=gzip-js`), as plain JSON, or, for `sendBeacon`, as a
+ * form body `data=<base64 JSON>`; all decode to an array or `{ batch }`.
+ */
 function eventsOf(request: Request): CapturedEvent[] {
   const body = request.postDataBuffer()
   if (!body) return []
@@ -14,6 +17,8 @@ function eventsOf(request: Request): CapturedEvent[] {
   } catch {
     text = body.toString('utf8')
   }
+  const form = new URLSearchParams(text).get('data')
+  if (text.startsWith('data=') && form) text = Buffer.from(form, 'base64').toString('utf8')
   try {
     const parsed = JSON.parse(text) as unknown
     const list = Array.isArray(parsed) ? parsed : ((parsed as { batch?: unknown[] }).batch ?? [parsed])
@@ -60,6 +65,26 @@ test.describe('analytics and SEO', () => {
     expect(outbound.properties).toMatchObject({ kind: expect.stringMatching(/external|mailto/), href: expect.any(String), channel: expect.any(String) })
     // sections are named by their id, as the dashboards filter them
     await expect.poll(() => events.filter((e) => e.event === 'section_viewed').map((e) => e.properties.section)).toContain('work')
+  })
+
+  test('engaged time per section is reported when the page hides', async ({ page }) => {
+    const events = await captureRelay(page)
+    await openPortfolio(page)
+    const work = page.locator('section#work')
+    await work.scrollIntoViewIfNeeded()
+    // a couple of seconds of real reading: input keeps the visitor engaged
+    for (let i = 0; i < 4; i++) {
+      await page.mouse.wheel(0, 1)
+      await page.waitForTimeout(500)
+    }
+    // the tab hides: the exit beacon goes out
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await expect.poll(() => events.find((e) => e.event === 'section_engaged' && e.properties.section === 'work'), { timeout: 15_000 }).toBeTruthy()
+    const engaged = events.find((e) => e.event === 'section_engaged' && e.properties.section === 'work')!
+    expect(engaged.properties.seconds).toBeGreaterThanOrEqual(1)
   })
 
   test('home has canonical, JSON-LD, and robots/sitemap are served', async ({ page, request }) => {

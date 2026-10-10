@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <div id="flick" aria-hidden="true" />
         {children}
-        <Analytics config={clientAnalyticsConfig()} />
+        <Analytics config={clientAnalyticsConfig()} surface="site" />
       </body>
     </html>
   )

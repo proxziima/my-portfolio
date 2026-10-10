@@ -11,9 +11,11 @@ export interface AnalyticsEvents {
   outbound_click: { href: string; host: string; kind: 'external' | 'mailto'; channel: LinkChannel; section: string | null }
   cta_clicked: { cta: string; section: string | null }
   section_viewed: { section: string }
+  section_engaged: { section: string; seconds: number }
   role_selected: { role: string }
   theme_changed: { theme: 'light' | 'dark' }
   os_app_opened: { app: string }
+  os_engaged: { seconds: number; embedded: boolean; apps_opened: number }
   twin_session_started: { resumed: boolean }
   twin_message_sent: { chars: number; turn: number }
   twin_refusal: { reason: string }
@@ -25,8 +27,17 @@ export interface AnalyticsEvents {
 export type AnalyticsEvent = keyof AnalyticsEvents
 export type Track = <E extends AnalyticsEvent>(event: E, properties: AnalyticsEvents[E]) => void
 
+const ready = () => typeof window !== 'undefined' && posthog.__loaded
+
 /** Sends one catalog event; a no-op until PostHog is initialised (no token, tests, SSR). */
 export const track: Track = (event, properties) => {
-  if (typeof window === 'undefined' || !posthog.__loaded) return
-  posthog.capture(event, properties)
+  if (ready()) posthog.capture(event, properties)
+}
+
+/**
+ * `track` for the moment the page hides or unloads: sent at once (the batch queue may never drain)
+ * over a beacon, which the browser delivers after the page is gone. A beacon cannot be retried.
+ */
+export const trackOnExit: Track = (event, properties) => {
+  if (ready()) posthog.capture(event, properties, { transport: 'sendBeacon', send_instantly: true })
 }

@@ -9,6 +9,7 @@ import { Window } from './Window'
 import { activeWindow, EMPTY_WINDOWS, windowReducer } from './window-manager'
 import styles from './Desktop.module.css'
 import { track } from '@/lib/analytics/events'
+import { countAppOpen } from '@/lib/analytics/os-engagement'
 
 type Phase = 'boot' | 'desktop' | 'shutdown'
 
@@ -33,6 +34,7 @@ export function Desktop({ data }: { data: OsData }) {
   const open = useCallback((id: string) => {
     dispatch({ type: 'open', id })
     track('os_app_opened', { app: id })
+    countAppOpen()
   }, [])
 
   if (phase === 'boot') return <Boot name={data.profile.name} onDone={boot} />

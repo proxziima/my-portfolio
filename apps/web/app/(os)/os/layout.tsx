@@ -28,7 +28,7 @@ export default function OsLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
-        <Analytics config={clientAnalyticsConfig()} />
+        <Analytics config={clientAnalyticsConfig()} surface="os" />
       </body>
     </html>
   )
