@@ -30,6 +30,7 @@
     "@payloadcms/richtext-lexical": "3.90.2",
     "@payloadcms/ui": "3.90.2",
     "@repo/cms-types": "*",
+    "@repo/observability": "*",
     "@repo/twin": "*",
     "cross-env": "^7.0.3",
     "dotenv": "16.4.7",
