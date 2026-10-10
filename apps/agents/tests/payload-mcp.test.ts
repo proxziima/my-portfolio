@@ -86,8 +86,9 @@ describe('callPayloadTool tracing', () => {
   })
 
   it('marks the span failed when the tool errors', async () => {
-    m.result = { isError: true, content: [{ type: 'text', text: 'boom' }] }
-    await expect(callPayloadTool('twinDisclose', {}, Schema)).rejects.toThrow(/twinDisclose failed/)
+    m.result = { isError: true, content: [{ type: 'text', text: 'boom: visitor said Rosebud' }] }
+    // the tool's content can echo visitor text, and the message becomes exception text: fixed wording only
+    await expect(callPayloadTool('twinDisclose', {}, Schema)).rejects.toThrow(new Error('Payload MCP twinDisclose failed'))
     const [span] = exporter.getFinishedSpans()
     expect(span!.status.code).toBe(2)
     expect(span!.attributes['error.type']).toBe('Error')

@@ -34,7 +34,8 @@ export async function callPayloadTool<S extends z.ZodType>(
       if (transport.sessionId) span.setAttribute('mcp.session.id', transport.sessionId)
       const meta = traceMeta()
       const result = await client.callTool({ name, arguments: args, ...(meta ? { _meta: meta } : {}) }, undefined, { timeout: PAYLOAD_MCP_TIMEOUT_MS })
-      if (result.isError) throw new Error(`Payload MCP ${name} failed: ${JSON.stringify(result.content)}`)
+      // Fixed wording: the tool's content can echo visitor text, and this message becomes exception text in Error Tracking.
+      if (result.isError) throw new Error(`Payload MCP ${name} failed`)
       const content = Content.safeParse(result.content)
       if (!content.success) throw new Error(`Payload MCP ${name} returned malformed content`)
       const text = content.data.find((c) => c.type === 'text')?.text
