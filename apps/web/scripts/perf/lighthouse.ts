@@ -4,10 +4,11 @@
  * Procedure (the baseline and every phase checkpoint use exactly this):
  *   1. CMS on 3201, from apps/payload (never payload.db):
  *        $env:DATABASE_URL='file:./payload.e2e.db'; bunx cross-env NODE_OPTIONS=--no-deprecation next dev --port 3201
- *   2. Production build of web, from apps/web (apps/web/.env.local points CMS_URL at 3201):
- *        bunx next build
- *   3. This script, from apps/web. `--serve` starts `next start` on --port (default 3100) from that build,
- *      waits for it, measures, and stops it; without `--serve` it measures whatever answers on --url.
+ *   2. This script, from apps/web (apps/web/.env.local points CMS_URL at 3201). `--serve` builds with the
+ *      package `build` script (`bun run build`: `next build`, then the source maps are stripped exactly as
+ *      in the Docker image, so the measured bundle is the production one), starts `next start` on --port
+ *      (default 3100), waits for it, measures, and stops it; without `--serve` it measures whatever answers
+ *      on --url.
  *        node scripts/perf/lighthouse.ts --serve --runs 3 --out <dir> [--compare <dir>/summary.json]
  *
  * Each form factor (mobile = Lighthouse's default Moto G Power emulation with simulated slow 4G;
@@ -154,6 +155,8 @@ function stop(server: ChildProcess) {
 let server: ChildProcess | null = null
 try {
   if (values.serve) {
+    const build = spawnSync('bun', ['run', 'build'], { stdio: 'inherit', shell: process.platform === 'win32' })
+    if (build.status !== 0) throw new Error(`bun run build exited ${build.status}`)
     server = spawn('bunx', ['next', 'start', '-p', String(port)], { stdio: 'ignore', shell: process.platform === 'win32' })
     await waitFor(url, 60_000)
   }
