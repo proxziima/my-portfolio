@@ -8,6 +8,9 @@ type McpEvent =
 
 type ToolCallParams = { name?: string; arguments?: unknown; _meta?: { traceparent?: string } }
 
+/** Every client session opens with these: counting them only adds noise next to the real traffic. */
+const isHandshake = (method: string): boolean => method === 'initialize' || method.startsWith('notifications/')
+
 const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$/
 
 /** Argument names only, sorted: values can hold visitor text, which the agent side redacts but this process can't. */
@@ -23,14 +26,15 @@ const paramsOf = (event: Extract<McpEvent, { type: 'REQUEST_RECEIVED' | 'REQUEST
 }
 
 /**
- * The PostHog event for one MCP event, or null when it isn't reported. A `tools/call` becomes an
+ * The PostHog event for one MCP event, or null when it isn't reported (anything but a completed
+ * request, and the `initialize` / `notifications/*` handshake). A `tools/call` becomes an
  * `$ai_span`; with the caller's `_meta.traceparent` (the twin sends one) it nests under the
  * caller's trace, otherwise the MCP session or request is its own trace (Claude Code, other clients).
  * mcp-handler 1.1's `onEvent` sees neither the tool output nor tool-level `isError` (the twin's own
  * `tools/call` span traces those client-side), and argument values are never recorded, only names.
  */
 export function mcpEventToCapture(event: McpEvent): { distinctId: string; event: string; properties: Record<string, unknown> } | null {
-  if (event.type !== 'REQUEST_COMPLETED') return null
+  if (event.type !== 'REQUEST_COMPLETED' || isHandshake(event.method)) return null
   if (event.method !== 'tools/call') return { distinctId: 'mcp:payload', event: 'mcp_request', properties: { method: event.method, status: event.status } }
   const params = paramsOf(event)
   const parent = TRACEPARENT.exec(params._meta?.traceparent ?? '')

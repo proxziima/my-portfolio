@@ -52,4 +52,10 @@ describe('mcpEventToCapture', () => {
     expect(mcpEventToCapture({ type: 'REQUEST_RECEIVED', timestamp: 0, method: 'tools/call', status: 'success' })).toBeNull()
     expect(mcpEventToCapture({ type: 'SESSION_STARTED', timestamp: 0, transport: 'HTTP' })).toBeNull()
   })
+
+  it('skips the handshake and notifications, which carry no signal', () => {
+    expect(mcpEventToCapture({ type: 'REQUEST_COMPLETED', timestamp: 0, method: 'initialize', status: 'success' })).toBeNull()
+    expect(mcpEventToCapture({ type: 'REQUEST_COMPLETED', timestamp: 0, method: 'notifications/initialized', status: 'success' })).toBeNull()
+    expect(mcpEventToCapture({ type: 'REQUEST_COMPLETED', timestamp: 0, method: 'notifications/cancelled', status: 'success' })).toBeNull()
+  })
 })
