@@ -104,7 +104,9 @@ function lighthouse(form: Form, path: string, cpu: number | null): Report {
     ...(cpu === null ? [] : [`--throttling.cpuSlowdownMultiplier=${cpu}`]),
     ...(form === 'desktop' ? ['--preset=desktop'] : []),
   ]
-  const r = spawnSync('bunx', args, { stdio: 'inherit', shell: process.platform === 'win32' })
+  // under a Windows shell an argument with a space (this repo's path, the chrome flags) must be quoted
+  const argv = process.platform === 'win32' ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args
+  const r = spawnSync('bunx', argv, { stdio: 'inherit', shell: process.platform === 'win32' })
   if (r.status !== 0) throw new Error(`lighthouse (${form}) exited ${r.status}`)
   return JSON.parse(readFileSync(path, 'utf8')) as Report
 }
