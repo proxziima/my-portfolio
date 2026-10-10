@@ -1,3 +1,4 @@
+import { MAX_ID_LENGTH } from '@repo/observability/cookie'
 import { extractBearerToken, verifyJwtHmac, type AuthFn } from 'eve/channels/auth'
 import { getEnv } from './env'
 import { visitorIdOf, type Principal } from './identity'
@@ -7,12 +8,12 @@ export type VisitorPrincipal = Principal & { issuer?: string; subject?: string }
 
 const CARRIED = ['tz', 'ph_did', 'ph_sid'] as const
 
-/** The JWT claims the twin reads: the zone and the browser's PostHog ids. Anything else is dropped. */
+/** The JWT claims the twin reads: the zone and the browser's PostHog ids, bounded like the cookie they came from. Anything else is dropped. */
 function carriedAttributes(attributes: VisitorPrincipal['attributes'] | undefined): Record<string, string> {
   const out: Record<string, string> = {}
   for (const key of CARRIED) {
     const value = attributes?.[key]
-    if (typeof value === 'string' && value.length > 0 && value.length <= 200) out[key] = value
+    if (typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH) out[key] = value
   }
   return out
 }

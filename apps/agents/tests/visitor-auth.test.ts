@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto'
+import { MAX_ID_LENGTH } from '@repo/observability/cookie'
 import { describe, expect, it, vi } from 'vitest'
 import { toVisitorPrincipal, visitorAuth } from '../agent/lib/visitor-auth'
 
@@ -27,8 +28,13 @@ describe('toVisitorPrincipal analytics attributes', () => {
   })
 
   it('drops non-string or oversized values', () => {
-    const p = toVisitorPrincipal({ ...base, attributes: { ph_did: 'x'.repeat(201), ph_sid: ['a'] } as unknown as Record<string, string> })
+    const p = toVisitorPrincipal({ ...base, attributes: { ph_did: 'x'.repeat(MAX_ID_LENGTH + 1), ph_sid: ['a'] } as unknown as Record<string, string> })
     expect(p?.attributes).toEqual({})
+  })
+
+  it('accepts ids up to the bound the PostHog cookie reader uses', () => {
+    const p = toVisitorPrincipal({ ...base, attributes: { ph_did: 'x'.repeat(MAX_ID_LENGTH) } })
+    expect(p?.attributes.ph_did).toHaveLength(MAX_ID_LENGTH)
   })
 })
 

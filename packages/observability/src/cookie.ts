@@ -5,10 +5,13 @@ export interface PostHogIds {
   sessionId: string | null
 }
 
-/** Longer than any id posthog-js generates (UUIDv7 = 36 chars): a forged or corrupt cookie. */
-const MAX_ID = 200
+/**
+ * Longer than any id posthog-js generates (UUIDv7 = 36 chars): a forged or corrupt cookie. Exported
+ * so every hop that carries these ids (the agent's JWT claims too) applies the same bound.
+ */
+export const MAX_ID_LENGTH = 200
 
-const id = (value: unknown): string | null => (typeof value === 'string' && value.length > 0 && value.length <= MAX_ID ? value : null)
+const id = (value: unknown): string | null => (typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH ? value : null)
 
 /**
  * Reads `ph_<token>_posthog` (URI-encoded JSON: `distinct_id`, `$sesid: [lastActivity, id, start]`)

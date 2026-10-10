@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { posthogIdsFromCookie } from '../src/cookie'
+import { MAX_ID_LENGTH, posthogIdsFromCookie } from '../src/cookie'
 
 const TOKEN = 'phc_abc'
 const value = (o: unknown) => encodeURIComponent(JSON.stringify(o))
@@ -23,7 +23,7 @@ describe('posthogIdsFromCookie', () => {
   })
 
   it('ignores ids too long to be real, so a forged cookie cannot bloat a JWT', () => {
-    const header = `ph_${TOKEN}_posthog=${value({ distinct_id: 'x'.repeat(201) })}`
+    const header = `ph_${TOKEN}_posthog=${value({ distinct_id: 'x'.repeat(MAX_ID_LENGTH + 1) })}`
     expect(posthogIdsFromCookie(header, TOKEN)).toBeNull()
   })
 })
