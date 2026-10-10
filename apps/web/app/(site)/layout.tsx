@@ -5,7 +5,7 @@ import { preconnect } from 'react-dom'
 import { Analytics } from '@/features/analytics/Analytics'
 import { ThemeScript } from '@/features/theme/ThemeScript'
 import { clientAnalyticsConfig } from '@/lib/analytics/request'
-import { siteUrl } from '@/lib/site'
+import { originOf, siteUrl } from '@/lib/site'
 import '../globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
@@ -22,8 +22,8 @@ export function generateMetadata(): Metadata {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   // CMS uploads (favicons, OG image) load from the CMS origin: open the connection early.
-  const cms = process.env.CMS_URL
-  if (cms && new URL(cms).origin !== new URL(siteUrl()).origin) preconnect(new URL(cms).origin)
+  const cms = originOf(process.env.CMS_URL)
+  if (cms && cms !== originOf(siteUrl())) preconnect(cms)
   return (
     <html lang="en" className={`${inter.variable} ${caveat.variable}`} suppressHydrationWarning>
       <head>

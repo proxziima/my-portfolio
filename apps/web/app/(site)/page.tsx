@@ -15,9 +15,9 @@ export async function generateMetadata(): Promise<Metadata> {
     title: settings.seo.title,
     description: settings.seo.description,
     alternates: { canonical: '/' },
-    // Next merges metadata shallowly: this object replaces the layout's openGraph, so it repeats type and locale.
+    // Next merges metadata shallowly: this object replaces the layout's openGraph, so it repeats type and locale (and the Twitter card below).
     openGraph: { type: 'website', locale: 'en_US', title: settings.seo.title, description: settings.seo.description, siteName: profile.name, url: '/', images },
-    twitter: { title: settings.seo.title, description: settings.seo.description, images },
+    twitter: { card: 'summary_large_image', title: settings.seo.title, description: settings.seo.description, images },
   }
 }
 

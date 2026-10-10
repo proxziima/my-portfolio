@@ -11,7 +11,7 @@ const rectOf = (anchor: string): PageRect | undefined => {
 
 /** Blocks whose vertical gaps get a marker, in page order. */
 const GAP_CHAIN = ['links', 'work', 'projects', 'content']
-/** How far the rails run past the end of `main`. */
+/** How far the rails run past the end of the page content (the footer's box, or `main` without one). */
 const DOC_TAIL = 40
 
 /**
@@ -26,10 +26,16 @@ export function measure(): Measurements | null {
   const chain = GAP_CHAIN.flatMap((a) => rectOf(a) ?? [])
   const gaps = chain.slice(1).map((to, i) => ({ from: chain[i]!, to }))
 
+  // the footer follows `main`: its bottom margin stands in for the trailing space main used to add around it
+  const footerEl = document.querySelector('.site-footer')
+  const contentBottom = footerEl
+    ? pageRect(footerEl).bottom + (parseFloat(getComputedStyle(footerEl).marginBottom) || 0)
+    : main.bottom
+
   return {
     main,
-    // not scrollHeight: the overlay itself inflates it, so the rails could only ever grow (the footer is in main)
-    docHeight: main.bottom + DOC_TAIL,
+    // not scrollHeight: the overlay itself inflates it, so the rails could only ever grow
+    docHeight: contentBottom + DOC_TAIL,
     sections: {
       bio: rectOf('bio'), figure: rectOf('figure'), work: rectOf('work'), projects: rectOf('projects'), content: rectOf('content'),
     },

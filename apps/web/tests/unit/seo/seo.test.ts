@@ -23,6 +23,21 @@ describe('siteUrl', () => {
     vi.stubEnv('SITE_URL', '')
     expect(siteUrl()).toBe('http://localhost:3000')
   })
+  it('throws on a malformed SITE_URL', async () => {
+    const { siteUrl } = await import('@/lib/site')
+    vi.stubEnv('SITE_URL', 'ada.dev')
+    expect(() => siteUrl()).toThrow('SITE_URL must be an absolute http(s) URL')
+  })
+})
+
+describe('originOf', () => {
+  it('returns the origin of http(s) URLs and null otherwise', async () => {
+    const { originOf } = await import('@/lib/site')
+    expect(originOf('https://cms.x.dev/uploads/a.png')).toBe('https://cms.x.dev')
+    expect(originOf('not a url')).toBeNull()
+    expect(originOf('ftp://x.dev')).toBeNull()
+    expect(originOf(undefined)).toBeNull()
+  })
 })
 
 describe('personJsonLd', () => {

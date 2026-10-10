@@ -138,7 +138,7 @@
   }
 
   :root[data-blackout] main > :not([data-anchor='switch']),
-:root[data-blackout] .site-footer {
+  :root[data-blackout] .site-footer {
     transition-duration: 0.5s !important;
   }
 }
