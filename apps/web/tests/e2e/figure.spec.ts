@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test'
+import { ASSETS } from '../../lib/assets/manifest'
 import { openPortfolio, test } from './support'
 
 // the models are allowed through: software WebGL is slow in headless Chromium, but one frame is enough
@@ -19,7 +20,15 @@ test('the monitor shows the OS and the scene draws a first frame', async ({ page
   await expect(fx.locator('img')).toHaveCount(2)
   // once the OS shows its desktop the static runs while the figure is on screen
   await expect(fx).toHaveAttribute('data-ready', 'true', { timeout: 20_000 })
+  // the encodes are attached only once the layers can show, in the pipeline's order (smallest passing codec first)
+  const expected = [ASSETS.desk.screen.staticBase, ASSETS.desk.screen.staticLayer].map((a) => a.sources.map((s) => [s.src, s.type]))
+  await expect
+    .poll(() => fx.locator('video').evaluateAll((vs) => vs.map((v) => [...v.querySelectorAll('source')].map((s) => [s.getAttribute('src'), s.type]))))
+    .toEqual(expected)
   await expect.poll(() => fx.locator('video').evaluateAll((vs) => (vs as HTMLVideoElement[]).some((v) => !v.paused)), { timeout: 10_000 }).toBe(true)
+  // each plays one of its own encodes
+  const playing = await fx.locator('video').evaluateAll((vs) => (vs as HTMLVideoElement[]).map((v) => new URL(v.currentSrc).pathname))
+  playing.forEach((src, i) => expect(expected[i]!.map(([s]) => s)).toContain(src))
 })
 
 test('full screen covers the viewport and Escape restores the box', async ({ page }) => {

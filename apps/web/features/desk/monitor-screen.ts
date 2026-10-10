@@ -1,6 +1,6 @@
 import { DoubleSide, Group, MathUtils, Mesh, MeshBasicMaterial, NoBlending, PlaneGeometry, type Object3D } from 'three'
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js'
-import { ASSETS, type ImageAsset } from '@/lib/assets/manifest'
+import { ASSETS, type ImageAsset, type VideoAsset } from '@/lib/assets/manifest'
 import { fallbackSrc, srcset } from '@/lib/assets/srcset'
 import { SCREEN, type Vec3 } from './config'
 
@@ -40,15 +40,12 @@ export interface MonitorScreen {
   css: CSS3DObject
   /** Add to the GL scene. */
   gl: Object3D
-  /** Plays the static videos; a no-op under reduced motion. */
+  /** Plays the static videos once they have sources; a no-op under reduced motion. */
   play(): void
   /** Pauses the static videos, so they decode only while the scene is on screen. */
   pause(): void
   dispose(): void
 }
-
-/** The reference's static videos (`MonitorScreen.createTextureLayers`), served from `public/` until their pipeline stage lands. */
-const LAYER_DIR = '/desk/screen'
 
 /** The OS's desktop root; absent while it shows the boot or shutdown console. */
 const DESKTOP_SELECTOR = '[data-anchor="desktop"]'
@@ -59,15 +56,20 @@ const DESKTOP_TIMEOUT_MS = 20_000
  * Shows the CRT layers only while the OS shows its desktop: the boot and shutdown screens are black
  * consoles; the CRT layers over them read as a broken texture. Watches the iframe's document (same
  * origin) on every load; where it cannot be read, or the desktop never appears, the layers come on
- * so they are never lost. Returns the cleanup.
+ * so they are never lost. `onFirstReady` runs the first time they come on. Returns the cleanup.
  */
-function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement): () => void {
+function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement, onFirstReady: () => void): () => void {
   let observer: MutationObserver | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
+  let shown = false
   // every mutation in the OS lands here: write only on a change
   const set = (ready: boolean) => {
     const value = String(ready)
     if (fx.dataset.ready !== value) fx.dataset.ready = value
+    if (ready && !shown) {
+      shown = true
+      onFirstReady()
+    }
   }
   const stop = () => {
     observer?.disconnect()
@@ -145,20 +147,41 @@ function layerPicture(className: string, asset: ImageAsset): HTMLPictureElement 
   return picture
 }
 
-/** A looping static layer; not autoplay, so `play`/`pause` decide when it decodes. */
-function layerVideo(className: string, file: string): HTMLVideoElement {
+/**
+ * A looping static layer with no sources yet: nothing downloads until the layers can be seen
+ * (`attachSources`). Not autoplay, so `play`/`pause` decide when it decodes.
+ */
+function layerVideo(className: string): HTMLVideoElement {
   const video = document.createElement('video')
   video.className = className
-  video.src = `${LAYER_DIR}/${file}`
   video.muted = true
   video.loop = true
   video.playsInline = true
-  video.preload = 'metadata'
+  video.preload = 'none'
   video.autoplay = false
   video.disablePictureInPicture = true
   video.setAttribute('aria-hidden', 'true')
   return video
 }
+
+/** The pipeline's encodes in its order (AV1, then VP9, then H.264): the first the browser can play wins. */
+function attachSources(video: HTMLVideoElement, asset: VideoAsset): void {
+  if (video.childElementCount) return
+  for (const s of asset.sources) {
+    const source = document.createElement('source')
+    source.src = s.src
+    source.type = s.type
+    video.append(source)
+  }
+  video.preload = 'auto'
+  video.load()
+}
+
+/** Each static layer and its encodes, in the reference's stacking order. */
+const LAYERS: ReadonlyArray<{ className: string; asset: VideoAsset }> = [
+  { className: 'screen-static', asset: ASSETS.desk.screen.staticBase },
+  { className: 'screen-static screen-static--fine', asset: ASSETS.desk.screen.staticLayer },
+]
 
 /**
  * The DOM the CSS3D object carries: a fixed-size slab shaded like a powered-off tube, the iframe
@@ -166,7 +189,11 @@ function layerVideo(className: string, file: string): HTMLVideoElement {
  * two static videos, smudges; blended in `screen-fx.css`), which let the pointer through to the
  * iframe and fade in only while the OS shows its desktop (`gateOnDesktop`).
  */
-function createScreenElement(src: string, screen: ScreenSpec): {
+function createScreenElement(
+  src: string,
+  screen: ScreenSpec,
+  onFirstReady: () => void,
+): {
   element: HTMLDivElement
   iframe: HTMLIFrameElement
   videos: HTMLVideoElement[]
@@ -188,12 +215,9 @@ function createScreenElement(src: string, screen: ScreenSpec): {
   fx.setAttribute('aria-hidden', 'true')
   fx.style.pointerEvents = 'none' // inline too: the iframe must stay clickable even before the stylesheet applies
   fx.dataset.ready = 'false'
-  const videos = [
-    layerVideo('screen-static', 'static-base.mp4'),
-    layerVideo('screen-static screen-static--fine', 'static-layer.mp4'),
-  ]
+  const videos = LAYERS.map((l) => layerVideo(l.className))
   fx.append(layerPicture('screen-shadow', ASSETS.desk.screen.shadow), ...videos, layerPicture('screen-smudges', ASSETS.desk.screen.smudges))
-  const stopGate = gateOnDesktop(iframe, fx)
+  const stopGate = gateOnDesktop(iframe, fx, onFirstReady)
   element.append(iframe, fx)
   return { element, iframe, videos, stopGate }
 }
@@ -212,7 +236,23 @@ const place = (object: Object3D, spec: PlaneSpec) => {
  * of the glass cover the iframe and the glass itself shows the DOM beneath the canvas.
  */
 export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): MonitorScreen {
-  const { element, iframe, videos, stopGate } = createScreenElement(src, screen)
+  /** Whether the figure wants the static running (`play` since the last `pause`). */
+  let wantPlay = false
+  /** Whether the layers have come on once: before that the videos have no sources. */
+  let shown = false
+  const attachAll = () => videos.forEach((v, i) => attachSources(v, LAYERS[i]!.asset))
+  const start = () => {
+    // the videos are hidden under reduced motion (screen-fx.css): do not fetch or decode them either
+    if (!wantPlay || !shown || prefersReducedMotion()) return
+    attachAll()
+    // a rejected play (autoplay policy, a pause racing it) leaves the static still, nothing worse
+    for (const v of videos) v.play().catch(() => {})
+  }
+  const { element, iframe, videos, stopGate } = createScreenElement(src, screen, () => {
+    shown = true
+    if (!prefersReducedMotion()) attachAll()
+    start()
+  })
   const tilt = MathUtils.degToRad(screen.tiltDeg)
 
   const css = new CSS3DObject(element)
@@ -243,19 +283,19 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
     css,
     gl,
     play() {
-      // the videos are hidden under reduced motion (screen-fx.css): do not decode them either
-      if (prefersReducedMotion()) return
-      // a rejected play (autoplay policy, a pause racing it) leaves the static still, nothing worse
-      for (const v of videos) v.play().catch(() => {})
+      wantPlay = true
+      start()
     },
     pause() {
+      wantPlay = false
       for (const v of videos) v.pause()
     },
     dispose() {
-      // pausing alone keeps the decoder: drop the source and reload to release it now
+      wantPlay = false
+      // pausing alone keeps the decoder: drop the sources and reload to release it now
       for (const v of videos) {
         v.pause()
-        v.removeAttribute('src')
+        v.replaceChildren()
         v.load()
       }
       for (const g of geometries) g.dispose()
