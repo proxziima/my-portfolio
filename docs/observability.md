@@ -12,6 +12,7 @@ Every capture path is fire-and-forget. With a blank `POSTHOG_PROJECT_TOKEN` noth
 | --- | --- | --- |
 | Web analytics (`$pageview`, `$pageleave`, autocapture) | posthog-js in the browser, sent through the first-party `/relay` proxy | `apps/web/lib/analytics/init.ts`, `apps/web/features/analytics/Analytics.tsx`, `apps/web/proxy.ts`, `apps/web/lib/analytics/relay.ts` |
 | Custom events (catalog below) | typed `track()`, a delegated click listener, a section observer | `apps/web/lib/analytics/events.ts`, `delegated.ts`, `sections.ts`, `apps/web/features/os/apps/messenger/` |
+| Engaged time (`section_engaged`, `os_engaged`) | an idle-aware clock per section and on the OS, reported on page hide or unload with `trackOnExit()` (beacon) | `apps/web/lib/analytics/engagement.ts`, `section-engagement.ts`, `os-engagement.ts` |
 | Web vitals | posthog-js `capture_performance: { web_vitals: true, network_timing: true }` | `apps/web/lib/analytics/init.ts` |
 | Session replay | posthog-js (disabled inside the embedded `/os` iframe, the parent page records it) | `apps/web/lib/analytics/init.ts` |
 | Error tracking, browser | `capture_exceptions`, `app/global-error.tsx` (reports only if posthog-js had loaded before the root layout failed), route `error.tsx` | `apps/web/app/global-error.tsx`, `apps/web/app/(site)/error.tsx` |
@@ -57,9 +58,11 @@ New env vars follow the `apps/agents/CLAUDE.md` rule: `agentsEnvSchema`, the `.e
 | `outbound_click` | delegated listener | href, host, kind (`external` or `mailto`), channel, section |
 | `cta_clicked` | `[data-track]` | cta, section |
 | `section_viewed` | IntersectionObserver | section |
+| `section_engaged` | section engagement clocks, on page hide or unload | section, seconds |
 | `role_selected` | RolePicker | role |
 | `theme_changed` | WallSwitch | theme |
 | `os_app_opened` | Desktop | app |
+| `os_engaged` | OS engagement clock, on page hide or unload | seconds, embedded, apps_opened |
 | `twin_session_started` | use-twin | resumed |
 | `twin_message_sent` | use-twin | chars, turn |
 | `twin_refusal` | use-twin (`refuse` helper, every refusal) | reason |
@@ -69,6 +72,8 @@ New env vars follow the `apps/agents/CLAUDE.md` rule: `agentsEnvSchema`, the `.e
 | `mcp_request` | Payload MCP, methods other than `tools/call`, `initialize` and `notifications/*` | method, status |
 
 Embedded `/os` (the iframe on the desk monitor) registers `embedded: true` on every event and sends no pageviews, page leaves or replay.
+
+**Engaged time.** `section_engaged` and `os_engaged` count only time that is on screen (section half visible, or OS document visible) with visitor input in the last 30 s, GA4-style. They are sent when the page hides or unloads and the clocks then reset, so sum `seconds` per session. The home page's `$pageleave` duration is wall clock and includes the time spent in the OS on the desk monitor; use these two events to split the 2D page from the OS. Details and insights in the [tracking plan](observability-tracking-plan.md#34-section_engaged).
 
 ## Conversions
 
@@ -83,6 +88,8 @@ Create these PostHog actions:
 
 - Web analytics (built in)
 - Trends of `section_viewed` by `section`
+- Average engaged seconds per section: sum of `section_engaged.seconds` by `section` / unique sessions
+- 2D versus OS: per session, sum of `section_engaged.seconds` against `os_engaged.seconds`, broken down by `embedded` and `$device_type`
 - Funnel: `$pageview`, `section_viewed` where section is work, `outbound_click`
 - Conversions trend
 - Web vitals p75 LCP, INP and CLS by `$pathname` and `$device_type`

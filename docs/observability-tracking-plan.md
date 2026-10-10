@@ -10,7 +10,7 @@ Links read `file:line` and point at the repo root (`../` from this file). Line n
 | --- | --- |
 | [1. Identity model](#1-identity-model) | Which `distinct_id` each signal carries |
 | [2. Automatic web signals](#2-automatic-posthog-web-signals) | What posthog-js sends by itself, from its init options |
-| [3. Custom web events](#3-custom-web-events) | The 12 typed events, one table each |
+| [3. Custom web events](#3-custom-web-events) | The 14 typed events, one table each |
 | [4. Conversions](#4-conversions) | Actions to define in PostHog |
 | [5. LLM traces](#5-serveragent-llm-traces) | The twin's OpenTelemetry trace tree and its redaction |
 | [6. MCP server](#6-mcp-server-cms) | `$ai_span` and `mcp_request` from Payload |
@@ -56,7 +56,7 @@ PostHog  generation joins the visitor's person timeline and replay
 
 ## 2. Automatic PostHog web signals
 
-Initialised once per document by [initPostHog](../apps/web/lib/analytics/init.ts#L15), called from [Analytics.tsx:18](../apps/web/features/analytics/Analytics.tsx#L18), which both layouts mount ([(site)/layout.tsx:35](../apps/web/app/(site)/layout.tsx#L35), [(os)/os/layout.tsx:31](../apps/web/app/(os)/os/layout.tsx#L31)). Options, from [init.ts:18-27](../apps/web/lib/analytics/init.ts#L18):
+Initialised once per document by [initPostHog](../apps/web/lib/analytics/init.ts#L15), called from [Analytics.tsx:31](../apps/web/features/analytics/Analytics.tsx#L31), which both layouts mount with their `surface` ([(site)/layout.tsx:35](../apps/web/app/(site)/layout.tsx#L35), [(os)/os/layout.tsx:31](../apps/web/app/(os)/os/layout.tsx#L31)). Options, from [init.ts:18-27](../apps/web/lib/analytics/init.ts#L18):
 
 | Option | Value | Effect |
 | --- | --- | --- |
@@ -82,13 +82,13 @@ Web vitals, exception autocapture and replay also need the matching switches in 
 
 **Session replay.** The code sets no recording options, so masking is the project setting: "Mask all inputs" on (`maskAllInputs`), which hides every typed value. Two extras are in code: the twin chat transcript ([History.tsx:54](../apps/web/features/os/apps/messenger/History.tsx#L54)) and the message box ([Conversation.tsx:97](../apps/web/features/os/apps/messenger/Conversation.tsx#L97)) carry `ph-no-capture`, which excludes them from replay and autocapture. That matters because the parent page's recorder also captures the same-origin `/os` iframe on the desk monitor.
 
-**Embedded `/os` iframe.** `Analytics` passes `embedded = window.self !== window.top` ([Analytics.tsx:18](../apps/web/features/analytics/Analytics.tsx#L18)). When embedded: `capture_pageview: false`, `capture_pageleave: false`, `disable_session_recording: true` ([init.ts:26](../apps/web/lib/analytics/init.ts#L26)) and `posthog.register({ embedded: true })` ([init.ts:29](../apps/web/lib/analytics/init.ts#L29)), so every event the frame sends (custom, `$autocapture`, `$web_vitals`, `$exception`) carries `embedded: true`. Everything else stays on, and the frame shares the parent's cookie, so it is the same visitor and session. Opening `/os` directly in a tab is not embedded: full pageviews and replay. The property is only registered in the iframe, so "`embedded` is not set" selects the standalone case.
+**Embedded `/os` iframe.** `Analytics` computes `embedded = window.self !== window.top` once ([Analytics.tsx:30](../apps/web/features/analytics/Analytics.tsx#L30)) and passes it to `initPostHog` and to the OS engagement tracker. When embedded: `capture_pageview: false`, `capture_pageleave: false`, `disable_session_recording: true` ([init.ts:26](../apps/web/lib/analytics/init.ts#L26)) and `posthog.register({ embedded: true })` ([init.ts:29](../apps/web/lib/analytics/init.ts#L29)), so every event the frame sends (custom, `$autocapture`, `$web_vitals`, `$exception`) carries `embedded: true`. Everything else stays on, and the frame shares the parent's cookie, so it is the same visitor and session. Opening `/os` directly in a tab is not embedded: full pageviews and replay. The property is only registered in the iframe, so "`embedded` is not set" selects the standalone case.
 
 **Do Not Track.** `respect_dnt` stops all browser capture. The BFF then finds no cookie, so the agent's traces for that visitor still flow, but under `web:<uuid>` with no `ph_did` or `$session_id` ([observability.md, Privacy](observability.md#privacy)).
 
 ## 3. Custom web events
 
-All twelve go through the typed [`track()`](../apps/web/lib/analytics/events.ts#L29), a no-op until `posthog.__loaded` (no token, tests, SSR). The catalog and property types live in [events.ts:11-24](../apps/web/lib/analytics/events.ts#L11). Wiring: [`Analytics`](../apps/web/features/analytics/Analytics.tsx) installs the delegated click listener and the section observer; the other events are called from components.
+All fourteen use the typed catalog in [events.ts:10-25](../apps/web/lib/analytics/events.ts#L10). Twelve go through [`track()`](../apps/web/lib/analytics/events.ts#L33); the two engaged-time events go through [`trackOnExit()`](../apps/web/lib/analytics/events.ts#L41), which sends at once over `sendBeacon` (`{ transport: 'sendBeacon', send_instantly: true }`: with request batching on, `transport` alone would only queue the event). Both are no-ops until `posthog.__loaded` (no token, tests, SSR). Wiring: [`Analytics`](../apps/web/features/analytics/Analytics.tsx) installs the delegated click listener on both surfaces, then per `surface` ([Analytics.tsx:14-17](../apps/web/features/analytics/Analytics.tsx#L14)): `site` adds the section observer and section engagement, `os` adds OS engagement. The other events are called from components.
 
 ### 3.1 `outbound_click`
 
@@ -125,12 +125,23 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | | |
 | --- | --- |
 | Trigger | A page section reaches 50% visibility |
-| Fired from | [sections.ts:19](../apps/web/lib/analytics/sections.ts#L19); selector [sections.ts:4](../apps/web/lib/analytics/sections.ts#L4), `threshold: 0.5` [sections.ts:22](../apps/web/lib/analytics/sections.ts#L22), installed at [Analytics.tsx:20](../apps/web/features/analytics/Analytics.tsx#L20) |
+| Fired from | [sections.ts:19](../apps/web/lib/analytics/sections.ts#L19); selector [sections.ts:4](../apps/web/lib/analytics/sections.ts#L4), `threshold: 0.5` [sections.ts:22](../apps/web/lib/analytics/sections.ts#L22), installed at [Analytics.tsx:16](../apps/web/features/analytics/Analytics.tsx#L16) |
 | Properties | `section` (string, `projects`; the section element's `id`, not its label) |
 | Notes | Once per section per page load (an in-memory set, then the element is unobserved); a reload fires again. Observes the sections present when `Analytics` mounts. Matches `section[id][aria-labelledby]`, which is what [`Section`](../apps/web/shared/ui/Section.tsx#L6) renders. Current ids: `work`, `projects`, `content` ([Portfolio.tsx:35-37](../apps/web/features/portfolio/Portfolio.tsx#L35)). Other `<section>` elements without both attributes are not tracked |
 | Suggested insight | Trend by `section`; funnel `$pageview`, `section_viewed` (`section = work`), `outbound_click` |
 
-### 3.4 `role_selected`
+### 3.4 `section_engaged`
+
+| | |
+| --- | --- |
+| Trigger | The page hides or unloads (`visibilitychange` to hidden, or `pagehide`): one event per page section with at least 1 s of engaged time since the last report |
+| Fired from | [section-engagement.ts:41](../apps/web/lib/analytics/section-engagement.ts#L41) via `trackOnExit`; same selector as `section_viewed` ([sections.ts:4](../apps/web/lib/analytics/sections.ts#L4)), `threshold: 0.5` [section-engagement.ts:23](../apps/web/lib/analytics/section-engagement.ts#L23); installed at [Analytics.tsx:16](../apps/web/features/analytics/Analytics.tsx#L16) (`surface="site"`) |
+| Properties | `section` (string, `work`; the section's `id`), `seconds` (number, `42.3`; engaged seconds, one decimal, always `>= 1`) |
+| Engagement rule | One clock per section ([engagement.ts](../apps/web/lib/analytics/engagement.ts)). Time accrues only while the section is at least half on screen, the tab is visible, and the visitor did something (scroll, wheel, pointer down, key, touch) within the last 30 s (`IDLE_MS`, [engagement.ts:5](../apps/web/lib/analytics/engagement.ts#L5)), GA4-style: a forgotten tab does not inflate the numbers. Page load and coming back to the tab count as an interaction. Sections on screen together each accrue |
+| Notes | The clocks reset after every report, so a visit that hides and shows the tab sends several events per section: sum `seconds` per session, never average the events. Sub-second remainders are dropped at each report. A section taller than twice the viewport never reaches 50% and accrues nothing (same limit as `section_viewed`). Sent as a beacon, so it cannot be retried. The home page's `$pageleave` duration is wall clock and includes the time spent in the OS on the desk monitor; use these events to split 2D page time from OS time |
+| Suggested insight | Average engaged seconds per section = sum of `seconds` by `section` / unique sessions (SQL: `sum(properties.seconds) / count(distinct $session_id)` grouped by `properties.section`). 2D versus OS: per session, sum of `section_engaged.seconds` against sum of `os_engaged.seconds` |
+
+### 3.5 `role_selected`
 
 | | |
 | --- | --- |
@@ -140,7 +151,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | Notes | Debounced: one event, with the final role, 800 ms after the last user-driven change, so a wheel spin through several roles counts once. Skipped when the settled role equals the role at the start of the interaction. Unknown slugs are ignored. Restoring the stored or hash role on load is `hydrate` (no animation), so it does not fire. Keys are ignored with a modifier held or while typing in a field. A pending event is dropped on unmount |
 | Suggested insight | Breakdown by `role` of the roles people deep-link or hotkey to |
 
-### 3.5 `theme_changed`
+### 3.6 `theme_changed`
 
 | | |
 | --- | --- |
@@ -150,17 +161,28 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | Notes | Not fired when the theme changes from outside (system preference, other tab). Skipped while the switch is disabled (blowout). Rapid toggles each count |
 | Suggested insight | Share of `dark` versus `light` |
 
-### 3.6 `os_app_opened`
+### 3.7 `os_app_opened`
 
 | | |
 | --- | --- |
 | Trigger | The visitor opens an app in the `/os` desktop: shortcut, messenger service button, or double-clicking the messenger contact |
-| Fired from | [Desktop.tsx:35](../apps/web/features/os/Desktop.tsx#L35); callers [Desktop.tsx:50](../apps/web/features/os/Desktop.tsx#L50) (shortcut), [Services.tsx:10](../apps/web/features/os/apps/messenger/Services.tsx#L10), [Messenger.tsx:35](../apps/web/features/os/apps/messenger/Messenger.tsx#L35) |
+| Fired from | [Desktop.tsx:36](../apps/web/features/os/Desktop.tsx#L36); callers [Desktop.tsx:52](../apps/web/features/os/Desktop.tsx#L52) (shortcut), [Services.tsx:10](../apps/web/features/os/apps/messenger/Services.tsx#L10), [Messenger.tsx:35](../apps/web/features/os/apps/messenger/Messenger.tsx#L35) |
 | Properties | `app` (string, `resume`): one of `showcase`, `resume`, `credits`, `doom`, `autocad`, `messenger`, `conversation` ([apps.ts:74-115](../apps/web/features/os/apps.ts#L74)) |
 | Notes | The boot window (`showcase`, [apps.ts:120](../apps/web/features/os/apps.ts#L120)) is opened by `dispatch`, not by `open`, so it is not counted. Fires inside the iframe, with `embedded: true` |
 | Suggested insight | Breakdown by `app`; "Opened resume" conversion (`app = resume`) |
 
-### 3.7 `twin_session_started`
+### 3.8 `os_engaged`
+
+| | |
+| --- | --- |
+| Trigger | The `/os` document hides or unloads (`visibilitychange` to hidden, or `pagehide`) with at least 1 s of engaged time since the last report. For the iframe on the desk monitor, that is the parent tab hiding or closing |
+| Fired from | [os-engagement.ts:31](../apps/web/lib/analytics/os-engagement.ts#L31) via `trackOnExit`; installed at [Analytics.tsx:15](../apps/web/features/analytics/Analytics.tsx#L15) (`surface="os"`); apps counted by `countAppOpen()` at [Desktop.tsx:37](../apps/web/features/os/Desktop.tsx#L37), next to `os_app_opened` |
+| Properties | `seconds` (number, engaged seconds, one decimal, `>= 1`), `embedded` (boolean; `true` in the desk-monitor iframe, `false` on `/os` in its own tab), `apps_opened` (number; apps the visitor opened since the last report, boot window excluded) |
+| Engagement rule | One clock, running while the OS document is visible, with the same 30 s idle rule as `section_engaged`. Input is only heard inside the OS document, so on the home page the monitor can be on screen while the clock idles: in the iframe, activity means the visitor is actually using the OS. Standalone, page load and coming back to the tab count as an interaction; embedded they do not (the iframe loads with the home page, whether or not the visitor wants the OS), so the clock starts idle and only input inside the OS starts it ([os-engagement.ts:20](../apps/web/lib/analytics/os-engagement.ts#L20)) |
+| Notes | The only time signal for the embedded OS: the iframe sends no `$pageview` or `$pageleave`. Resets after every report (sum per session). In the iframe the registered `embedded` super property says the same; the explicit property makes the standalone case `false` rather than unset |
+| Suggested insight | Sum of `seconds` per session, broken down by `embedded` and `$device_type`; 2D versus OS against `section_engaged`; average `apps_opened` |
+
+### 3.9 `twin_session_started`
 
 | | |
 | --- | --- |
@@ -170,7 +192,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | Notes | Fires on every mount of the hook (the Conversation window, [Conversation.tsx:41](../apps/web/features/os/apps/messenger/Conversation.tsx#L41)), so reopening the window fires again. It marks the chat opened, not a message sent; the eve session itself is created server-side on the first message |
 | Suggested insight | Chat-open rate; `resumed` split for returning chatters |
 
-### 3.8 `twin_message_sent`
+### 3.10 `twin_message_sent`
 
 | | |
 | --- | --- |
@@ -180,7 +202,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | Notes | Fired before the send, so a message that is then refused also shows a `twin_refusal`. A message held while the saved session resumes is counted when it is delivered ([use-twin.ts:213-218](../apps/web/features/os/apps/messenger/use-twin.ts#L213)), through `send`. The automatic resend to a renewed session is not counted again. The message text is never sent to PostHog from the browser |
 | Suggested insight | "Chatted" conversion; distribution of `turn` (conversation depth) and `chars` |
 
-### 3.9 `twin_refusal`
+### 3.11 `twin_refusal`
 
 | | |
 | --- | --- |
@@ -190,7 +212,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | Notes | Mapped from the HTTP status in `refusalOf` ([use-twin.ts:33](../apps/web/features/os/apps/messenger/use-twin.ts#L33)). A 404 on a saved session first triggers `twin_session_renewed` instead, and only a second failure refuses |
 | Suggested insight | Breakdown by `reason`; alert on a rising `offline` share |
 
-### 3.10 `twin_session_renewed`
+### 3.12 `twin_session_renewed`
 
 | | |
 | --- | --- |
@@ -200,7 +222,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | Notes | At most once per window instance (`renewed` ref), so a broken server cannot loop. Added during implementation, not in the spec |
 | Suggested insight | Trend; a spike means sessions are dying server-side |
 
-### 3.11 `booking_opened`
+### 3.13 `booking_opened`
 
 | | |
 | --- | --- |
@@ -210,7 +232,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | Notes | Once per mount target element (the `mounted` WeakSet); a second booker in the same chat fires again |
 | Suggested insight | Funnel `twin_message_sent`, `booking_opened`, `booking_completed` |
 
-### 3.12 `booking_completed`
+### 3.14 `booking_completed`
 
 | | |
 | --- | --- |
@@ -388,7 +410,7 @@ Routing is in [relay.ts:10-14](../apps/web/lib/analytics/relay.ts#L10). The prox
 | `SITE_URL` | web | Validated at boot together with the region ([instrumentation.ts:8-18](../apps/web/instrumentation.ts#L8)) |
 | `CMS_URL`, `TWIN_REDACT_SECRET`, `TWIN_PROMPT_CANARY` | agents | Feed the redactor ([processor.ts:127-131](../apps/agents/agent/lib/observability/processor.ts#L127)) |
 
-**Without a token.** `posthogConfig()` returns `null`: `clientAnalyticsConfig()` is `null` so [`Analytics`](../apps/web/features/analytics/Analytics.tsx#L16) does nothing and `track()` is a no-op; the server SDK is a no-op client ([server.ts:11](../packages/observability/src/server.ts#L11)); the agent's span processor is never built and the redaction rules are never fetched; the MCP capture and error calls reach the no-op client; `/relay` answers 404. Dev, tests and CI run this way. A bad region throws at web boot; per request the web helpers instead switch analytics off for that request and log once ([request.ts:19](../apps/web/lib/analytics/request.ts#L19)).
+**Without a token.** `posthogConfig()` returns `null`: `clientAnalyticsConfig()` is `null` so [`Analytics`](../apps/web/features/analytics/Analytics.tsx#L24) does nothing and `track()` is a no-op; the server SDK is a no-op client ([server.ts:11](../packages/observability/src/server.ts#L11)); the agent's span processor is never built and the redaction rules are never fetched; the MCP capture and error calls reach the no-op client; `/relay` answers 404. Dev, tests and CI run this way. A bad region throws at web boot; per request the web helpers instead switch analytics off for that request and log once ([request.ts:19](../apps/web/lib/analytics/request.ts#L19)).
 
 ## 9. Quick verification checklist
 
@@ -401,11 +423,13 @@ Open PostHog, Activity, Live events, with a token set in a dev project ([observa
 | `$web_vitals` | Load and interact, then leave | `$web_vitals_LCP_value`, INP, CLS, FCP |
 | Replay | Visit, type in a field | A recording with the input masked; the twin transcript and box blank |
 | `section_viewed` | Scroll to the bottom | One each for `work`, `projects`, `content` |
+| `section_engaged` | Scroll through the page, then switch tabs | One per section read for 1 s or more, `seconds` with one decimal |
 | `outbound_click` | Click GitHub, LinkedIn, an email link | `channel` = `github`, `linkedin`, `email`; `kind` = `mailto` for email |
 | `cta_clicked` | Mute, full screen, "Open the desktop" | `cta` = `desk_mute`, `desk_fullscreen`, `open_desktop`; `section` null |
 | `role_selected` | Press `2`, change the URL hash, or spin the picker and stop | `role` = the slug, once, about 800 ms after you stop |
 | `theme_changed` | Flip the wall switch | `theme` = the new value |
 | `os_app_opened` | Open an app on `/os` | `app` = its id; in the iframe, `embedded = true` |
+| `os_engaged` | Use `/os` a few seconds, open an app, then switch tabs | `seconds` >= 1, `apps_opened` >= 1, `embedded` false; on the home page's monitor, `embedded` true |
 | `twin_session_started` | Open the conversation | `resumed` false, then true after a reload |
 | `twin_message_sent` | Send a message | `chars`, `turn`; no text |
 | `twin_refusal` | Exceed a limit, or stop the agent | `reason` = `throttled`, `too_long`, `ended`, `offline` |
