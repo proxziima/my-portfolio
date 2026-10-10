@@ -3,8 +3,11 @@ import type { PostHog } from 'posthog-js'
 /** Where a link leads, for the outbound and conversion insights. */
 export type LinkChannel = 'github' | 'linkedin' | 'email' | 'calendar' | 'other'
 
-/** The heavy experiences whose load time and failures are measured (`experience_ready` / `experience_failed`). */
-export type Experience = 'desk_scene' | 'os_boot' | 'dos_app' | 'twin_first_reply'
+/**
+ * The heavy experiences whose load time and failures are measured (`experience_ready` / `experience_failed`).
+ * `os_app` only fails: an OS window whose app could not load or crashed.
+ */
+export type Experience = 'desk_scene' | 'os_boot' | 'dos_app' | 'twin_first_reply' | 'os_app'
 
 /**
  * Every custom event the site sends and its properties. PostHog's defaults cover pageviews,

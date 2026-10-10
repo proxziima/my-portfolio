@@ -1,5 +1,6 @@
 'use client'
 import { Suspense, type ReactNode } from 'react'
+import { AppBoundary } from './AppBoundary'
 import bevel from './bevel.module.css'
 import { Icon, type IconName } from './icons'
 import { useWindowGeometry } from './use-window-geometry'
@@ -7,6 +8,8 @@ import type { Size } from './window-geometry'
 import styles from './Window.module.css'
 
 interface Props {
+  /** The OS app id, for the failure analytics of the app inside. */
+  app: string
   title: string
   /** The status bar's text, like the reference's copyright line; defaults to the title. */
   status?: string
@@ -29,7 +32,7 @@ interface Props {
 
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation()
 
-export function Window({ title, status, icon, barColor, active, zIndex, hidden, size, aspect, bounds, onFocus, onMinimize, onClose, children }: Props) {
+export function Window({ app, title, status, icon, barColor, active, zIndex, hidden, size, aspect, bounds, onFocus, onMinimize, onClose, children }: Props) {
   const { style, maximized, onMoveStart, onResizeStart, toggleMaximize } = useWindowGeometry(size, bounds, aspect)
   return (
     <section
@@ -52,8 +55,11 @@ export function Window({ title, status, icon, barColor, active, zIndex, hidden, 
         </span>
       </header>
       <div className={`${styles.content} ${bevel.sunken}`}>
-        {/* an app's code loads with its first window: the chrome draws at once, the content follows */}
-        <Suspense fallback={<div className={styles.loading} />}>{children}</Suspense>
+        {/* an app's code loads with its first window: the chrome draws at once, the content follows;
+            a load that fails, or an app that crashes, stays in this window */}
+        <AppBoundary app={app}>
+          <Suspense fallback={<div className={styles.loading} />}>{children}</Suspense>
+        </AppBoundary>
       </div>
       <footer className={styles.status}>
         <span className={bevel.sunken}>{status ?? title}</span>

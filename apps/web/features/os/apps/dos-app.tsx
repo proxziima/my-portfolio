@@ -1,10 +1,12 @@
 'use client'
-import { lazy, Suspense, type ComponentType } from 'react'
+import { Suspense, type ComponentType } from 'react'
 import type { OsAppProps } from '../apps'
+import { retryableLazy } from '../lazy-app'
 import styles from './dos/DosPlayer.module.css'
 
-// the player loads with the first DOS window; until then the window shows the player's own loading line
-const DosPlayer = lazy(() => import('./dos/DosPlayer').then((m) => ({ default: m.DosPlayer })))
+// the player loads with the first DOS window; until then the window shows the player's own loading line,
+// and a failed load is the window's to show and retry
+const DosPlayer = retryableLazy<{ app: string; bundleUrl: string }>(() => import('./dos/DosPlayer').then((m) => ({ default: m.DosPlayer })))
 
 /**
  * A DOS program as an OS app: its js-dos bundle in the player, on black so the letterbox matches the

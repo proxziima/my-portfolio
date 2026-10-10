@@ -249,7 +249,7 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 | | |
 | --- | --- |
 | Properties, ready | `experience` (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), `ms` (integer milliseconds since the start, `1463`), `app` (string, DOS only: `resume`, `doom`, `autocad`) |
-| Properties, failed | `experience`, `reason` (short machine label, never error text or user data; per experience below), `app` (DOS only) |
+| Properties, failed | `experience` (the above, plus `os_app`, which only fails), `reason` (short machine label, never error text or user data; per experience below), `app` (`dos_app`: the DOS app id; `os_app`: any OS app id, `messenger`, `credits`, `doom`…) |
 | Notes | Inside the desk-monitor iframe the `embedded: true` super property rides along (the embedded `os_boot` is the iframe's own boot) |
 | Suggested insight | p50 and p95 of `ms` per `experience` (SQL: `quantile(0.95)(properties.ms)` grouped by `properties.experience`); failure rate = `experience_failed` / (`experience_ready` + `experience_failed`) per `experience`; both broken down by `$device_type` and `$browser`; for `dos_app`, by `app`; `experience_failed` by `reason` |
 
@@ -278,7 +278,16 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 | Start | A DOS window mounts its player ([DosPlayer.tsx:18](../apps/web/features/os/apps/dos/DosPlayer.tsx#L18)); `app` is the OS app id passed through `dosApp(id, bundle, name)` ([apps.ts:81](../apps/web/features/os/apps.ts#L81)) |
 | Ready | js-dos's `run(bundle)` resolves: the emulator is running the bundle ([DosPlayer.tsx:41](../apps/web/features/os/apps/dos/DosPlayer.tsx#L41)). The first DOS window also pays for the js-dos runtime script |
 | Failed | `load_error` when the js-dos script fails to load or defines no `Dos` ([DosPlayer.tsx:30](../apps/web/features/os/apps/dos/DosPlayer.tsx#L30)); `run_error` when the emulator rejects the bundle ([DosPlayer.tsx:48](../apps/web/features/os/apps/dos/DosPlayer.tsx#L48)), where the window shows "DOS could not start" |
-| Notes | Every window opening is timed (reopening Doom times it again, usually faster with the runtime cached) |
+| Notes | Every window opening is timed (reopening Doom times it again, usually faster with the runtime cached). A failure to download the player's own code chunk is an `os_app` failure, not a `dos_app` one |
+
+#### `os_app`
+
+| | |
+| --- | --- |
+| Start | None: only failures are reported. Every app but the boot Showcase loads its code with its first window (`lazyApp`, [lazy-app.tsx](../apps/web/features/os/lazy-app.tsx); the DOS player likewise, [dos-app.tsx:9](../apps/web/features/os/apps/dos-app.tsx#L9)) |
+| Ready | None |
+| Failed | Each window has its own error boundary ([AppBoundary.tsx:40](../apps/web/features/os/AppBoundary.tsx#L40), mounted in [Window.tsx:60](../apps/web/features/os/Window.tsx#L60)): `chunk_load_error` when the app's code chunk fails to download (offline, or a tab older than the deploy whose chunks are gone); `render_error` when the app throws while rendering. The window shows a notice with Retry, which imports the chunk again; the desktop and the other windows keep working. `app` is the window's app id. A `$exception` with the original error goes with it ([AppBoundary.tsx:42](../apps/web/features/os/AppBoundary.tsx#L42)) |
+| Notes | Failure rate per app = `experience_failed` with `experience = os_app` / `os_app_opened`, by `app`. Each failure is reported, so a visitor pressing Retry while still offline sends one per press. Reopening the window after a failure also imports again |
 
 #### `twin_first_reply`
 
@@ -416,6 +425,7 @@ All capture sites, each producing a PostHog `$exception`. Server sites use [`cap
 | Browser, uncaught errors and rejections | browser id | SDK exception properties | `capture_exceptions` [init.ts:23](../apps/web/lib/analytics/init.ts#L23) |
 | Browser, `(site)` route boundary | browser id | the error | [(site)/error.tsx:9](../apps/web/app/(site)/error.tsx#L9) |
 | Browser, `/os` boundary | browser id | the error | [(os)/os/error.tsx:9](../apps/web/app/(os)/os/error.tsx#L9) |
+| Browser, OS window boundary (an app's chunk failed to load, or the app crashed) | browser id | the original error (the import's own, not the wrapper) | [AppBoundary.tsx:42](../apps/web/features/os/AppBoundary.tsx#L42) |
 | Browser, blog preview boundary (draft mode only) | browser id | the error | [blog/error.tsx:10](../apps/web/app/(site)/blog/error.tsx#L10) |
 | Browser, root layout failed | browser id, only if posthog-js had already loaded | the error | [global-error.tsx:9](../apps/web/app/global-error.tsx#L9) |
 | Web server `onRequestError` | PostHog id from the request cookie, or none | `path` (query string stripped), `method`, `routePath`, `routeType` | [instrumentation.ts:20-27](../apps/web/instrumentation.ts#L20) |
@@ -483,7 +493,7 @@ Open PostHog, Activity, Live events, with a token set in a dev project ([observa
 | `twin_session_renewed` | Clear the server session, then send | Fires once |
 | `booking_opened`, `booking_completed` | Ask the twin to schedule, book in the booker | One each, no properties |
 | `experience_ready` | Scroll to the desk; open `/os`; open Doom; send the twin a message | One each: `desk_scene`, `os_boot` (and an embedded one after hovering the desk), `dos_app` with `app` = `doom`, `twin_first_reply`; `ms` an integer |
-| `experience_failed` | Block `*.glb` or `/js-dos/js-dos.js` in the Network tab, then load the desk or open a DOS app | `reason` = `load_error` (desk, or DOS with `app`); a refused twin message gives its refusal kind |
+| `experience_failed` | Block `*.glb` or `/js-dos/js-dos.js` in the Network tab, then load the desk or open a DOS app; on `/os`, go offline in DevTools before opening Credits for the first time | `reason` = `load_error` (desk, or DOS with `app`); a refused twin message gives its refusal kind; Credits: `experience` = `os_app`, `reason` = `chunk_load_error`, `app` = `credits`, the window shows Retry and the rest of the desktop works |
 | `$ai_generation` | After a twin reply, LLM analytics, Traces | `chat <model>` generations plus `twin.gate` and `twin.intent`; `distinctId` equals the visitor's; no prompt text, no canary |
 | MCP `$ai_span` | A twin turn that searches | `$ai_span` with `mcp_tool` `twinSearch`, `$ai_trace_id` equal to the turn's trace, `$ai_parent_id` set, `mcp_input_keys` names only |
 | `mcp_request` | Call `tools/list` from an MCP client | `method`, `status`; none for `initialize` or `notifications/*` |
