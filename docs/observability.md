@@ -2,6 +2,8 @@
 
 PostHog is the single backend for product analytics, session replay, web vitals, error tracking and LLM traces. Search Console covers search. Design and decisions: [the spec](superpowers/specs/2026-10-10-observability-and-seo-design.md).
 
+For every event, trace and error with its trigger, source line and properties, see the [tracking plan](observability-tracking-plan.md).
+
 Every capture path is fire-and-forget. With a blank `POSTHOG_PROJECT_TOKEN` nothing is initialised and no request is made (dev, tests and CI run this way).
 
 ## What is captured and where
