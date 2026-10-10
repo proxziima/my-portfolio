@@ -1,13 +1,14 @@
+import { ASSETS } from '@/lib/assets/manifest'
 import { playChime } from '@/lib/audio/chime'
 import { audioContext } from '@/lib/audio/context'
 import { ambienceParams } from './ambience'
 
-const DIR = '/desk/audio'
+const A = ASSETS.desk.audio
 const SAMPLES = {
-  mouseDown: `${DIR}/mouse-down.mp3`,
-  mouseUp: `${DIR}/mouse-up.mp3`,
-  keys: [1, 2, 3, 4, 5, 6].map((n) => `${DIR}/key-${n}.mp3`),
-  office: `${DIR}/office.mp3`,
+  mouseDown: A.mouseDown,
+  mouseUp: A.mouseUp,
+  keys: [A.key1, A.key2, A.key3, A.key4, A.key5, A.key6],
+  office: A.office,
 }
 const LEVEL = { key: 0.8, mouse: 0.8 }
 /** Stereo stand-in for the reference's positional audio: keyboard a little left, mouse to the right. */

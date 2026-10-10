@@ -16,7 +16,9 @@
     "resume:pdf": "bun scripts/resume-pdf/build.ts",
     "perf:lighthouse": "node scripts/perf/lighthouse.ts",
     "perf:shifts": "node scripts/perf/layout-shifts.ts",
-    "fonts:fallbacks": "node scripts/fonts/fallbacks.ts"
+    "fonts:fallbacks": "node scripts/fonts/fallbacks.ts",
+    "assets:build": "bun scripts/assets/build.ts",
+    "assets:check": "bun scripts/assets/build.ts --check"
   },
   "dependencies": {
     "@payloadcms/live-preview-react": "3.90.2",
@@ -54,6 +56,7 @@
     "jsdom": "^30.1.1",
     "pixelmatch": "8.0.0",
     "pngjs": "7.0.0",
+    "sharp": "0.35.5",
     "typescript": "7.0.2",
     "vitest": "^5.0.2"
   }

@@ -1,0 +1,83 @@
+{
+  "desk.audio.key1": {
+    "source": "4a413b3a0d4e0f95a60a0b76e9cb7a43ad756f744fadcfcf64b53b723dc854da",
+    "recipe": "f9405693250973ec524418d14615bb23efc336846c6081312cc8fc2a6e2e3b7a",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-1.4a413b3a0d.mp3"
+    ],
+    "value": "/assets/desk/audio/key-1.4a413b3a0d.mp3"
+  },
+  "desk.audio.key2": {
+    "source": "d8663f1577d8a3b68fc3ca1a85fe67f1f346c5b8fe461ff10f81db5d4eb0d172",
+    "recipe": "5170af942770c9c5de34fe6b4eb267c42fcd3b516110daad514ab47460b873da",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-2.d8663f1577.mp3"
+    ],
+    "value": "/assets/desk/audio/key-2.d8663f1577.mp3"
+  },
+  "desk.audio.key3": {
+    "source": "31997a19d9b0147d24199aaa4bd243e6faea7dd710ab2490c8cc0d66df5c7090",
+    "recipe": "39bc285f7d859362f7c012f6401a952ed949297cb4833a2b1cc965c2967229e6",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-3.31997a19d9.mp3"
+    ],
+    "value": "/assets/desk/audio/key-3.31997a19d9.mp3"
+  },
+  "desk.audio.key4": {
+    "source": "fa1206a4cbb8e117c5465e2bb9cc83d0d2f4444b9ed8ca5046d7b4b2b0629cdc",
+    "recipe": "2d41d45bec5f6c9a3c1d699f70c03bde0d6a6a24e0ef624e7c7283b431248bbf",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-4.fa1206a4cb.mp3"
+    ],
+    "value": "/assets/desk/audio/key-4.fa1206a4cb.mp3"
+  },
+  "desk.audio.key5": {
+    "source": "6cd1c85a10e0947646b0f3ded51c0343ec14d95194e17f677533417edf1945be",
+    "recipe": "1ca951b52c4479a5aa1c69c99b57126b643d519f55866844de3b1c9f91f44523",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-5.6cd1c85a10.mp3"
+    ],
+    "value": "/assets/desk/audio/key-5.6cd1c85a10.mp3"
+  },
+  "desk.audio.key6": {
+    "source": "e65afce367b0b0a70396f41633864432cf17a42a525f4dac08f69011673e708f",
+    "recipe": "bf68f30d9e4e85281fe911d2a485fef7a32c418c1e96e387ce2c8eb70a207287",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-6.e65afce367.mp3"
+    ],
+    "value": "/assets/desk/audio/key-6.e65afce367.mp3"
+  },
+  "desk.audio.mouseDown": {
+    "source": "454c75d2370b7eb12d48575ea5783821e38f767de8117f7557c2b473bb695249",
+    "recipe": "3dfc4e3497a019c460480a8856078f9f5a88a5811221a5c3b8c221c6012a25aa",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/mouse-down.454c75d237.mp3"
+    ],
+    "value": "/assets/desk/audio/mouse-down.454c75d237.mp3"
+  },
+  "desk.audio.mouseUp": {
+    "source": "e06dd429c5fb741148f74a690a6223b8ddc7191f29c91b221340f661b1636e47",
+    "recipe": "15fae08185afe9694df2d2ea2ad41dd64ab87f125e6247928a9cc046aa1c70e7",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/mouse-up.e06dd429c5.mp3"
+    ],
+    "value": "/assets/desk/audio/mouse-up.e06dd429c5.mp3"
+  },
+  "desk.audio.office": {
+    "source": "fffe9677c5bf476b1528abfd1d24bb5ab089941091d7c3d92bf5234b5d4599d8",
+    "recipe": "15c4b50804b4b1c24dab5bfa12ef821772118dc73495b93857672e9aa7f4aa48",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/office.fffe9677c5.mp3"
+    ],
+    "value": "/assets/desk/audio/office.fffe9677c5.mp3"
+  }
+}
