@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Caveat, Inter } from 'next/font/google'
+import { Analytics } from '@/features/analytics/Analytics'
 import { ThemeScript } from '@/features/theme/ThemeScript'
+import { clientAnalyticsConfig } from '@/lib/analytics/request'
 import '../globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
@@ -15,6 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <div id="flick" aria-hidden="true" />
         {children}
+        <Analytics config={clientAnalyticsConfig()} />
       </body>
     </html>
   )

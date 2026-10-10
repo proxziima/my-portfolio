@@ -7,7 +7,7 @@ const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: fileURLToPath(new URL('../..', import.meta.url)),
   // Shared TypeScript source (contract, db, redaction) compiled by Next, like @repo/cms-types.
-  transpilePackages: ['@repo/twin'],
+  transpilePackages: ['@repo/twin', '@repo/observability'],
 }
 
 export default nextConfig
