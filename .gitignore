@@ -42,3 +42,6 @@ yarn-error.log*
 *.db-journal
 *.db.bak
 *.db.*.bak
+
+# perf reports (apps/web/scripts/perf)
+.perf/

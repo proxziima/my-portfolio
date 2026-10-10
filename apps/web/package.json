@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check-types": "next typegen && tsc --noEmit",
-    "resume:pdf": "bun scripts/resume-pdf/build.ts"
+    "resume:pdf": "bun scripts/resume-pdf/build.ts",
+    "perf:lighthouse": "node scripts/perf/lighthouse.ts",
+    "perf:shifts": "node scripts/perf/layout-shifts.ts"
   },
   "dependencies": {
     "@payloadcms/live-preview-react": "3.90.2",
