@@ -50,7 +50,8 @@ const relay = async (r: Response) => {
 
 /**
  * Any failure past validation (agent unreachable or 5xx, redaction rules unavailable, database)
- * reaches the visitor as the `offline` refusal; the cause is only logged.
+ * reaches the visitor as the `offline` refusal; the cause is only logged. Nothing in the catch may
+ * throw, or the refusal becomes a 500: `posthogIdsFromRequest` and `captureServerError` never do.
  */
 const failSafe =
   (name: string, handler: (request: Request, context: Context) => Promise<Response>) =>

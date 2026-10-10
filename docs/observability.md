@@ -34,7 +34,7 @@ Two root layouts exist: `(site)` and `(os)`. So `app/global-not-found.tsx` (enab
    - "Discard client IP data"
 3. Search Console: add the property for `SITE_URL`, put the verification token in `GOOGLE_SITE_VERIFICATION`, then submit `<SITE_URL>/sitemap.xml`.
 
-`SITE_URL` must be an absolute http(s) URL (the web app throws at startup otherwise). Unset, it falls back to `http://localhost:3000`. In compose it is mapped from `WEB_PUBLIC_URL`.
+`SITE_URL` must be an absolute http(s) URL, and `POSTHOG_REGION` must be `us` or `eu`: the web app checks both once in `instrumentation.ts` `register()` and fails startup otherwise. Per request, the analytics helpers (`clientAnalyticsConfig`, `posthogIdsFromRequest`) never throw: a bad value that slips through switches analytics off for that request and is logged once. Unset, it falls back to `http://localhost:3000`. In compose it is mapped from `WEB_PUBLIC_URL`.
 
 New env vars follow the `apps/agents/CLAUDE.md` rule: `agentsEnvSchema`, the `.env.example` files (the offline eval fixture lists them blank), `docker-compose.yml` and `.env.deploy.example`.
 
