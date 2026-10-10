@@ -16,6 +16,9 @@ const nextConfig = {
     // the site's CSS is ~9 KB gzipped and every page is dynamic: inline it, no render-blocking requests
     inlineCss: true,
   },
+  // Maps feed PostHog's symbolication; scripts/sourcemaps.ts uploads them (when credentials exist) and
+  // deletes them after the build, so none is ever served.
+  productionBrowserSourceMaps: true,
   async headers() {
     return [
       // content-hashed by scripts/assets: a changed file is a new URL

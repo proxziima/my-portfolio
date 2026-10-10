@@ -140,6 +140,20 @@ The twin starts with the stack, but it needs these external pieces before it can
 
 Retention runs inside `agents`. Every day at 03:00 it purges visitors not seen for 90 days, with everything they own. A visitor can delete their own data with `DELETE https://<web>/api/twin/me`.
 
+## Source maps for PostHog (optional)
+
+`next build` emits browser source maps, and `apps/web/scripts/sourcemaps.ts` (the tail of `bun run build`) sends them to PostHog for readable stack traces, then deletes every `.map` and its `sourceMappingURL` comment. The image never contains a map and the site never serves one.
+
+The upload needs two BuildKit secrets on the web image build: `posthog_cli_token` (a PostHog personal API key with the error-tracking write scope) and `posthog_cli_env_id` (the project/environment id). They are mounted only for the build step (`RUN --mount=type=secret,...` in `apps/web/Dockerfile`), so they are not in any layer, nor in the runtime environment. From a shell build:
+
+```bash
+docker build -f apps/web/Dockerfile \
+  --secret id=posthog_cli_token,env=POSTHOG_CLI_TOKEN \
+  --secret id=posthog_cli_env_id,env=POSTHOG_CLI_ENV_ID .
+```
+
+Where the platform can't pass build secrets, skip them: nothing breaks. Without the secrets the script logs `upload skipped`, still removes the maps, and the build succeeds; PostHog just shows minified stack frames. An upload that fails (network, bad token) only logs a warning.
+
 ## Updating
 
 Push to the deployed branch, then click **Deploy** (or enable Easypanel's auto-deploy for the service). The images are rebuilt from the new commit and the containers are replaced; the `cms-data` and `twin-pg` volumes stay. On start, `agents` applies any new twin migration. When the new `cms` handles its first request, it runs any migration that isn't in `payload_migrations` yet.

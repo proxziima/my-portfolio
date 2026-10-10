@@ -6,6 +6,7 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "env": ["CMS_URL", "REVALIDATE_SECRET"],
+      "passThroughEnv": ["POSTHOG_CLI_TOKEN", "POSTHOG_CLI_ENV_ID"],
       "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
     "lint": {
