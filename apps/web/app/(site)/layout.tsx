@@ -8,8 +8,17 @@ import { clientAnalyticsConfig } from '@/lib/analytics/request'
 import { originOf, siteUrl } from '@/lib/site'
 import '../globals.css'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
-const caveat = Caveat({ subsets: ['latin'], weight: ['500', '600'], variable: '--font-caveat', display: 'swap' })
+// the matched per-platform fallbacks (styles/font-fallbacks.css) replace next/font's single Arial one; Turbopack ignores
+// `adjustFontFallback: false` unless `fallback` is given, so both are set (literals: next/font reads them statically)
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+  adjustFontFallback: false,
+  fallback: ['Inter Fallback Segoe', 'Inter Fallback Roboto', 'Inter Fallback Helvetica', 'Inter Fallback Arial'],
+})
+// only Curious mode's notes use it: never preload it ahead of the body face
+const caveat = Caveat({ subsets: ['latin'], weight: ['500', '600'], variable: '--font-caveat', display: 'swap', preload: false })
 
 export function generateMetadata(): Metadata {
   return {
