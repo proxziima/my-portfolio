@@ -25,7 +25,7 @@ describe('installDelegatedTracking', () => {
   let uninstall: () => void
   beforeEach(() => {
     document.body.innerHTML = `
-      <section aria-labelledby="work-title"><h2 id="work-title">Work</h2>
+      <section id="work" aria-labelledby="work-title"><h2 id="work-title">Work</h2>
         <a id="ext" href="https://github.com/me">GitHub</a>
         <button id="cta" data-track="open_desktop"><span id="inner">Open</span></button>
       </section>
@@ -41,7 +41,7 @@ describe('installDelegatedTracking', () => {
 
   it('tracks outbound clicks with the section they sit in', () => {
     click('ext')
-    expect(track).toHaveBeenCalledWith('outbound_click', { href: 'https://github.com/me', host: 'github.com', kind: 'external', channel: 'github', section: 'work-title' })
+    expect(track).toHaveBeenCalledWith('outbound_click', { href: 'https://github.com/me', host: 'github.com', kind: 'external', channel: 'github', section: 'work' })
   })
   it('tracks mailto clicks outside any section', () => {
     click('mail')
@@ -49,7 +49,7 @@ describe('installDelegatedTracking', () => {
   })
   it('tracks data-track CTAs from a nested click target', () => {
     click('inner')
-    expect(track).toHaveBeenCalledWith('cta_clicked', { cta: 'open_desktop', section: 'work-title' })
+    expect(track).toHaveBeenCalledWith('cta_clicked', { cta: 'open_desktop', section: 'work' })
   })
   it('ignores internal links', () => {
     click('local')

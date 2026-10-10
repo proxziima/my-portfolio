@@ -22,8 +22,9 @@ beforeEach(() => {
     },
   )
   document.body.innerHTML = `
-    <section aria-labelledby="work"></section>
-    <section aria-labelledby="projects"></section>
+    <section id="work" aria-labelledby="work-title"><h2 id="work-title">Work</h2></section>
+    <section id="projects" aria-labelledby="projects-title"><h2 id="projects-title">Projects</h2></section>
+    <section aria-labelledby="whats-new"></section>
     <section></section>`
 })
 afterEach(() => {
@@ -32,7 +33,7 @@ afterEach(() => {
 })
 
 describe('observeSections', () => {
-  it('observes labelled sections only and reports each once', () => {
+  it('observes the page sections (id plus label) only and reports each once by id', () => {
     const track = vi.fn()
     const stop = observeSections(track)
     expect(observed).toHaveLength(2)

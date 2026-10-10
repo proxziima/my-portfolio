@@ -1,4 +1,5 @@
 import type { AnalyticsEvents, LinkChannel, Track } from './events'
+import { PAGE_SECTION } from './sections'
 
 const CHANNELS: ReadonlyArray<[RegExp, LinkChannel]> = [
   [/(^|\.)github\.com$/, 'github'],
@@ -24,9 +25,9 @@ export function classifyLink(href: string, origin: string): Omit<AnalyticsEvents
   return { href: url.href, host, kind: 'external', channel }
 }
 
-/** The labelled section a click happened in: the home page is one long page, sections are its map. */
+/** The page section (its id) a click happened in: the home page is one long page, sections are its map. */
 function sectionOf(el: Element): string | null {
-  return el.closest('[aria-labelledby]')?.getAttribute('aria-labelledby') ?? null
+  return el.closest(PAGE_SECTION)?.id || null
 }
 
 /**
