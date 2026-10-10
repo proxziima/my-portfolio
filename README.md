@@ -74,6 +74,8 @@ Details, including the production cookie-domain requirement, are in [apps/payloa
 
 Production is an Easypanel Compose service built from [`docker-compose.yml`](docker-compose.yml): `web` (port 3000) and `cms` (port 3001, SQLite and uploads on the `cms-data` volume). Variables are listed in [`.env.deploy.example`](.env.deploy.example). Step by step, including the first deploy, updates, backups and troubleshooting: [docs/deploy-easypanel.md](docs/deploy-easypanel.md).
 
+Analytics, error tracking, LLM traces and SEO setup (PostHog, Search Console, event catalog, dashboards): [docs/observability.md](docs/observability.md).
+
 ## MCP
 
 The CMS exposes its portfolio collections and globals over MCP (`@payloadcms/plugin-mcp`, `apps/payload/src/mcp/mcp-plugin.ts`) at `http://127.0.0.1:3001/api/mcp`, with API keys created in the admin. Setup is in [apps/payload/README.md](apps/payload/README.md#mcp).

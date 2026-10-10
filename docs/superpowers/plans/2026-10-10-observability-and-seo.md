@@ -554,7 +554,7 @@ export interface AnalyticsEvents {
   twin_session_started: { resumed: boolean }
   twin_message_sent: { chars: number; turn: number }
   twin_refusal: { reason: string }
-  twin_reset: Record<string, never>
+  twin_session_renewed: Record<string, never>
   booking_opened: Record<string, never>
   booking_completed: Record<string, never>
 }
@@ -1104,7 +1104,7 @@ In `use-twin.ts`:
   }, [initial])
 ```
 
-- In `reset`, add `track('twin_reset', {})` before `resetAgent()`.
+- In `reset`, add `track('twin_session_renewed', {})` before `resetAgent()`.
 - In `fail`, after `setRefusal(refusalOf(error))`, call `track('twin_refusal', { reason: refusalOf(error) })`. Compute `refusalOf(error)` once into a const and use it for both.
 - In `send`, right after `lastSent.current = text`, add:
 
