@@ -8,6 +8,8 @@ const nextConfig = {
   outputFileTracingRoot: fileURLToPath(new URL('../..', import.meta.url)),
   // Shared TypeScript source (contract, db, redaction) compiled by Next, like @repo/cms-types.
   transpilePackages: ['@repo/twin', '@repo/observability'],
+  // PostHog's API paths end in a slash (`/e/`); a redirect would drop the POST body.
+  skipTrailingSlashRedirect: true,
 }
 
 export default nextConfig
