@@ -17,7 +17,7 @@ export interface AnalyticsEvents {
   twin_session_started: { resumed: boolean }
   twin_message_sent: { chars: number; turn: number }
   twin_refusal: { reason: string }
-  twin_reset: Record<string, never>
+  twin_session_renewed: Record<string, never>
   booking_opened: Record<string, never>
   booking_completed: Record<string, never>
 }

@@ -80,7 +80,7 @@ This package has no framework imports. Its exports:
   - `role_selected { role }` from the role picker
   - `theme_changed { theme }` from WallSwitch
   - `os_app_opened { app }` from `Desktop.open(id)`. App `resume` is the resume conversion.
-  - Twin, from `use-twin.ts`: `twin_session_started { resumed }`, `twin_message_sent { chars, turn }` (never the text, which lives in the LLM trace), `twin_refusal { reason }`, `twin_reset`.
+  - Twin, from `use-twin.ts`: `twin_session_started { resumed }`, `twin_message_sent { chars, turn }` (never the text, which lives in the LLM trace), `twin_refusal { reason }`, `twin_session_renewed`.
   - Booking: `booking_opened` and `booking_completed` (the Cal embed's `bookingSuccessful`).
 - **`data-track`** attributes on the desk CTAs: `desk_mute`, `desk_fullscreen`, `open_desktop`.
 - **Errors**:
@@ -146,7 +146,7 @@ This package has no framework imports. Its exports:
 | `role_selected` | RolePicker | role |
 | `theme_changed` | WallSwitch | theme |
 | `os_app_opened` | Desktop | app |
-| `twin_session_started` / `twin_message_sent` / `twin_refusal` / `twin_reset` | use-twin | resumed / chars, turn / reason / — |
+| `twin_session_started` / `twin_message_sent` / `twin_refusal` / `twin_session_renewed` | use-twin | resumed / chars, turn / reason / — |
 | `booking_opened` / `booking_completed` | BookingDialog | — |
 | `$ai_generation`, `$ai_span`, `$ai_trace` | agents (OTel), payload MCP | PostHog LLM schema |
 | `mcp_request` | payload MCP | method |

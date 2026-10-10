@@ -89,6 +89,11 @@ export function useTwin() {
   const typing = agent.status === 'submitted' || (agent.status === 'streaming' && !isParked(agent.events))
 
   const { send: sendTurn, reset: resetAgent } = agent
+  /** Shows the visitor a refusal and records it; one place so the two can't drift. */
+  const refuse = useCallback((reason: Refusal) => {
+    setRefusal(reason)
+    track('twin_refusal', { reason })
+  }, [])
   // Read inside callbacks, which must not be recreated on every status change.
   const status = useRef(agent.status)
   status.current = agent.status
@@ -96,7 +101,6 @@ export function useTwin() {
   const held = useRef<string | null>(null)
   const reset = useCallback(() => {
     setRefusal(null)
-    track('twin_reset', {})
     resetAgent()
   }, [resetAgent])
 
@@ -108,6 +112,7 @@ export function useTwin() {
   const renew = useCallback((): boolean => {
     if (renewed.current) return false
     renewed.current = true
+    track('twin_session_renewed', {})
     reset()
     return true
   }, [reset])
@@ -115,12 +120,10 @@ export function useTwin() {
   const fail = useCallback(
     (error: unknown): boolean => {
       if (isGone(error) && renew()) return true
-      const reason = refusalOf(error)
-      setRefusal(reason)
-      track('twin_refusal', { reason })
+      refuse(refusalOf(error))
       return false
     },
-    [renew],
+    [renew, refuse],
   )
 
   // The last text submitted through `send`, so a first turn whose session turned out to be gone
@@ -136,10 +139,10 @@ export function useTwin() {
       try {
         await sendTurn(text)
       } catch (retryError) {
-        setRefusal(refusalOf(retryError))
+        refuse(refusalOf(retryError))
       }
     },
-    [sendTurn],
+    [sendTurn, refuse],
   )
 
   const send = useCallback(
@@ -175,13 +178,12 @@ export function useTwin() {
     if (!failed) return
     const text = lastSent.current
     if (!renew()) {
-      setRefusal('offline')
-      track('twin_refusal', { reason: 'offline' })
+      refuse('offline')
       return
     }
     lastSent.current = null
     if (text !== null) void resend(text)
-  }, [failed, renew, resend])
+  }, [failed, renew, resend, refuse])
 
   useEffect(() => {
     // A failed session is handled above, from the stream; its error must not also become a refusal.
@@ -202,11 +204,10 @@ export function useTwin() {
     if (agent.status !== 'resuming') return
     const timer = setTimeout(() => {
       if (renew()) return
-      setRefusal('offline')
-      track('twin_refusal', { reason: 'offline' })
+      refuse('offline')
     }, RESUME_STALL_MS)
     return () => clearTimeout(timer)
-  }, [agent.status, renew])
+  }, [agent.status, renew, refuse])
 
   // Delivers the held message once the session can take it (resumed, or renewed and ready).
   useEffect(() => {
