@@ -202,4 +202,8 @@ export const ASSETS = {
       ],
     },
   },
+  osFonts: {
+    millennium: 'app/(os)/fonts/Millennium.woff2',
+    millenniumBold: 'app/(os)/fonts/Millennium-Bold.woff2',
+  },
 } as const

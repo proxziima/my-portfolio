@@ -39,6 +39,8 @@ jobs:
           PAYLOAD_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
         run: bun run --cwd apps/payload test:int
       - run: bun run --cwd apps/web test
+      # hash/manifest only: needs no ffmpeg or encoders, fails when a source or recipe changed without `assets:build`
+      - run: bun run --cwd apps/web assets:check
       - run: bun test scripts/scan-client-bundle.test.ts
       - name: agent builds and discovers every capability
         run: bun run --cwd apps/agents info && bun run --cwd apps/agents build

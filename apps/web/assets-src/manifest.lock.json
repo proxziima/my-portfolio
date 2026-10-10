@@ -1082,5 +1082,27 @@
         }
       ]
     }
+  },
+  "osFonts.millennium": {
+    "source": "98fb4bc1e806757efa7778fccf22cf5dc4cf1b972430dce8e811fbbfa74bd904",
+    "recipe": "dcbd5a640969ae8d0dc4de55d5329048ebdbd5ab59e7f2b8992ad5df051003bc",
+    "tools": {
+      "wawoff2": "2.0.1"
+    },
+    "outputs": [
+      "app/(os)/fonts/Millennium.woff2"
+    ],
+    "value": "app/(os)/fonts/Millennium.woff2"
+  },
+  "osFonts.millenniumBold": {
+    "source": "7cc0f2a1b4395791195ac582dd22781a0b69001be7eeaf0626839ec608da81d5",
+    "recipe": "a292ed41597331b34de225132ed82bd76be813fcf8770011d86dd8a767ed0bc5",
+    "tools": {
+      "wawoff2": "2.0.1"
+    },
+    "outputs": [
+      "app/(os)/fonts/Millennium-Bold.woff2"
+    ],
+    "value": "app/(os)/fonts/Millennium-Bold.woff2"
   }
 }

@@ -15,6 +15,7 @@ import { sha256 } from './hash.ts'
 import { checkLock, LOCK_FILE, outputFile, recipeHash, writeManifest, type Lock } from './manifest.ts'
 import { RECIPES, SOURCE_DIR, type Recipe } from './recipes.ts'
 import { copyStage } from './stages/copy.ts'
+import { fontStage } from './stages/font.ts'
 import { imageStage, textureStage } from './stages/image.ts'
 import { modelStage } from './stages/model.ts'
 import type { StageResult } from './stages/stage.ts'
@@ -29,6 +30,7 @@ const STAGES: Partial<Record<Recipe['kind'], Stage>> = {
   texture: (recipe, bytes) => textureStage(recipe as Extract<Recipe, { kind: 'texture' }>, bytes),
   model: (recipe, bytes) => modelStage(recipe as Extract<Recipe, { kind: 'model' }>, bytes),
   video: (recipe, bytes) => videoStage(recipe as Extract<Recipe, { kind: 'video' }>, bytes),
+  font: (recipe, bytes) => fontStage(recipe.source, bytes),
 }
 
 const { values } = parseArgs({
