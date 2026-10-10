@@ -114,9 +114,9 @@ All fourteen use the typed catalog in [events.ts:10-25](../apps/web/lib/analytic
 
 | `cta` | Element | Line |
 | --- | --- | --- |
-| `desk_mute` | Mute / Unmute button on the desk video | [Figure.tsx:68](../apps/web/features/figure/Figure.tsx#L68) |
-| `desk_fullscreen` | Full screen button | [Figure.tsx:73](../apps/web/features/figure/Figure.tsx#L73) |
-| `open_desktop` | "Open the desktop" link to `/os` | [Figure.tsx:77](../apps/web/features/figure/Figure.tsx#L77) |
+| `desk_mute` | Mute / Unmute button on the desk video | [Figure.tsx:78](../apps/web/features/figure/Figure.tsx#L78) |
+| `desk_fullscreen` | Full screen button | [Figure.tsx:83](../apps/web/features/figure/Figure.tsx#L83) |
+| `open_desktop` | "Open the desktop" link to `/os` | [Figure.tsx:87](../apps/web/features/figure/Figure.tsx#L87) |
 
 These are the only `data-track` attributes in the repo. A new CTA needs only the attribute; add it to this table.
 
@@ -257,9 +257,9 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 
 | | |
 | --- | --- |
-| Start | The figure box comes within 200 px of the viewport and the lazy `DeskScene` (three.js, `next/dynamic`, `ssr: false`) is mounted, so the chunk download is included ([Figure.tsx:32](../apps/web/features/figure/Figure.tsx#L32)) |
-| Ready | The first frame drawn with the models in place (`onFirstFrame`, the same moment as `data-loaded="true"`; [DeskScene.tsx:46](../apps/web/features/desk/DeskScene.tsx#L46)) |
-| Failed | `webgl_unavailable` when the engine cannot be created ([DeskScene.tsx:52](../apps/web/features/desk/DeskScene.tsx#L52)); `load_error` when the models fail to load ([DeskScene.tsx:96](../apps/web/features/desk/DeskScene.tsx#L96)). Both are where the figure already collapses to its caption ([Figure.tsx:35](../apps/web/features/figure/Figure.tsx#L35)) |
+| Start | The figure box comes within 200 px of the viewport and the lazy `DeskScene` (three.js, `next/dynamic`, `ssr: false`) is mounted, so the chunk download is included ([Figure.tsx:39](../apps/web/features/figure/Figure.tsx#L39)) |
+| Ready | The first frame drawn with the models in place (`onFirstFrame`, the same moment as `data-loaded="true"`; [DeskScene.tsx:59](../apps/web/features/desk/DeskScene.tsx#L59)) |
+| Failed | `webgl_unavailable` when the engine cannot be created ([DeskScene.tsx:68](../apps/web/features/desk/DeskScene.tsx#L68)); `load_error` when the models fail to load ([DeskScene.tsx:120](../apps/web/features/desk/DeskScene.tsx#L120)). Both are where the figure already collapses to its caption ([Figure.tsx:39](../apps/web/features/figure/Figure.tsx#L39)) |
 | Notes | Frames render only while the box is on screen, so a visitor who stops inside the 200 px margin without scrolling the box into view adds that wait to `ms`. A failure to download the scene's code chunk goes to the error boundary (`$exception`), not here |
 
 #### `os_boot`
@@ -269,7 +269,7 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 | Start | `Desktop` first renders ([Desktop.tsx:22](../apps/web/features/os/Desktop.tsx#L22)), on `/os` or in the desk-monitor iframe |
 | Ready | The boot screen hands over to the desktop (`boot`, [Desktop.tsx:35](../apps/web/features/os/Desktop.tsx#L35)): the BIOS typewriter finishing, or the visitor skipping it with a click or key |
 | Failed | None: a crash here is an error-boundary `$exception` |
-| Notes | First boot only: the timer settles once per mount, so a reboot after Shutdown is not timed. Mostly hydration plus the typewriter (about 1.5 s locally), so a rising p95 points at slow hydration |
+| Notes | First boot only: the timer settles once per mount, so a reboot after Shutdown is not timed. Mostly hydration plus the typewriter (about 1.5 s locally), so a rising p95 points at slow hydration. Inside the desk monitor the iframe mounts on approach (a mouse entering the figure, keyboard focus on the screen, on touch the monitor scrolling half into view, or full screen; [DeskScene.tsx](../apps/web/features/desk/DeskScene.tsx), [intent.ts](../apps/web/features/desk/intent.ts)), so the embedded `os_boot` starts then, not necessarily during the page load. Until then the screen is a powered-off tube and no OS document exists, so a visitor who never approaches the desk sends no embedded `os_boot`, `os_engaged` or `os_app_opened` at all |
 
 #### `dos_app`
 
@@ -482,7 +482,7 @@ Open PostHog, Activity, Live events, with a token set in a dev project ([observa
 | `twin_refusal` | Exceed a limit, or stop the agent | `reason` = `throttled`, `too_long`, `ended`, `offline` |
 | `twin_session_renewed` | Clear the server session, then send | Fires once |
 | `booking_opened`, `booking_completed` | Ask the twin to schedule, book in the booker | One each, no properties |
-| `experience_ready` | Scroll to the desk; open `/os`; open Doom; send the twin a message | One each: `desk_scene`, `os_boot` (and an embedded one from the monitor), `dos_app` with `app` = `doom`, `twin_first_reply`; `ms` an integer |
+| `experience_ready` | Scroll to the desk; open `/os`; open Doom; send the twin a message | One each: `desk_scene`, `os_boot` (and an embedded one after hovering the desk), `dos_app` with `app` = `doom`, `twin_first_reply`; `ms` an integer |
 | `experience_failed` | Block `*.glb` or `/js-dos/js-dos.js` in the Network tab, then load the desk or open a DOS app | `reason` = `load_error` (desk, or DOS with `app`); a refused twin message gives its refusal kind |
 | `$ai_generation` | After a twin reply, LLM analytics, Traces | `chat <model>` generations plus `twin.gate` and `twin.intent`; `distinctId` equals the visitor's; no prompt text, no canary |
 | MCP `$ai_span` | A twin turn that searches | `$ai_span` with `mcp_tool` `twinSearch`, `$ai_trace_id` equal to the turn's trace, `$ai_parent_id` set, `mcp_input_keys` names only |
