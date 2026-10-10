@@ -7,8 +7,8 @@ const TTL_MS = 5 * 60_000
 const FETCH_TIMEOUT_MS = 3_000
 /** After a failure, no new fetch is attempted for this long. */
 const FAILURE_BACKOFF_MS = 30_000
-/** After a failure, the last good rules are served only while they are younger than this. */
-const MAX_STALE_MS = 60 * 60_000
+/** After a failure, the last good rules are served only while they are younger than this. Exported so other holders of the rules apply the same cap. */
+export const MAX_STALE_MS = 60 * 60_000
 
 let cached: { at: number; rules: RedactionRules } | null = null
 let failure: { at: number; error: unknown } | null = null

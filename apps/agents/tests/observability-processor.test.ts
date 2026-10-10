@@ -1,5 +1,6 @@
-import type { ReadableSpan, SpanProcessor } from '@opentelemetry/sdk-trace-base'
-import type { SpanExportContext, SpanExportPolicy } from 'eve/instrumentation/otel'
+import { ROOT_CONTEXT } from '@opentelemetry/api'
+import type { ReadableSpan, Span, SpanProcessor } from '@opentelemetry/sdk-trace-base'
+import { otelIntegration, type SpanExportContext, type SpanExportPolicy } from 'eve/instrumentation/otel'
 import { describe, expect, it, vi } from 'vitest'
 import { IDENTITY_KEYS, lazyProcessor, makeRedactor, postHogDestination, redactingEventsProcessor, redactionPolicy } from '../agent/lib/observability/processor'
 
@@ -148,6 +149,74 @@ describe('postHogDestination (policy and processors together)', () => {
     for (const p of d.spanProcessors) p.onEnd(applyPolicy(d.exportPolicy, turn()))
     expect(exporter.onEnd).not.toHaveBeenCalled()
     expect(redactor).not.toHaveBeenCalled()
+  })
+})
+
+/** A span shaped like the SDK's: a class instance whose methods live on the prototype, as eve's facade expects. */
+class FakeSpan {
+  name = 'chat x'
+  events: FakeEvent[]
+  status: { code: number; message?: string }
+  constructor(
+    public attributes: Record<string, unknown>,
+    extra: { events?: FakeEvent[]; status?: { code: number; message?: string } } = {},
+  ) {
+    this.events = extra.events ?? []
+    this.status = extra.status ?? { code: 0 }
+  }
+  spanContext() {
+    return { traceId: 't', spanId: 's', traceFlags: 1 }
+  }
+}
+
+describe('postHogDestination inside eve (otelIntegration)', () => {
+  const turn = () =>
+    new FakeSpan(
+      {
+        'gen_ai.input.messages': 'my name is Rosebud',
+        'gen_ai.output.messages': 'hi Rosebud',
+        'mcp.tool.result': 'Rosebud',
+        'gen_ai.request.model': 'm',
+        'gen_ai.usage.input_tokens': 7,
+        'ai.settings.context.sessionId': UUID,
+        'gen_ai.conversation.id': UUID,
+      },
+      { events: [{ name: 'exception', time: [1, 0], attributes: { 'exception.message': 'Rosebud' } }], status: { code: 2, message: 'Rosebud' } },
+    )
+  /** eve's real pipeline: the destination's processor wrapped in eve's content-filtering processor with its export policy. */
+  const run = (redactor: () => ((t: string) => string) | null) => {
+    const exporter = inner()
+    const processor = otelIntegration(
+      postHogDestination({ config: () => ({ token: 'phc_x', ingestHost: 'https://us.i.posthog.com' }), redactor, exporter: () => exporter }),
+    ).spanProcessors[0] as SpanProcessor
+    const s = turn()
+    processor.onStart(s as unknown as Span, ROOT_CONTEXT)
+    processor.onEnd(s as unknown as ReadableSpan)
+    return { out: sent(exporter), original: s }
+  }
+
+  it('redacts every content string with the rules loaded, ids intact', () => {
+    const { out, original } = run(() => makeRedactor(rules, CANARY))
+    expect(out.attributes).toEqual({
+      'gen_ai.input.messages': 'my name is [redacted]',
+      'gen_ai.output.messages': 'hi [redacted]',
+      'mcp.tool.result': '[redacted]',
+      'gen_ai.request.model': 'm',
+      'gen_ai.usage.input_tokens': 7,
+      'ai.settings.context.sessionId': UUID,
+      'gen_ai.conversation.id': UUID,
+    })
+    expect(out.events[0]!.attributes).toEqual({ 'exception.message': '[redacted]' })
+    expect(out.status).toEqual({ code: 2, message: '[redacted]' })
+    expect(out.spanContext().traceId).toBe('t')
+    expect(original.attributes['gen_ai.input.messages']).toBe('my name is Rosebud')
+  })
+
+  it('strips content without the rules, ids intact', () => {
+    const { out } = run(() => null)
+    expect(out.attributes).toEqual({ 'gen_ai.request.model': 'm', 'gen_ai.usage.input_tokens': 7, 'ai.settings.context.sessionId': UUID, 'gen_ai.conversation.id': UUID })
+    expect(JSON.stringify(out.events)).not.toContain('Rosebud')
+    expect(out.status).toEqual({ code: 2 })
   })
 })
 

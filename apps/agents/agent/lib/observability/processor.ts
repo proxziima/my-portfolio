@@ -2,7 +2,7 @@ import type { Context } from '@opentelemetry/api'
 import type { ReadableSpan, Span, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { PostHogSpanProcessor } from '@posthog/ai/otel'
 import { posthogConfig, type PostHogConfig } from '@repo/observability/config'
-import { fetchRedactionRules, redactText, type RedactionRules } from '@repo/twin/redact'
+import { fetchRedactionRules, MAX_STALE_MS, redactText, type RedactionRules } from '@repo/twin/redact'
 import type { SpanExportPolicy } from 'eve/instrumentation/otel'
 import { getEnv } from '../env'
 
@@ -108,37 +108,53 @@ export function redactingEventsProcessor(inner: SpanProcessor, redactor: () => R
 
 /** How often the background refresh asks for the rules; `fetchRedactionRules` itself caches for five minutes. */
 const REFRESH_EVERY_MS = 10_000
-let redactor: Redactor | null = null
+/** The redactor and when its rules loaded: past `MAX_STALE_MS` it is no longer served, even if refreshes stall. */
+let loaded: { redactor: Redactor; at: number } | null = null
 let refreshing = false
 let refreshedAt = -Infinity
 
 /**
  * Refreshes the redactor in the background, one request at a time. A rejection means the rules are
  * gone or older than `fetchRedactionRules` will serve, so content is held back again, as on the
- * transcript path.
+ * transcript path. A synchronous throw (missing env) is caught here: it must neither leave the
+ * in-flight flag set, which would stop every later refresh, nor escape into a span's `end()`.
  */
 function refreshRules(): void {
   if (refreshing || Date.now() - refreshedAt < REFRESH_EVERY_MS) return
   refreshing = true
   refreshedAt = Date.now()
-  fetchRedactionRules(getEnv().CMS_URL, getEnv().TWIN_REDACT_SECRET)
-    .then(
-      (rules) => {
-        redactor = makeRedactor(rules, getEnv().TWIN_PROMPT_CANARY)
-      },
-      () => {
-        redactor = null
-      },
-    )
-    .finally(() => {
-      refreshing = false
-    })
+  try {
+    const env = getEnv()
+    fetchRedactionRules(env.CMS_URL, env.TWIN_REDACT_SECRET)
+      .then(
+        (rules) => {
+          loaded = { redactor: makeRedactor(rules, env.TWIN_PROMPT_CANARY), at: Date.now() }
+        },
+        () => {
+          loaded = null
+        },
+      )
+      .finally(() => {
+        refreshing = false
+      })
+  } catch (error) {
+    loaded = null
+    refreshing = false
+    console.error('[observability] redaction rules refresh failed', error instanceof Error ? error.message : error)
+  }
 }
 
-/** The current redactor (null until the rules first load), kicking off a refresh when one is due. */
-function currentRedactor(): Redactor | null {
+/** The current redactor: null until the rules load and once they are older than `MAX_STALE_MS`; kicks off a refresh when one is due. */
+export function currentRedactor(): Redactor | null {
   refreshRules()
-  return redactor
+  return loaded && Date.now() - loaded.at < MAX_STALE_MS ? loaded.redactor : null
+}
+
+/** Test seam: forget the loaded rules and the refresh schedule. */
+export function resetRedactorState(): void {
+  loaded = null
+  refreshing = false
+  refreshedAt = -Infinity
 }
 
 let config: { value: PostHogConfig | null } | { error: unknown } | undefined
