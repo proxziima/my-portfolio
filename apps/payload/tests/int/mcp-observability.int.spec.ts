@@ -11,7 +11,7 @@ describe('mcpEventToCapture', () => {
   it('turns a completed tools/call into an $ai_span joined to the caller trace', () => {
     const c = mcpEventToCapture({
       type: 'REQUEST_COMPLETED', timestamp: 0, sessionId: 'mcp-s', requestId: 'r1', method: 'tools/call', status: 'success', duration: 120,
-      result: rpc({ name: 'twinSearch', arguments: { query: 'react' }, _meta: { traceparent: `00-${TRACE}-${SPAN}-01` } }),
+      result: rpc({ name: 'twinSearch', arguments: { query: 'react', limit: 3 }, _meta: { traceparent: `00-${TRACE}-${SPAN}-01` } }),
     })
     expect(c).toEqual({
       distinctId: 'mcp:payload',
@@ -23,7 +23,8 @@ describe('mcpEventToCapture', () => {
         $ai_session_id: 'mcp-s',
         $ai_latency: 0.12,
         $ai_is_error: false,
-        $ai_input_state: { query: 'react' },
+        $ai_input_state: { keys: ['limit', 'query'] },
+        mcp_input_keys: ['limit', 'query'],
         mcp_tool: 'twinSearch',
       },
     })
@@ -40,9 +41,10 @@ describe('mcpEventToCapture', () => {
     expect(c?.properties).not.toHaveProperty('$ai_parent_id')
   })
 
-  it('truncates large inputs', () => {
-    const c = mcpEventToCapture({ type: 'REQUEST_COMPLETED', timestamp: 0, requestId: 'r3', method: 'tools/call', status: 'success', result: rpc({ name: 'x', arguments: { body: 'y'.repeat(20_000) } }) })
-    expect(String(c?.properties.$ai_input_state).length).toBeLessThanOrEqual(8_192 + 20)
+  it('never records argument values', () => {
+    const c = mcpEventToCapture({ type: 'REQUEST_COMPLETED', timestamp: 0, requestId: 'r3', method: 'tools/call', status: 'success', result: rpc({ name: 'twinSearch', arguments: { query: 'secret visitor text' } }) })
+    expect(JSON.stringify(c)).not.toContain('secret visitor text')
+    expect(c?.properties.mcp_input_keys).toEqual(['query'])
   })
 
   it('counts other methods as mcp_request and ignores received/session events', () => {

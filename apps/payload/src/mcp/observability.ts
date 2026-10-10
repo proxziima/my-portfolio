@@ -8,14 +8,10 @@ type McpEvent =
 
 type ToolCallParams = { name?: string; arguments?: unknown; _meta?: { traceparent?: string } }
 
-const MAX_INPUT = 8_192
 const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$/
 
-/** Big tool arguments (document bodies) are cut so one event can't blow past PostHog's size limits. */
-const truncated = (value: unknown): unknown => {
-  const json = JSON.stringify(value)
-  return json && json.length > MAX_INPUT ? `${json.slice(0, MAX_INPUT)}…[truncated]` : value
-}
+/** Argument names only, sorted: values can hold visitor text, which the agent side redacts but this process can't. */
+const argumentKeys = (args: unknown): string[] => (args && typeof args === 'object' ? Object.keys(args).sort() : [])
 
 /**
  * The tools/call params. mcp-handler 1.1 emits REQUEST_COMPLETED with no `parameters`: its `result`
@@ -30,7 +26,8 @@ const paramsOf = (event: Extract<McpEvent, { type: 'REQUEST_RECEIVED' | 'REQUEST
  * The PostHog event for one MCP event, or null when it isn't reported. A `tools/call` becomes an
  * `$ai_span`; with the caller's `_meta.traceparent` (the twin sends one) it nests under the
  * caller's trace, otherwise the MCP session or request is its own trace (Claude Code, other clients).
- * The tool's own output isn't visible to `onEvent`, so only the input is recorded.
+ * mcp-handler 1.1's `onEvent` sees neither the tool output nor tool-level `isError` (the twin's own
+ * `tools/call` span traces those client-side), and argument values are never recorded, only names.
  */
 export function mcpEventToCapture(event: McpEvent): { distinctId: string; event: string; properties: Record<string, unknown> } | null {
   if (event.type !== 'REQUEST_COMPLETED') return null
@@ -38,6 +35,7 @@ export function mcpEventToCapture(event: McpEvent): { distinctId: string; event:
   const params = paramsOf(event)
   const parent = TRACEPARENT.exec(params._meta?.traceparent ?? '')
   const tool = params.name ?? 'unknown'
+  const keys = argumentKeys(params.arguments)
   return {
     distinctId: 'mcp:payload',
     event: '$ai_span',
@@ -48,7 +46,8 @@ export function mcpEventToCapture(event: McpEvent): { distinctId: string; event:
       ...(event.sessionId ? { $ai_session_id: event.sessionId } : {}),
       ...(event.duration !== undefined ? { $ai_latency: event.duration / 1000 } : {}),
       $ai_is_error: event.status === 'error',
-      $ai_input_state: truncated(params.arguments ?? {}),
+      $ai_input_state: { keys },
+      mcp_input_keys: keys,
       mcp_tool: tool,
     },
   }
