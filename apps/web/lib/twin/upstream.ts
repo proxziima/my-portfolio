@@ -1,4 +1,5 @@
 import 'server-only'
+import type { PostHogIds } from '@repo/observability/cookie'
 import { twinEnv } from './env'
 import { mintVisitorJwt, safeTimeZone } from './jwt'
 
@@ -7,6 +8,7 @@ export interface AgentRequest {
   method: 'GET' | 'POST'
   body?: unknown
   tz?: string | null
+  analytics?: PostHogIds | null
   search?: string
   signal?: AbortSignal
 }
@@ -14,7 +16,7 @@ export interface AgentRequest {
 /** Calls the agent's eve routes as this visitor. The agent is only reachable from the server. */
 export async function agentFetch(path: string, visitorId: string, init: AgentRequest): Promise<Response> {
   const env = twinEnv()
-  const token = await mintVisitorJwt(visitorId, safeTimeZone(init.tz), env.TWIN_JWT_SECRET)
+  const token = await mintVisitorJwt(visitorId, safeTimeZone(init.tz), env.TWIN_JWT_SECRET, undefined, init.analytics ?? null)
   return fetch(`${env.TWIN_AGENT_URL}/eve/v1/${path}${init.search ?? ''}`, {
     method: init.method,
     headers: { authorization: `Bearer ${token}`, ...(init.body === undefined ? {} : { 'content-type': 'application/json' }) },

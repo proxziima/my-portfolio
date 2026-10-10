@@ -5,6 +5,18 @@ import { visitorIdOf, type Principal } from './identity'
 /** A principal plus the JWT issuer and subject eve carries alongside it. */
 export type VisitorPrincipal = Principal & { issuer?: string; subject?: string }
 
+const CARRIED = ['tz', 'ph_did', 'ph_sid'] as const
+
+/** The JWT claims the twin reads: the zone and the browser's PostHog ids. Anything else is dropped. */
+function carriedAttributes(attributes: VisitorPrincipal['attributes'] | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const key of CARRIED) {
+    const value = attributes?.[key]
+    if (typeof value === 'string' && value.length > 0 && value.length <= 200) out[key] = value
+  }
+  return out
+}
+
 /**
  * eve's jwtHmac always yields a `service` principal; visitors must be `user` principals so
  * per-principal memory works and webhooks (service) stay distinguishable (spec §8).
@@ -12,7 +24,7 @@ export type VisitorPrincipal = Principal & { issuer?: string; subject?: string }
  */
 export function toVisitorPrincipal(p: VisitorPrincipal): VisitorPrincipal | null {
   if (!p.subject) return null
-  const visitor: VisitorPrincipal = { principalType: 'user', principalId: `web:${p.subject}`, authenticator: 'twin-web', issuer: p.issuer, subject: p.subject, attributes: typeof p.attributes?.tz === 'string' ? { tz: p.attributes.tz } : {} }
+  const visitor: VisitorPrincipal = { principalType: 'user', principalId: `web:${p.subject}`, authenticator: 'twin-web', issuer: p.issuer, subject: p.subject, attributes: carriedAttributes(p.attributes) }
   return visitorIdOf(visitor) ? visitor : null
 }
 

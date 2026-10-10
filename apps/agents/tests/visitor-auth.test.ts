@@ -18,13 +18,27 @@ function mint(claims: Record<string, unknown>, secret = SECRET): string {
 
 const request = (token?: string) => new Request('http://agents/eve/v1/session', { headers: token ? { authorization: `Bearer ${token}` } : {} })
 
+describe('toVisitorPrincipal analytics attributes', () => {
+  const base = { principalType: 'service', principalId: 'x', authenticator: 'jwt', subject: VISITOR } as const
+
+  it('keeps the PostHog ids next to the zone', () => {
+    const p = toVisitorPrincipal({ ...base, attributes: { tz: 'UTC', ph_did: 'd-1', ph_sid: 's-1' } })
+    expect(p?.attributes).toEqual({ tz: 'UTC', ph_did: 'd-1', ph_sid: 's-1' })
+  })
+
+  it('drops non-string or oversized values', () => {
+    const p = toVisitorPrincipal({ ...base, attributes: { ph_did: 'x'.repeat(201), ph_sid: ['a'] } as unknown as Record<string, string> })
+    expect(p?.attributes).toEqual({})
+  })
+})
+
 describe('toVisitorPrincipal', () => {
   it('turns a verified web JWT principal into a user principal keyed by visitor', () => {
     const p = toVisitorPrincipal({ principalType: 'service', principalId: 'portfolio-web:7f9c2a50-1d1e-4c1b-9a51-1f2a3b4c5d6e', authenticator: 'jwt-hmac', issuer: 'portfolio-web', subject: '7f9c2a50-1d1e-4c1b-9a51-1f2a3b4c5d6e', attributes: { tz: 'Europe/Lisbon' } })
     expect(p).toEqual({ principalType: 'user', principalId: 'web:7f9c2a50-1d1e-4c1b-9a51-1f2a3b4c5d6e', authenticator: 'twin-web', issuer: 'portfolio-web', subject: '7f9c2a50-1d1e-4c1b-9a51-1f2a3b4c5d6e', attributes: { tz: 'Europe/Lisbon' } })
   })
 
-  it('copies only the tz attribute, dropping any other claim', () => {
+  it('copies only the carried attributes, dropping any other claim', () => {
     const base = { principalType: 'service', principalId: 'x:y', authenticator: 'jwt-hmac', issuer: 'portfolio-web', subject: VISITOR } as const
     expect(toVisitorPrincipal({ ...base, attributes: { tz: 'Europe/Lisbon', role: 'admin' } })?.attributes).toEqual({ tz: 'Europe/Lisbon' })
     expect(toVisitorPrincipal({ ...base, attributes: { tz: 5 } as unknown as Record<string, string> })?.attributes).toEqual({})
