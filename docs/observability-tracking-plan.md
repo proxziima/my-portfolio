@@ -10,7 +10,7 @@ Links read `file:line` and point at the repo root (`../` from this file). Line n
 | --- | --- |
 | [1. Identity model](#1-identity-model) | Which `distinct_id` each signal carries |
 | [2. Automatic web signals](#2-automatic-posthog-web-signals) | What posthog-js sends by itself, from its init options |
-| [3. Custom web events](#3-custom-web-events) | The 14 typed events, one table each |
+| [3. Custom web events](#3-custom-web-events) | The 16 typed events, one table each |
 | [4. Conversions](#4-conversions) | Actions to define in PostHog |
 | [5. LLM traces](#5-serveragent-llm-traces) | The twin's OpenTelemetry trace tree and its redaction |
 | [6. MCP server](#6-mcp-server-cms) | `$ai_span` and `mcp_request` from Payload |
@@ -166,7 +166,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | | |
 | --- | --- |
 | Trigger | The visitor opens an app in the `/os` desktop: shortcut, messenger service button, or double-clicking the messenger contact |
-| Fired from | [Desktop.tsx:36](../apps/web/features/os/Desktop.tsx#L36); callers [Desktop.tsx:52](../apps/web/features/os/Desktop.tsx#L52) (shortcut), [Services.tsx:10](../apps/web/features/os/apps/messenger/Services.tsx#L10), [Messenger.tsx:35](../apps/web/features/os/apps/messenger/Messenger.tsx#L35) |
+| Fired from | [Desktop.tsx:40](../apps/web/features/os/Desktop.tsx#L40); callers [Desktop.tsx:56](../apps/web/features/os/Desktop.tsx#L56) (shortcut), [Services.tsx:10](../apps/web/features/os/apps/messenger/Services.tsx#L10), [Messenger.tsx:35](../apps/web/features/os/apps/messenger/Messenger.tsx#L35) |
 | Properties | `app` (string, `resume`): one of `showcase`, `resume`, `credits`, `doom`, `autocad`, `messenger`, `conversation` ([apps.ts:74-115](../apps/web/features/os/apps.ts#L74)) |
 | Notes | The boot window (`showcase`, [apps.ts:120](../apps/web/features/os/apps.ts#L120)) is opened by `dispatch`, not by `open`, so it is not counted. Fires inside the iframe, with `embedded: true` |
 | Suggested insight | Breakdown by `app`; "Opened resume" conversion (`app = resume`) |
@@ -176,7 +176,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | | |
 | --- | --- |
 | Trigger | The `/os` document hides or unloads (`visibilitychange` to hidden, or `pagehide`) with at least 1 s of engaged time since the last report. For the iframe on the desk monitor, that is the parent tab hiding or closing |
-| Fired from | [os-engagement.ts:31](../apps/web/lib/analytics/os-engagement.ts#L31) via `trackOnExit`; installed at [Analytics.tsx:15](../apps/web/features/analytics/Analytics.tsx#L15) (`surface="os"`); apps counted by `countAppOpen()` at [Desktop.tsx:37](../apps/web/features/os/Desktop.tsx#L37), next to `os_app_opened` |
+| Fired from | [os-engagement.ts:31](../apps/web/lib/analytics/os-engagement.ts#L31) via `trackOnExit`; installed at [Analytics.tsx:15](../apps/web/features/analytics/Analytics.tsx#L15) (`surface="os"`); apps counted by `countAppOpen()` at [Desktop.tsx:41](../apps/web/features/os/Desktop.tsx#L41), next to `os_app_opened` |
 | Properties | `seconds` (number, engaged seconds, one decimal, `>= 1`), `embedded` (boolean; `true` in the desk-monitor iframe, `false` on `/os` in its own tab), `apps_opened` (number; apps the visitor opened since the last report, boot window excluded) |
 | Engagement rule | One clock, running while the OS document is visible, with the same 30 s idle rule as `section_engaged`. Input is only heard inside the OS document, so on the home page the monitor can be on screen while the clock idles: in the iframe, activity means the visitor is actually using the OS. Standalone, page load and coming back to the tab count as an interaction; embedded they do not (the iframe loads with the home page, whether or not the visitor wants the OS), so the clock starts idle and only input inside the OS starts it ([os-engagement.ts:20](../apps/web/lib/analytics/os-engagement.ts#L20)) |
 | Notes | The only time signal for the embedded OS: the iframe sends no `$pageview` or `$pageleave`. Resets after every report (sum per session). In the iframe the registered `embedded` super property says the same; the explicit property makes the standalone case `false` rather than unset |
@@ -187,7 +187,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | | |
 | --- | --- |
 | Trigger | The twin chat hook mounts (the Conversation window opens) |
-| Fired from | [use-twin.ts:68](../apps/web/features/os/apps/messenger/use-twin.ts#L68) |
+| Fired from | [use-twin.ts:73](../apps/web/features/os/apps/messenger/use-twin.ts#L73) |
 | Properties | `resumed` (boolean, `true`; a saved session id was found in `localStorage` key `twin-session`) |
 | Notes | Fires on every mount of the hook (the Conversation window, [Conversation.tsx:41](../apps/web/features/os/apps/messenger/Conversation.tsx#L41)), so reopening the window fires again. It marks the chat opened, not a message sent; the eve session itself is created server-side on the first message |
 | Suggested insight | Chat-open rate; `resumed` split for returning chatters |
@@ -197,9 +197,9 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | | |
 | --- | --- |
 | Trigger | The visitor submits a non-empty message to the twin |
-| Fired from | [use-twin.ts:159](../apps/web/features/os/apps/messenger/use-twin.ts#L159); props built in [twin-analytics.ts:5](../apps/web/features/os/apps/messenger/twin-analytics.ts#L5) |
+| Fired from | [use-twin.ts:176](../apps/web/features/os/apps/messenger/use-twin.ts#L176); props built in [twin-analytics.ts:5](../apps/web/features/os/apps/messenger/twin-analytics.ts#L5) |
 | Properties | `chars` (number, `87`; length of the trimmed text, never the text), `turn` (number, `3`; 1-based count of the visitor's messages in this conversation) |
-| Notes | Fired before the send, so a message that is then refused also shows a `twin_refusal`. A message held while the saved session resumes is counted when it is delivered ([use-twin.ts:213-218](../apps/web/features/os/apps/messenger/use-twin.ts#L213)), through `send`. The automatic resend to a renewed session is not counted again. The message text is never sent to PostHog from the browser |
+| Notes | Fired before the send, so a message that is then refused also shows a `twin_refusal`. A message held while the saved session resumes is counted when it is delivered ([use-twin.ts:243-248](../apps/web/features/os/apps/messenger/use-twin.ts#L243)), through `send`. The automatic resend to a renewed session is not counted again. The message text is never sent to PostHog from the browser |
 | Suggested insight | "Chatted" conversion; distribution of `turn` (conversation depth) and `chars` |
 
 ### 3.11 `twin_refusal`
@@ -207,9 +207,9 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | | |
 | --- | --- |
 | Trigger | A send or stream fails and the window shows the visitor a refusal |
-| Fired from | [use-twin.ts:95](../apps/web/features/os/apps/messenger/use-twin.ts#L95) (`refuse`, the one place every refusal goes through) |
+| Fired from | [use-twin.ts:111](../apps/web/features/os/apps/messenger/use-twin.ts#L111) (`refuse`, the one place every refusal goes through) |
 | Properties | `reason` (`throttled` 429, `too_long` 413, `ended` 403, `offline` 503 or anything without an HTTP status; [limits.ts:24](../packages/twin/src/contract/limits.ts#L24)) |
-| Notes | Mapped from the HTTP status in `refusalOf` ([use-twin.ts:33](../apps/web/features/os/apps/messenger/use-twin.ts#L33)). A 404 on a saved session first triggers `twin_session_renewed` instead, and only a second failure refuses |
+| Notes | Mapped from the HTTP status in `refusalOf` ([use-twin.ts:37](../apps/web/features/os/apps/messenger/use-twin.ts#L37)). A 404 on a saved session first triggers `twin_session_renewed` instead, and only a second failure refuses |
 | Suggested insight | Breakdown by `reason`; alert on a rising `offline` share |
 
 ### 3.12 `twin_session_renewed`
@@ -217,7 +217,7 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | | |
 | --- | --- |
 | Trigger | The saved session was gone (404) or failed for good, and the window starts a fresh session |
-| Fired from | [use-twin.ts:115](../apps/web/features/os/apps/messenger/use-twin.ts#L115) |
+| Fired from | [use-twin.ts:132](../apps/web/features/os/apps/messenger/use-twin.ts#L132) |
 | Properties | none |
 | Notes | At most once per window instance (`renewed` ref), so a broken server cannot loop. Added during implementation, not in the spec |
 | Suggested insight | Trend; a spike means sessions are dying server-side |
@@ -241,6 +241,53 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 | Properties | none (no attendee, time or booking data) |
 | Notes | Driven by the Cal embed's own callback, so it depends on that script loading |
 | Suggested insight | "Booked a call" conversion |
+
+### 3.15 `experience_ready` and `experience_failed`
+
+One measurement per heavy experience, through one helper: `startExperience(experience, extra?)` ([experience.ts:15](../apps/web/lib/analytics/experience.ts#L15)) reads `performance.now()` at the start and returns `{ ready(), failed(reason) }`; the first call sends its event and later calls are ignored, so an experience is either ready or failed, once. Components use `useExperience(experience, { active, app })` ([use-experience.ts:10](../apps/web/lib/analytics/use-experience.ts#L10)), which starts the timer during the first render where `active` is true (not in an effect: the child that settles it runs its effects first) and returns a stable timer. An experience left before it settles (window closed, page left, component unmounted) sends nothing.
+
+| | |
+| --- | --- |
+| Properties, ready | `experience` (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), `ms` (integer milliseconds since the start, `1463`), `app` (string, DOS only: `resume`, `doom`, `autocad`) |
+| Properties, failed | `experience`, `reason` (short machine label, never error text or user data; per experience below), `app` (DOS only) |
+| Notes | Inside the desk-monitor iframe the `embedded: true` super property rides along (the embedded `os_boot` is the iframe's own boot) |
+| Suggested insight | p50 and p95 of `ms` per `experience` (SQL: `quantile(0.95)(properties.ms)` grouped by `properties.experience`); failure rate = `experience_failed` / (`experience_ready` + `experience_failed`) per `experience`; both broken down by `$device_type` and `$browser`; for `dos_app`, by `app`; `experience_failed` by `reason` |
+
+#### `desk_scene`
+
+| | |
+| --- | --- |
+| Start | The figure box comes within 200 px of the viewport and the lazy `DeskScene` (three.js, `next/dynamic`, `ssr: false`) is mounted, so the chunk download is included ([Figure.tsx:32](../apps/web/features/figure/Figure.tsx#L32)) |
+| Ready | The first frame drawn with the models in place (`onFirstFrame`, the same moment as `data-loaded="true"`; [DeskScene.tsx:46](../apps/web/features/desk/DeskScene.tsx#L46)) |
+| Failed | `webgl_unavailable` when the engine cannot be created ([DeskScene.tsx:52](../apps/web/features/desk/DeskScene.tsx#L52)); `load_error` when the models fail to load ([DeskScene.tsx:96](../apps/web/features/desk/DeskScene.tsx#L96)). Both are where the figure already collapses to its caption ([Figure.tsx:35](../apps/web/features/figure/Figure.tsx#L35)) |
+| Notes | Frames render only while the box is on screen, so a visitor who stops inside the 200 px margin without scrolling the box into view adds that wait to `ms`. A failure to download the scene's code chunk goes to the error boundary (`$exception`), not here |
+
+#### `os_boot`
+
+| | |
+| --- | --- |
+| Start | `Desktop` first renders ([Desktop.tsx:22](../apps/web/features/os/Desktop.tsx#L22)), on `/os` or in the desk-monitor iframe |
+| Ready | The boot screen hands over to the desktop (`boot`, [Desktop.tsx:35](../apps/web/features/os/Desktop.tsx#L35)): the BIOS typewriter finishing, or the visitor skipping it with a click or key |
+| Failed | None: a crash here is an error-boundary `$exception` |
+| Notes | First boot only: the timer settles once per mount, so a reboot after Shutdown is not timed. Mostly hydration plus the typewriter (about 1.5 s locally), so a rising p95 points at slow hydration |
+
+#### `dos_app`
+
+| | |
+| --- | --- |
+| Start | A DOS window mounts its player ([DosPlayer.tsx:18](../apps/web/features/os/apps/dos/DosPlayer.tsx#L18)); `app` is the OS app id passed through `dosApp(id, bundle, name)` ([apps.ts:81](../apps/web/features/os/apps.ts#L81)) |
+| Ready | js-dos's `run(bundle)` resolves: the emulator is running the bundle ([DosPlayer.tsx:41](../apps/web/features/os/apps/dos/DosPlayer.tsx#L41)). The first DOS window also pays for the js-dos runtime script |
+| Failed | `load_error` when the js-dos script fails to load or defines no `Dos` ([DosPlayer.tsx:30](../apps/web/features/os/apps/dos/DosPlayer.tsx#L30)); `run_error` when the emulator rejects the bundle ([DosPlayer.tsx:48](../apps/web/features/os/apps/dos/DosPlayer.tsx#L48)), where the window shows "DOS could not start" |
+| Notes | Every window opening is timed (reopening Doom times it again, usually faster with the runtime cached) |
+
+#### `twin_first_reply`
+
+| | |
+| --- | --- |
+| Start | The visitor sends a message, right after `twin_message_sent` ([use-twin.ts:178](../apps/web/features/os/apps/messenger/use-twin.ts#L178)) |
+| Ready | The first twin message with text that was not on screen at the send appears ([use-twin.ts:199](../apps/web/features/os/apps/messenger/use-twin.ts#L199); `hasNewReply` in [twin-analytics.ts:26](../apps/web/features/os/apps/messenger/twin-analytics.ts#L26)). Compared by message, so the previous reply still streaming paragraphs does not count |
+| Failed | The refusal kind (`throttled`, `too_long`, `ended`, `offline`) from the `refuse` helper, next to `twin_refusal` ([use-twin.ts:112](../apps/web/features/os/apps/messenger/use-twin.ts#L112)); `timeout` after `TWIN_REPLY_TIMEOUT_MS` = 60 s without text ([use-twin.ts:180](../apps/web/features/os/apps/messenger/use-twin.ts#L180)) |
+| Notes | One measurement at a time: a message sent before the reply keeps timing the first one (simplest, and the reply usually answers both). A session renewed after a 404 or `session.failed` keeps the measurement open, so `ms` includes the renewal and resend. Closing the conversation before the reply sends nothing. A turn that answers with no text at all (only a tool) ends as `timeout` |
 
 ## 4. Conversions
 
@@ -435,6 +482,8 @@ Open PostHog, Activity, Live events, with a token set in a dev project ([observa
 | `twin_refusal` | Exceed a limit, or stop the agent | `reason` = `throttled`, `too_long`, `ended`, `offline` |
 | `twin_session_renewed` | Clear the server session, then send | Fires once |
 | `booking_opened`, `booking_completed` | Ask the twin to schedule, book in the booker | One each, no properties |
+| `experience_ready` | Scroll to the desk; open `/os`; open Doom; send the twin a message | One each: `desk_scene`, `os_boot` (and an embedded one from the monitor), `dos_app` with `app` = `doom`, `twin_first_reply`; `ms` an integer |
+| `experience_failed` | Block `*.glb` or `/js-dos/js-dos.js` in the Network tab, then load the desk or open a DOS app | `reason` = `load_error` (desk, or DOS with `app`); a refused twin message gives its refusal kind |
 | `$ai_generation` | After a twin reply, LLM analytics, Traces | `chat <model>` generations plus `twin.gate` and `twin.intent`; `distinctId` equals the visitor's; no prompt text, no canary |
 | MCP `$ai_span` | A twin turn that searches | `$ai_span` with `mcp_tool` `twinSearch`, `$ai_trace_id` equal to the turn's trace, `$ai_parent_id` set, `mcp_input_keys` names only |
 | `mcp_request` | Call `tools/list` from an MCP client | `method`, `status`; none for `initialize` or `notifications/*` |

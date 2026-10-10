@@ -13,6 +13,7 @@ Every capture path is fire-and-forget. With a blank `POSTHOG_PROJECT_TOKEN` noth
 | Web analytics (`$pageview`, `$pageleave`, autocapture) | posthog-js in the browser, sent through the first-party `/relay` proxy | `apps/web/lib/analytics/init.ts`, `apps/web/features/analytics/Analytics.tsx`, `apps/web/proxy.ts`, `apps/web/lib/analytics/relay.ts` |
 | Custom events (catalog below) | typed `track()`, a delegated click listener, a section observer | `apps/web/lib/analytics/events.ts`, `delegated.ts`, `sections.ts`, `apps/web/features/os/apps/messenger/` |
 | Engaged time (`section_engaged`, `os_engaged`) | an idle-aware clock per section and on the OS, reported on page hide or unload with `trackOnExit()` (beacon) | `apps/web/lib/analytics/engagement.ts`, `section-engagement.ts`, `os-engagement.ts` |
+| Experience load time and failures (`experience_ready`, `experience_failed`) | one settle-once timer per heavy experience: desk scene, OS boot, DOS apps, twin first reply | `apps/web/lib/analytics/experience.ts`, `use-experience.ts` |
 | Web vitals | posthog-js `capture_performance: { web_vitals: true, network_timing: true }` | `apps/web/lib/analytics/init.ts` |
 | Session replay | posthog-js (disabled inside the embedded `/os` iframe, the parent page records it) | `apps/web/lib/analytics/init.ts` |
 | Error tracking, browser | `capture_exceptions`, `app/global-error.tsx` (reports only if posthog-js had loaded before the root layout failed), route `error.tsx` | `apps/web/app/global-error.tsx`, `apps/web/app/(site)/error.tsx` |
@@ -68,12 +69,16 @@ New env vars follow the `apps/agents/CLAUDE.md` rule: `agentsEnvSchema`, the `.e
 | `twin_refusal` | use-twin (`refuse` helper, every refusal) | reason |
 | `twin_session_renewed` | use-twin, when the chat auto-renews a dead session | none |
 | `booking_opened` / `booking_completed` | BookingDialog | none |
+| `experience_ready` | Figure/DeskScene, Desktop, DosPlayer, use-twin | experience (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), ms, app (DOS only) |
+| `experience_failed` | the same | experience, reason (`webgl_unavailable`, `load_error`, `run_error`, `timeout` or the refusal kind), app (DOS only) |
 | `$ai_generation`, `$ai_span`, `$ai_trace` | agents (OTel), Payload MCP | PostHog LLM schema |
 | `mcp_request` | Payload MCP, methods other than `tools/call`, `initialize` and `notifications/*` | method, status |
 
 Embedded `/os` (the iframe on the desk monitor) registers `embedded: true` on every event and sends no pageviews, page leaves or replay.
 
 **Engaged time.** `section_engaged` and `os_engaged` count only time that is on screen (section half visible, or OS document visible) with visitor input in the last 30 s, GA4-style. They are sent when the page hides or unloads and the clocks then reset, so sum `seconds` per session. The home page's `$pageleave` duration is wall clock and includes the time spent in the OS on the desk monitor; use these two events to split the 2D page from the OS. Details and insights in the [tracking plan](observability-tracking-plan.md#34-section_engaged).
+
+**Experience load time.** Each heavy experience is timed once per mount and reports either `experience_ready` (whole milliseconds since its start) or `experience_failed` (a short machine `reason`, never error text), never both: the desk scene from the near-viewport mount to its first frame, the OS from Desktop mount to the first desktop (reboots are not timed), a DOS app from its window opening to js-dos running the bundle, the twin from a sent message to its first new text (60 s timeout). An experience left before it settles (window closed, page left) reports nothing. Details in the [tracking plan](observability-tracking-plan.md#315-experience_ready-and-experience_failed).
 
 ## Conversions
 
@@ -93,6 +98,8 @@ Create these PostHog actions:
 - Funnel: `$pageview`, `section_viewed` where section is work, `outbound_click`
 - Conversions trend
 - Web vitals p75 LCP, INP and CLS by `$pathname` and `$device_type`
+- Experience load time: p50 and p95 of `experience_ready.ms` by `experience` (and by `app` for `dos_app`), broken down by `$device_type` and `$browser`
+- Experience failure rate: `experience_failed` / (`experience_ready` + `experience_failed`) by `experience`, with `experience_failed` broken down by `reason`
 - Error tracking issues
 - LLM analytics: cost per day, p95 latency, error rate, generations by `gen_ai.agent.name`
 - `$ai_span` count by `mcp_tool`
