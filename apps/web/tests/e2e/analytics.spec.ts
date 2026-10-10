@@ -87,6 +87,16 @@ test.describe('analytics and SEO', () => {
     expect(engaged.properties.seconds).toBeGreaterThanOrEqual(1)
   })
 
+  test('the OS boot reports its load time once the desktop is up', async ({ page }) => {
+    const events = await captureRelay(page)
+    await page.goto('/os')
+    await expect(page.locator('[data-anchor="desktop"]')).toBeVisible({ timeout: 15_000 })
+    await expect.poll(() => events.find((e) => e.event === 'experience_ready' && e.properties.experience === 'os_boot'), { timeout: 15_000 }).toBeTruthy()
+    const ready = events.find((e) => e.event === 'experience_ready' && e.properties.experience === 'os_boot')!
+    expect(Number.isInteger(ready.properties.ms)).toBe(true)
+    expect(ready.properties.ms).toBeGreaterThan(0)
+  })
+
   test('home has canonical, JSON-LD, and robots/sitemap are served', async ({ page, request }) => {
     await page.goto('/')
     // Next prints the root canonical as the bare origin; for http(s) that is the same URL as `<origin>/`

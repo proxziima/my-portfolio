@@ -78,19 +78,19 @@ export const APPS: readonly OsApp[] = [
     shortcut: 'My Resume',
     icon: 'resume',
     // Acrobat Reader for DOS opening the résumé (content/resume.md, built in by `bun run resume:pdf`)
-    component: dosApp('/resume.jsdos', 'Resume'),
+    component: dosApp('resume', '/resume.jsdos', 'Resume'),
     // its 640×480 VGA screen, as tall as the Showcase window, like AutoCAD
     aspect: 4 / 3,
     ...DOS_CHROME,
   },
   { id: 'credits', title: 'Credits', shortcut: 'Credits', icon: 'document', component: Credits, size: { width: 1100, height: 800 } },
-  { id: 'doom', title: 'Doom', shortcut: 'Doom', icon: 'doom', component: dosApp('/doom.jsdos', 'Doom'), size: { width: 980, height: 670 }, ...DOS_CHROME },
+  { id: 'doom', title: 'Doom', shortcut: 'Doom', icon: 'doom', component: dosApp('doom', '/doom.jsdos', 'Doom'), size: { width: 980, height: 670 }, ...DOS_CHROME },
   {
     id: 'autocad',
     title: 'AutoCAD Release 12',
     shortcut: 'AutoCAD',
     icon: 'autocad',
-    component: dosApp('/autocad.jsdos', 'AutoCAD'),
+    component: dosApp('autocad', '/autocad.jsdos', 'AutoCAD'),
     // its 640×480 VGA screen, as tall as the Showcase window (about 1149×862 on the 1280×1024 desk)
     aspect: 4 / 3,
     ...DOS_CHROME,

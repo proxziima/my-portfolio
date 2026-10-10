@@ -3,6 +3,9 @@ import posthog from 'posthog-js'
 /** Where a link leads, for the outbound and conversion insights. */
 export type LinkChannel = 'github' | 'linkedin' | 'email' | 'calendar' | 'other'
 
+/** The heavy experiences whose load time and failures are measured (`experience_ready` / `experience_failed`). */
+export type Experience = 'desk_scene' | 'os_boot' | 'dos_app' | 'twin_first_reply'
+
 /**
  * Every custom event the site sends and its properties. PostHog's defaults cover pageviews,
  * page leave (time on page, scroll depth), web vitals, autocapture and exceptions.
@@ -22,6 +25,9 @@ export interface AnalyticsEvents {
   twin_session_renewed: Record<string, never>
   booking_opened: Record<string, never>
   booking_completed: Record<string, never>
+  experience_ready: { experience: Experience; ms: number; app?: string }
+  /** `reason` is a short machine label, never error text. */
+  experience_failed: { experience: Experience; reason: string; app?: string }
 }
 
 export type AnalyticsEvent = keyof AnalyticsEvents
