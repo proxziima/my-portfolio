@@ -24,7 +24,7 @@ Every capture path is fire-and-forget. With a blank `POSTHOG_PROJECT_TOKEN` noth
 
 Two root layouts exist: `(site)` and `(os)`. So `app/global-not-found.tsx` (enabled with `experimental.globalNotFound`) renders unmatched URLs and `app/global-error.tsx` sits at the app root. 404s are not tracked, by design: `global-not-found` loads no analytics, and a missing page is not an error.
 
-One failure can show up as more than one issue (the model call and the turn it failed, for example). Error Tracking groups them, so read them as one incident.
+One failure can show up as more than one issue (the model call and the turn it failed, for example). Different exception types stay separate issues, so read them together by `sessionId`.
 
 ## Setup
 
@@ -36,7 +36,7 @@ One failure can show up as more than one issue (the model call and the turn it f
    - "Discard client IP data"
 3. Search Console: add the property for `SITE_URL`, put the verification token in `GOOGLE_SITE_VERIFICATION`, then submit `<SITE_URL>/sitemap.xml`.
 
-`SITE_URL` must be an absolute http(s) URL, and `POSTHOG_REGION` must be `us` or `eu`: the web app checks both once in `instrumentation.ts` `register()` and fails startup otherwise. Per request, the analytics helpers (`clientAnalyticsConfig`, `posthogIdsFromRequest`) never throw: a bad value that slips through switches analytics off for that request and is logged once. Unset, it falls back to `http://localhost:3000`. In compose it is mapped from `WEB_PUBLIC_URL`.
+`SITE_URL` must be an absolute http(s) URL, and `POSTHOG_REGION` must be `us` or `eu`: the web app checks both once in `instrumentation.ts` `register()` and fails startup otherwise. Per request, the analytics helpers (`clientAnalyticsConfig`, `posthogIdsFromRequest`) never throw: a bad value that slips through switches analytics off for that request and is logged once. An unset `SITE_URL` falls back to `http://localhost:3000`. In compose it is mapped from `WEB_PUBLIC_URL`.
 
 New env vars follow the `apps/agents/CLAUDE.md` rule: `agentsEnvSchema`, the `.env.example` files (the offline eval fixture lists them blank), `docker-compose.yml` and `.env.deploy.example`.
 
