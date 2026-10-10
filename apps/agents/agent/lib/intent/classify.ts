@@ -2,8 +2,7 @@ import { generateText, Output } from 'ai'
 import { IntentClass } from '@repo/twin/contract'
 import { isAbort } from '../abort'
 import { intentClassifierModel } from '../models'
-import { generationSpan, modelIdOf } from '../observability/spans'
-import type { TraceIdentity } from '../observability/trace-context'
+import { classifierTelemetry, type TraceIdentity } from '../observability/trace-context'
 
 /**
  * The intent label's instructions. The hard line is requesting_call: a visitor asking the owner to
@@ -58,7 +57,7 @@ export function intentPrompt(turns: ReadonlyArray<{ role: 'visitor' | 'twin'; te
 /**
  * One enum label for the recent turns, or null when the classifier is unavailable (spec §7).
  * Never throws: the evaluation is persisted from signals alone either way. Timeouts are expected
- * and silent; any other failure is logged. With `trace`, the call is a `twin.intent` generation span.
+ * and silent; any other failure is logged. The call is a `twin.intent` generation, tied to the visitor when `trace` is given.
  */
 export async function classifyIntent(
   turns: ReadonlyArray<{ role: 'visitor' | 'twin'; text: string }>,
@@ -67,17 +66,15 @@ export async function classifyIntent(
 ): Promise<IntentClass | null> {
   const signal = AbortSignal.timeout(timeoutMs)
   try {
-    const model = intentClassifierModel()
-    const { output } = await generationSpan('twin.intent', modelIdOf(model), trace, () =>
-      generateText({
-        model,
-        instructions: INTENT_SYSTEM,
-        prompt: intentPrompt(turns),
-        output: Output.choice({ options: [...IntentClass.options] }),
-        abortSignal: signal,
-        maxRetries: 0, // the timeout decides the fallback
-      }),
-    )
+    const { output } = await generateText({
+      model: intentClassifierModel(),
+      instructions: INTENT_SYSTEM,
+      prompt: intentPrompt(turns),
+      output: Output.choice({ options: [...IntentClass.options] }),
+      abortSignal: signal,
+      maxRetries: 0, // the timeout decides the fallback
+      ...classifierTelemetry('twin.intent', trace),
+    })
     return IntentClass.parse(output)
   } catch (error) {
     if (signal.aborted || isAbort(error)) return null

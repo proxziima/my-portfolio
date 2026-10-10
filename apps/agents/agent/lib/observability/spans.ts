@@ -1,5 +1,4 @@
 import { context, propagation, SpanStatusCode, trace, type Attributes, type Span } from '@opentelemetry/api'
-import { contextAttributes, type TraceIdentity } from './trace-context'
 
 /** eve registers the global tracer provider; outside it (unit tests, scripts) these spans are no-ops. */
 const tracer = () => trace.getTracer('portfolio-twin')
@@ -28,38 +27,4 @@ export function traceMeta(): Record<string, string> | undefined {
   const carrier: Record<string, string> = {}
   propagation.inject(context.active(), carrier)
   return carrier.traceparent ? { traceparent: carrier.traceparent } : undefined
-}
-
-/** A model's id whether the AI SDK was handed a string or a provider model object. */
-export function modelIdOf(model: string | { modelId: string }): string {
-  return typeof model === 'string' ? model : model.modelId
-}
-
-/**
- * Wraps a direct AI SDK call (the gate and intent classifiers run outside eve's model loop) in a
- * gen_ai chat span, which PostHog turns into an `$ai_generation` in the visitor's conversation.
- */
-export function generationSpan<R extends { usage?: { inputTokens?: number; outputTokens?: number }; response?: { modelId?: string } }>(
-  functionId: string,
-  modelId: string,
-  identity: TraceIdentity | undefined,
-  run: () => Promise<R>,
-): Promise<R> {
-  const attributes: Attributes = {
-    'gen_ai.operation.name': 'chat',
-    'gen_ai.provider.name': 'openrouter',
-    'gen_ai.request.model': modelId,
-    'gen_ai.agent.name': functionId,
-    ...(identity ? contextAttributes(identity) : {}),
-  }
-  return inSpan(`chat ${modelId}`, attributes, async (span) => {
-    const result = await run()
-    // Optional reads: test doubles of generateText often omit usage and response.
-    span.setAttributes({
-      'gen_ai.response.model': result.response?.modelId ?? modelId,
-      'gen_ai.usage.input_tokens': result.usage?.inputTokens ?? 0,
-      'gen_ai.usage.output_tokens': result.usage?.outputTokens ?? 0,
-    })
-    return result
-  })
 }

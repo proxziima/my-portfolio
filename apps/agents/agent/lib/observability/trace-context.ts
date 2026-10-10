@@ -33,7 +33,15 @@ export function runtimeContextOf(id: TraceIdentity): Record<string, string> {
   return { distinctId: id.distinctId, sessionId: id.conversationId, ...(id.replaySessionId ? { $session_id: id.replaySessionId } : {}) }
 }
 
-/** The same context as span attributes, for spans the twin starts itself (eve flattens to `ai.settings.context.*`). */
-export function contextAttributes(id: TraceIdentity): Record<string, string> {
-  return Object.fromEntries(Object.entries(runtimeContextOf(id)).map(([k, v]) => [`ai.settings.context.${k}`, v]))
+/**
+ * AI SDK telemetry for a direct classifier call: eve registers the AI SDK OpenTelemetry integration
+ * globally, so the call already emits its own generation; this names it and, with an identity,
+ * attaches the runtime context (every key opted in, as eve does for its own model calls) so the
+ * spans land as `ai.settings.context.*` in the visitor's conversation.
+ */
+export function classifierTelemetry(functionId: string, id: TraceIdentity | undefined) {
+  if (!id) return { telemetry: { functionId } }
+  const runtimeContext = runtimeContextOf(id)
+  const includeRuntimeContext = Object.fromEntries(Object.keys(runtimeContext).map((k) => [k, true as const]))
+  return { telemetry: { functionId, includeRuntimeContext }, runtimeContext }
 }
