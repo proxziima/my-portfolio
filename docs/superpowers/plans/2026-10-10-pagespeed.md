@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Production PageSpeed ≥ 90 on mobile and desktop, CLS ≤ 0.02 under real throttling, and desktop page weight at load under 1.5 MB (from 8.9 MB), with verified visual parity of the desk, the figure and the CRT layers, and no feature removed.
+**Goal:** Production PageSpeed ≥ 90 on mobile and desktop, CLS ≤ 0.05 under real throttling (the ~0.045 desktop font-swap residual is accepted by the owner, spec §4.1), and desktop page weight at load under 1.5 MB (from 8.9 MB), with verified visual parity of the desk, the figure and the CRT layers, and no feature removed.
 
 **Architecture:**
 - **Phase 1** fixes the font-fallback reflow that causes CLS, inlines the small CSS, and makes hashed media immutable. It moves every desk and theme asset behind a committed, re-runnable pipeline: sharp, gltf-transform with meshopt, and ffmpeg with a parity-gated CRF search. The pipeline writes hashed files to `public/assets/` and a generated TS manifest.
@@ -504,7 +504,7 @@ Tasks 1.2 onwards do not depend on this one and may continue meanwhile. Commit t
 - [ ] **Step 9: Verify CLS with the recorder**
 
 Run: `node scripts/perf/layout-shifts.ts --cpu 6 --runs 3` and `… --width 412 --height 823`
-Expected: `CLS 0.0000` to `0.02` in 3/3 runs at both sizes.
+Expected: CLS ≤ 0.05 in 3/3 runs at both sizes (owner accepted the ~0.045 residual at 1350×940).
 
 - [ ] **Step 10: Unit tests and types**
 
@@ -1248,9 +1248,9 @@ git commit -m "chore(web): serve only pipeline outputs; check asset drift in CI"
   - `node scripts/perf/lighthouse.ts --serve --runs 2 --throttling devtools --out .perf/phase1-devtools --compare .perf/baseline-devtools/summary.json`
   - `node scripts/perf/layout-shifts.ts --cpu 6 --runs 3` at 1350×940 and 412×823
 
-  Expected: desktop bytes at load down by more than 6 MB (the videos), CLS ≤ 0.02 in the recorder, no render-blocking stylesheet in `summary.json` (`renderBlocking: []`), and TBT unchanged or lower (Phase 1 is mostly bytes and CLS).
+  Expected: desktop bytes at load down by more than 6 MB (the videos), CLS ≤ 0.05 in the recorder, no render-blocking stylesheet in `summary.json` (`renderBlocking: []`), and TBT unchanged or lower (Phase 1 is mostly bytes and CLS).
 - [ ] **Step 2: Visual parity:** `bun run test:parity` → pass. Attach `test-results/parity/*.diff.png` for any non-zero diff to the PR.
-- [ ] **Step 3:** After the owner deploys Phase 1, run PSI on production (pagespeed.web.dev) for mobile and desktop and record both in the PR. Expected: desktop CLS ≈ 0, desktop byte weight under 1.5 MB.
+- [ ] **Step 3:** After the owner deploys Phase 1, run PSI on production (pagespeed.web.dev) for mobile and desktop and record both in the PR. Expected: desktop CLS ≤ 0.05, desktop byte weight under 1.5 MB.
 
 ---
 
@@ -1998,7 +1998,7 @@ git commit -m "perf(web): the desk renders in a worker where supported, main thr
         "categories:accessibility": ["error", { "minScore": 1 }],
         "categories:best-practices": ["error", { "minScore": 1 }],
         "categories:seo": ["error", { "minScore": 1 }],
-        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.02 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.05 }],
         "total-blocking-time": ["error", { "maxNumericValue": 300 }],
         "total-byte-weight": ["error", { "maxNumericValue": 1600000 }],
         "resource-summary:script:size": ["error", { "maxNumericValue": 460000 }]

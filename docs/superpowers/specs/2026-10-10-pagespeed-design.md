@@ -114,7 +114,7 @@ stays the ground truth, and every phase ends with a PSI run on production (§10)
 
 **Goals.**
 - Production PSI: mobile ≥ 90, desktop ≥ 90.
-- CLS ≤ 0.02 under real throttling.
+- CLS ≤ 0.05 under real throttling (owner decision: the ~0.045 desktop font-swap residual is accepted, §4.1).
 - TBT under 200 ms (mobile) and 150 ms (desktop) in PSI.
 - Page weight at load under 1.5 MB on desktop (from 8.9 MB).
 - Visual parity on the desk, the figure and the CRT layers, verified (§9).
@@ -167,13 +167,19 @@ order, each gated by measurement:
    The owner then decides between the options, each with its cost: `display: 'optional'` (first
    slow visits keep the fallback), inlining the font (about 75 KB more in every HTML response),
    reserving space (spacing changes), or accepting the residual shift.
+
+   **Owner decision (2026-10-10): accept the residual.** After tuning, the gate holds every
+   paragraph's line count, but words still move inside equal-height paragraphs when Inter swaps
+   in: local CLS (CPU ×6, 1.6 Mb/s) 0.1484 → 0.0449 at 1350×940 and 0.0017 at 412×823. The font
+   loading strategy stays as it is: no `display` change and no inlined font. CLS gates are
+   ≤ 0.05 accordingly (this section, §3, §10 and the plan).
 5. **The figure stays a fixed-ratio box** (already true). Its caption row gets `min-height` of one
    line, so a caption swap between roles never moves the sections below. That is a role-change
    shift, not load CLS, but it is the same class of bug.
 
 Verification: `scripts/perf/layout-shifts.ts` (committed with this design) against the local build
 and, after deploy, against production, with CPU ×6, 150 ms and 1.6 Mb/s at 1350×940 and 412×823:
-CLS ≤ 0.02 in 3 of 3 runs. Today: 0.148.
+CLS ≤ 0.05 in 3 of 3 runs (the accepted font-swap residual is ~0.045 at 1350×940). Today: 0.148.
 
 ### 4.2 Delivery: inline CSS, caching (7)
 
@@ -565,7 +571,7 @@ load failure maps to the same `load_error`. A lost context (new: today it is not
 - **Lighthouse CI** (Phase 3, Task 3.6): a `lighthouse` job in `.github/workflows/ci.yml` that
   builds the throwaway CMS (as `live-evals` does: build, migrate, seed on SQLite in `.tmp`) and the
   web app, starts both, and runs `@lhci/cli@0.15.1` (3 runs, desktop and mobile). Budgets:
-  performance ≥ 0.9 (warn) and ≥ 0.8 (error), CLS ≤ 0.02 (error), TBT ≤ 300 ms (error, CI
+  performance ≥ 0.9 (warn) and ≥ 0.8 (error), CLS ≤ 0.05 (error), TBT ≤ 300 ms (error, CI
   hardware), total byte weight ≤ 1,600 KB (error), script ≤ 450 KB (error). Upload to `filesystem`
   plus `actions/upload-artifact`, never to temporary public storage.
 - **PostHog alerting** (guidance, executed by the owner): insights on `$web_vitals` for p75 LCP,
