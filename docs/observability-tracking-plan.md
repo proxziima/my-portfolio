@@ -134,10 +134,10 @@ These are the only `data-track` attributes in the repo. A new CTA needs only the
 
 | | |
 | --- | --- |
-| Trigger | The visitor switches the headline role by URL hash change or by pressing a digit key `1..n` |
-| Fired from | [RoleProvider.tsx:41](../apps/web/features/role/RoleProvider.tsx#L41) (`select`); callers [use-role-persistence.ts:54](../apps/web/features/role/use-role-persistence.ts#L54) (hashchange) and [use-role-persistence.ts:60](../apps/web/features/role/use-role-persistence.ts#L60) (keydown) |
+| Trigger | The visitor settles on a different headline role, by any input: URL hash change, digit key `1..n`, or the picker's wheel, drag and row click |
+| Fired from | [use-role-analytics.ts](../apps/web/features/role/use-role-analytics.ts) (`useRoleAnalytics`), called from [RoleProvider.tsx](../apps/web/features/role/RoleProvider.tsx) |
 | Properties | `role` (string, a discipline slug from the CMS) |
-| Notes | Unknown slugs are ignored. Restoring the stored or hash role on load is `hydrate`, not `select`, so it does not fire. Keys are ignored with a modifier held or while typing in a field. The picker's own wheel, drag and row click go through `step` and do **not** fire this event, so it undercounts picker use |
+| Notes | Debounced: one event, with the final role, 800 ms after the last user-driven change, so a wheel spin through several roles counts once. Skipped when the settled role equals the role at the start of the interaction. Unknown slugs are ignored. Restoring the stored or hash role on load is `hydrate` (no animation), so it does not fire. Keys are ignored with a modifier held or while typing in a field. A pending event is dropped on unmount |
 | Suggested insight | Breakdown by `role` of the roles people deep-link or hotkey to |
 
 ### 3.5 `theme_changed`
@@ -403,7 +403,7 @@ Open PostHog, Activity, Live events, with a token set in a dev project ([observa
 | `section_viewed` | Scroll to the bottom | One each for `work`, `projects`, `content` |
 | `outbound_click` | Click GitHub, LinkedIn, an email link | `channel` = `github`, `linkedin`, `email`; `kind` = `mailto` for email |
 | `cta_clicked` | Mute, full screen, "Open the desktop" | `cta` = `desk_mute`, `desk_fullscreen`, `open_desktop`; `section` null |
-| `role_selected` | Press `2`, or change the URL hash | `role` = the slug |
+| `role_selected` | Press `2`, change the URL hash, or spin the picker and stop | `role` = the slug, once, about 800 ms after you stop |
 | `theme_changed` | Flip the wall switch | `theme` = the new value |
 | `os_app_opened` | Open an app on `/os` | `app` = its id; in the iframe, `embedded = true` |
 | `twin_session_started` | Open the conversation | `resumed` false, then true after a reload |
