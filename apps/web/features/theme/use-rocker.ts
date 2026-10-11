@@ -2,9 +2,32 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { ATLAS, flipDuration, frameAt, frameOrigin, isValidAtlas, smoothstep } from './rocker-atlas'
 
+/** The decoded atlas, whichever way it was decoded. */
+type Atlas = { source: CanvasImageSource; width: number; height: number; release(): void }
+
+/**
+ * Decodes the atlas off the main thread: `createImageBitmap` on the fetched bytes, with its default
+ * options, which give drawImage the same pixels as an `<img>` would. Where it is missing, an
+ * `<img>`'s `decode()`, which is also asynchronous but leaves the first draw to decode on the main
+ * thread in some engines.
+ */
+async function decodeAtlas(src: string): Promise<Atlas> {
+  if (typeof createImageBitmap === 'function') {
+    const response = await fetch(src)
+    if (!response.ok) throw new Error(`rocker atlas: HTTP ${response.status}`)
+    const bitmap = await createImageBitmap(await response.blob())
+    return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() }
+  }
+  const img = new Image()
+  img.decoding = 'async'
+  img.src = src
+  await img.decode()
+  return { source: img, width: img.naturalWidth, height: img.naturalHeight, release: () => {} }
+}
+
 /** Draws the rocker from the atlas onto a canvas. Until the atlas is valid, `ready` stays false and the `<img>` fallback shows. */
 export function useRocker(canvasRef: RefObject<HTMLCanvasElement | null>, initial: 0 | 1, reduce: boolean) {
-  const atlas = useRef<HTMLImageElement | null>(null)
+  const atlas = useRef<Atlas | null>(null)
   const [ready, setReady] = useState(false)
   const now = useRef<number>(initial)
   const target = useRef<number>(initial)
@@ -15,23 +38,29 @@ export function useRocker(canvasRef: RefObject<HTMLCanvasElement | null>, initia
     if (!ctx || !atlas.current) return
     const { sx, sy } = frameOrigin(frameAt(p))
     ctx.clearRect(0, 0, ATLAS.width, ATLAS.height)
-    ctx.drawImage(atlas.current, sx, sy, ATLAS.width, ATLAS.height, 0, 0, ATLAS.width, ATLAS.height)
+    ctx.drawImage(atlas.current.source, sx, sy, ATLAS.width, ATLAS.height, 0, 0, ATLAS.width, ATLAS.height)
     now.current = p
   }, [canvasRef])
 
   useEffect(() => {
     let cancelled = false
-    const img = new Image()
-    img.decoding = 'async'
-    img.src = ATLAS.src
-    img.decode().then(() => {
-      if (cancelled) return
-      if (!isValidAtlas(img.naturalWidth, img.naturalHeight)) throw new Error('invalid rocker atlas')
-      atlas.current = img
+    decodeAtlas(ATLAS.src).then((decoded) => {
+      if (cancelled || !isValidAtlas(decoded.width, decoded.height)) {
+        decoded.release()
+        if (!cancelled) setReady(false)
+        return
+      }
+      atlas.current = decoded
       draw(now.current)
       setReady(true)
     }).catch(() => { if (!cancelled) setReady(false) })
-    return () => { cancelled = true; cancelAnimationFrame(raf.current); raf.current = 0 }
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(raf.current)
+      raf.current = 0
+      atlas.current?.release()
+      atlas.current = null
+    }
   }, [draw])
 
   /** `instant` jumps (first sync after hydration); a flip already heading to `to` is left alone. */
