@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Production PageSpeed ≥ 90 on mobile and desktop, CLS ≤ 0.05 under real throttling (the ~0.045 desktop font-swap residual is accepted by the owner, spec §4.1), and desktop page weight at load under 1.5 MB (from 8.9 MB), with verified visual parity of the desk, the figure and the CRT layers, and no feature removed.
+**Goal:** Production PageSpeed ≥ 90 on mobile and desktop, CLS ≤ 0.05 under real throttling (a ceiling: Inter is `display: 'optional'`, spec §4.1, so the font adds no shift and the expected value is ~0), and desktop page weight at load under 1.5 MB (from 8.9 MB), with verified visual parity of the desk, the figure and the CRT layers, and no feature removed.
 
 **Architecture:**
 - **Phase 1** fixes the font-fallback reflow that causes CLS, inlines the small CSS, and makes hashed media immutable. It moves every desk and theme asset behind a committed, re-runnable pipeline: sharp, gltf-transform with meshopt, and ffmpeg with a parity-gated CRF search. The pipeline writes hashed files to `public/assets/` and a generated TS manifest.
@@ -21,6 +21,7 @@
 - **Smudges (Task 1.6).** The 1280 w variants were dropped by the pipeline's own rules (AVIF 1280 w not smaller than AVIF 2048 w at the gate; no WebP passing below the source): shipped AVIF 2048 w plus the source JPEG. The still layers get their candidates on power-on, and the CRT fade-in waits for them to decode.
 - **Assets.** `assets:check` also verifies hashed outputs against their file names, the generated manifest against the lock, and orphans in `public/assets`. The OS fonts have no `ASSETS` entry (next/font needs a literal path). The bulb sample is a copy recipe (`blowout.bulb`), no longer in `public/sound/`.
 - **Source maps.** The post-build script also matches Turbopack's CSS map comment (`/*# …css.map*/`, no space) and strips it from the client reference manifests that `inlineCss` renders from.
+- **Fonts (Task 1.1).** Inter is `display: 'optional'` (owner decision 2026-10-11, spec §4.1 item 3), still preloaded; Caveat stays `swap`, not preloaded. The line-count gate of Steps 1 to 4 is replaced by `font-fallback.spec.ts` as built: a normal load renders Inter from the first paint with load CLS ≤ 0.001, and Inter held past the block period leaves the letter in a tuned fallback with no swap and CLS ≤ 0.001, at 1350×940 and 412×823. The "accept the residual" decision and its ~0.045 at 1350×940 are superseded: the recorder measures 0.0000 at both sizes.
 - **Rocker atlas.** Decoded with `createImageBitmap(blob)` off the main thread; `new Image()` only where the API is missing.
 
 **Repo rules for every task:**
@@ -48,7 +49,7 @@
 - `apps/web/scripts/perf/layout-shifts.ts`: the layout-shift recorder (Task 0.1, already written)
 - `apps/web/scripts/perf/chunks.ts`: chunk-to-module report and bundle assertions (Task 2.8)
 - `apps/web/scripts/fonts/fallbacks.ts`, `apps/web/styles/font-fallbacks.css` (generated): per-platform matched fallbacks
-- `apps/web/tests/e2e/font-fallback.spec.ts`: the line-count equivalence gate
+- `apps/web/tests/e2e/font-fallback.spec.ts`: the font-loading gate (as built: Inter from the first paint, or the matched fallback kept, with no shift; spec §4.1)
 - `apps/web/tests/e2e/visual/desk-parity.spec.ts`, `apps/web/tests/e2e/visual/compare.ts`, `apps/web/tests/e2e/visual/baseline/*.png`: visual parity
 - `apps/web/scripts/sourcemaps.ts`: PostHog upload (optional) and map removal
 - `apps/web/assets-src/**`: committed asset sources (moved from `public/`)
@@ -514,7 +515,7 @@ Tasks 1.2 onwards do not depend on this one and may continue meanwhile. Commit t
 - [ ] **Step 9: Verify CLS with the recorder**
 
 Run: `node scripts/perf/layout-shifts.ts --cpu 6 --runs 3` and `… --width 412 --height 823`
-Expected: CLS ≤ 0.05 in 3/3 runs at both sizes (owner accepted the ~0.045 residual at 1350×940).
+Expected: CLS ≤ 0.05 in 3/3 runs at both sizes (as built, with Inter `optional`: 0.0000).
 
 - [ ] **Step 10: Unit tests and types**
 

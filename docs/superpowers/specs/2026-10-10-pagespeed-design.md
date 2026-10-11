@@ -100,7 +100,7 @@ stays the ground truth, and every phase ends with a PSI run on production (§10)
 | Approved item | Finding | Long-term alternative adopted |
 |---|---|---|
 | (5) "explicit aspect-ratio reserve for the figure box" | The box already reserves 3:2 (`Figure.module.css`, `aspect-ratio: 3 / 2`, and the layout e2e test asserts it). The box never resizes. It *moves*, by exactly one bio line (24 px), because the first bio paragraph wraps to one more line in the fallback face (§1.2). | No change to the box. Fix the line-count difference at its source (§4.1). |
-| (5) "next/font fallback metric overrides for all fonts" | `next/font/google` already generates an override fallback by default (`adjustFontFallback: true`: Arial with one `size-adjust` from Inter's average width), and `next/font/local` defaults to `'Arial'`. It exists and is still not close enough: one average-width factor against Arial's glyph widths leaves the first paragraph one line longer at 600 px. Caveat is preloaded on every page although only Curious mode uses it. | Replace the single generic fallback with **per-platform matched fallbacks** (Segoe UI, Roboto, Helvetica Neue, Arial, each with its own `size-adjust`/`ascent-override`/`descent-override`/`line-gap-override` from font metrics), add a **line-count equivalence gate** over every role's bio and headline at 390/768/1440, stop preloading Caveat, and use a measured escalation if the gate cannot be met (§4.1). |
+| (5) "next/font fallback metric overrides for all fonts" | `next/font/google` already generates an override fallback by default (`adjustFontFallback: true`: Arial with one `size-adjust` from Inter's average width), and `next/font/local` defaults to `'Arial'`. It exists and is still not close enough: one average-width factor against Arial's glyph widths leaves the first paragraph one line longer at 600 px. Caveat is preloaded on every page although only Curious mode uses it. | Replace the single generic fallback with **per-platform matched fallbacks** (Segoe UI, Roboto, Helvetica Neue, Arial, each with its own `size-adjust`/`ascent-override`/`descent-override`/`line-gap-override` from font metrics), add a **line-count equivalence gate** over every role's bio and headline at 390/768/1440, stop preloading Caveat, and use a measured escalation if the gate cannot be met (§4.1; as built, the owner chose `display: 'optional'` for Inter and the gate became a no-swap gate). |
 | (7) "modern browserslist dropping legacy polyfills" | Next 16's default target is already `chrome 111, edge 111, firefox 111, safari 16.4`. The flagged polyfills are Next's hard-wired `polyfill-module`, which no Browserslist removes. | No Browserslist change. Patching Next would be a workaround. Accept the finding, record it, and recheck on each Next upgrade. The posthog-js `Math.trunc` flag leaves the critical path with posthog's lazy load (§6.3). |
 | (7) "private source maps" | Private maps do not clear Lighthouse's "missing source maps" diagnostic, which only public maps satisfy. That diagnostic is informational and not scored; Best Practices is already 100. | Private maps for PostHog error symbolication, built and then deleted from `.next/static` before the image is assembled. The diagnostic stays visible and that is by design (§4.3). |
 | (3) "seamless loop trim" | `static-layer` changes across all 30 s and `static-base` is a 6 s loop. Trimming would remove content. | No trim. The pipeline checks the loop seam (first against last frame) and only reports it (§4.4). |
@@ -114,7 +114,7 @@ stays the ground truth, and every phase ends with a PSI run on production (§10)
 
 **Goals.**
 - Production PSI: mobile ≥ 90, desktop ≥ 90.
-- CLS ≤ 0.05 under real throttling (owner decision: the ~0.045 desktop font-swap residual is accepted, §4.1).
+- CLS ≤ 0.05 under real throttling (a ceiling: with Inter on `display: 'optional'`, §4.1, the font adds no shift and the expected value is ~0).
 - TBT under 200 ms (mobile) and 150 ms (desktop) in PSI.
 - Page weight at load under 1.5 MB on desktop (from 8.9 MB).
 - Visual parity on the desk, the figure and the CRT layers, verified (§9).
@@ -147,69 +147,87 @@ order, each gated by measurement:
    letter-frequency average but by measuring, in Playwright's Chromium, the rendered widths of
    *the site's own text* (every discipline's bio and headline from the CMS seed, at weights 400,
    430, 500 and 620) in Inter and in each fallback, then solving for the factor that minimises the
-   largest relative line-width error.
+   largest relative line-width error. Chromium on Linux matches `local()` on a font's exact full or
+   PostScript name, with no fontconfig aliasing, so `local('Arial')` alone does not find Liberation
+   Sans: the Arial family also lists its metric-compatible clones, Arimo and Liberation Sans
+   (Capsize's Arial and Arimo metrics agree on every advance and vertical metric), which Linux
+   desktops, ChromeOS and the CI runner (`playwright install --with-deps` installs
+   `fonts-liberation`) have; the script generates them (`clones`).
 2. **Caveat is not preloaded** (`preload: false`). Only Curious mode's notes use it. The preload
-   competes with Inter on slow links, which is what makes the swap late enough to be seen.
-3. **Line-count equivalence gate** (`tests/e2e/font-fallback.spec.ts`): for every discipline (from
-   the drum), at 390, 768 and 1440 wide, it lays the page out with the woff2 blocked (fallback) and
-   with it loaded, and asserts that every bio paragraph and the `h1` have the same height in both.
-   This test reproduces today's bug: it fails on `main` at 1440 for the default role.
+   competes with Inter on slow links, which makes Inter late (with `optional`, item 3: late enough
+   to miss the first paint and leave the letter in the fallback).
+3. **Inter loads with `display: 'optional'` (owner decision, 2026-10-11; supersedes the 2026-10-10
+   one below).** In `app/(site)/layout.tsx` and `app/global-not-found.tsx`, still preloaded. With
+   `optional` the face the letter first appears in is the face it keeps: on a normal load the
+   preloaded Inter is there before the block period ends and the letter is set in Inter from its
+   first paint; a load that misses it keeps the matched fallback for the page's life, and the
+   later arrival of the woff2 swaps and moves nothing. Font loading therefore contributes no CLS
+   on any platform, tuned fallback or not.
 
-   **What CI verifies (revised after the first Linux run).** The original assumption, "CI's
-   fallback is Arial, i.e. Liberation Sans", was wrong: Chromium on Linux matches `local()` on a
-   font's exact full or PostScript name, with no fontconfig aliasing, so `local('Arial')` does not
-   find Liberation Sans. No family of the stack matched on the Ubuntu runner and the text fell
-   through to the generic `sans-serif` with no overrides at all: every width failed, the fallback
-   always *shorter* (fewer lines, e.g. bio 72 px against Inter's 96 px at 1440, where the tuned
-   Arial matches), which is an Arial-width face without the tuning's ~7 % `size-adjust`
-   (fontconfig's `sans-serif` there is Liberation Sans or FreeSans, both Arial/Helvetica-width).
-   Two changes follow:
-   - The Arial family also lists its metric-compatible clones, Arimo and Liberation Sans
-     (Capsize's Arial and Arimo metrics agree on every advance and vertical metric), which Linux
-     desktops, ChromeOS and the runner (`playwright install --with-deps` installs
-     `fonts-liberation`) have. `scripts/fonts/fallbacks.ts` generates them (`clones`).
-   - The gate tests the user-facing property on every platform. It reads the face Chromium
-     actually rendered (CDP `CSS.getPlatformFontsForNode`, the face with the most glyphs; emoji
-     and symbol fallbacks are ignored) and names it in the report. (a) At 390, 412, 768, 1350 and
-     1440, for every role, a face with a committed tuning (any `local()` name in
-     `font-fallbacks.css`) must give Inter's block heights exactly; an untuned face is reported as
-     skipped with its name, never silently passed. (b) On every platform, tuned or not, the swap
-     itself is measured: the woff2 are held until the page has laid out and hydrated in the
-     fallback, then released, and the layout shifts after the release must sum to ≤ 0.05 at
-     1350×940 and 412×823 (the recorder's sizes). It asserts the fonts were still loading and that
-     Inter took over, so it cannot pass with no swap. On Windows (Segoe UI) it measures 0.0449 and
-     0.0017, the numbers of the owner decision below.
-   - **Arial and its clones cannot meet the gate** (measured on Windows' real Arial with the Segoe
-     face removed, and by `fonts:fallbacks`): no size-adjust in ±5 % keeps every height; the best
-     (1.0105, committed) still differs at 390 px role 2 (bio p1: 5 lines vs 6) and 412 px role 1
-     (bio p3: 3 vs 4), and the swap CLS is 0.0357 at 1350×940 but **0.1753 at 412×823**. CI on
-     Linux (Liberation Sans) is therefore expected to fail (a) at 390/412 and (b) at 412×823 until
-     the owner decides (step 4). Roboto and Helvetica Neue keep untested corrections (1.0000): no
-     machine here has them, and no CI runner verifies them.
-4. **If the gate fails, stop (owner decision):** the font loading strategy never changes
-   automatically. `display: 'optional'` is **not** applied. If the tuned per-platform fallbacks
-   still fail the gate for some role and width, the implementer stops and reports:
-   - the failing cases (role, width, platform fallback, paragraph, line count in each face);
-   - the measured residual shift: `layout-shifts.ts` CLS at 1350×940 and 412×823, against the
-     production local build;
-   - the corrections tried.
+   *Why.* The first Linux run showed the swap could not be made shift-free there: Liberation Sans
+   (Arial's clone, which Linux desktops, ChromeOS and the CI runner have) cannot be tuned to wrap
+   like Inter. No `size-adjust` within ±5 % keeps every line count (the best, 1.0105, committed,
+   still differs at 390 px role 2, bio p1: 5 lines against 6, and 412 px role 1, bio p3: 3 against
+   4), and its swap measured **0.1753** at 412×823 (0.0357 at 1350×940). Android (Roboto) and Apple
+   (Helvetica Neue) keep untested corrections (1.0000) that no machine here or CI runner can
+   verify. A per-platform residual that only some platforms can measure is not a bound, so the
+   owner took `optional`, whose cost is the one listed in item 4: a first visit on a slow link
+   keeps the fallback for that page view. The local recorder's throttling (CPU ×6, 150 ms,
+   1.6 Mb/s) is such a link: the letter stays in Segoe UI there, while the dev, CI and
+   Lighthouse loads get Inter. The matched fallbacks (item 1) stay: they are what that rare view
+   looks like, as close to Inter as a system face can be.
 
-   The owner then decides between the options, each with its cost: `display: 'optional'` (first
-   slow visits keep the fallback), inlining the font (about 75 KB more in every HTML response),
-   reserving space (spacing changes), or accepting the residual shift.
+   **Caveat stays `swap`.** It is not preloaded (item 2) and is only fetched when Curious mode's
+   notes first render, after the visitor turns the mode on (or at load for a returning visitor
+   who left it on, after hydration), which is always past a 100 ms block period: `optional`
+   would leave the notes in their fallback (next/font's metric-adjusted Arial) almost every time,
+   a visible loss. Its swap cannot shift content: the notes are absolutely positioned in an
+   out-of-flow overlay, and nothing else is set in Caveat. Measured with the Caveat woff2 held
+   until the notes were drawn in the fallback, then released (1350×940, mode toggled and mode
+   left on): zero layout-shift entries, before and after the swap. At 412 px no notes are drawn.
+   The OS's faces (`app/(os)/os/layout.tsx`: the local Millennium woff2 and Ultra) stay `swap`:
+   they set the monitor's OS, which boots on approach inside its own iframe, not the letter.
 
-   **Owner decision (2026-10-10): accept the residual.** After tuning, the gate holds every
-   paragraph's line count, but words still move inside equal-height paragraphs when Inter swaps
-   in: local CLS (CPU ×6, 1.6 Mb/s) 0.1484 → 0.0449 at 1350×940 and 0.0017 at 412×823. The font
-   loading strategy stays as it is: no `display` change and no inlined font. CLS gates are
-   ≤ 0.05 accordingly (this section, §3, §10 and the plan).
+   **What CI verifies** (`tests/e2e/font-fallback.spec.ts`, at the recorder's 1350×940 and
+   412×823; each test names the face Chromium rendered, read through CDP
+   `CSS.getPlatformFontsForNode`, the face with the most glyphs, emoji and symbol fallbacks
+   ignored):
+   - *A normal load shows the letter in Inter from its first paint, with no shift.* Inter's
+     `@font-face` rules are `font-display: optional` and one of their woff2 is preloaded (the
+     `Link` header next/font sends, or a `<link>`); after the load the rendered face is Inter,
+     which under `optional` means it was Inter from the first paint (a face that misses the block
+     period is never used later); and the load's CLS is ≤ 0.001.
+   - *Inter arriving late leaves the letter in the matched fallback, with no shift.* The woff2 are
+     held until the page has laid out and hydrated, 500 ms past the block period (it asserts
+     `document.fonts.status` is still `loading`, so it cannot pass with no late font); the
+     rendered face must be one with a committed tuning (any `local()` name in
+     `font-fallbacks.css`: Segoe UI on Windows, Liberation Sans on the runner); then the fonts are
+     released, and the face must stay the same and the load's CLS stay ≤ 0.001.
+
+   The first gate, every role's block heights equal in the fallback and in Inter at 390 to 1440
+   px, is removed: its purpose was to keep the swap from moving text, and with `optional` the two
+   layouts never meet in one page view. Equal heights across two separate visits are not
+   something a reader sees, and Liberation Sans cannot meet it anyway. How close the fallback
+   wraps is still the job of `scripts/fonts/fallbacks.ts`, which reports each face's residual
+   line differences when it regenerates the tuning.
+4. **Earlier decision (2026-10-10, superseded by item 3).** The rule was: if the tuned fallbacks
+   fail the line-count gate, the font loading strategy never changes automatically; the
+   implementer stops and reports the failing cases, the residual `layout-shifts.ts` CLS and the
+   corrections tried, and the owner decides between `display: 'optional'` (first slow visits keep
+   the fallback), inlining the font (about 75 KB more in every HTML response), reserving space
+   (spacing changes), or accepting the residual shift. On Windows the tuned Segoe UI held every
+   line count but words still moved inside equal-height paragraphs (local CLS 0.1484 → 0.0449 at
+   1350×940 and 0.0017 at 412×823), and the owner first accepted that residual with CLS gates at
+   ≤ 0.05. The Linux numbers in item 3 then ruled it out.
 5. **The figure stays a fixed-ratio box** (already true). Its caption row gets `min-height` of one
    line, so a caption swap between roles never moves the sections below. That is a role-change
    shift, not load CLS, but it is the same class of bug.
 
 Verification: `scripts/perf/layout-shifts.ts` (committed with this design) against the local build
 and, after deploy, against production, with CPU ×6, 150 ms and 1.6 Mb/s at 1350×940 and 412×823:
-CLS ≤ 0.05 in 3 of 3 runs (the accepted font-swap residual is ~0.045 at 1350×940). Today: 0.148.
+CLS ≤ 0.05 in 3 of 3 runs. Measured before `optional` (2026-10-10, `swap`): 0.0449 at 1350×940 and
+0.0017 at 412×823, 3 of 3 runs each (0.148 before any of §4.1). After (`optional`): 0.0000 at both
+sizes, 3 of 3 runs. The 0.05 budgets stay as a ceiling; the expected value is now ~0.
 
 ### 4.2 Delivery: inline CSS, caching (7)
 
@@ -705,7 +723,7 @@ load failure maps to the same `load_error`. A lost context (new: today it is not
 | Worker host's ImageBitmap path changes alpha compositing (premultiplied canvas → bitmap → bitmaprenderer) and the occluder hole looks different | The occluder writes `(0,0,0,0)`, which is identical premultiplied or not. Parity shots of the monitor pose (§9) are the gate. The main host is the fallback switch (`?deskHost=main` for debugging). |
 | OS hydration during the camera zoom janks the zoom (main thread) | The `pointer` trigger fires on entering the figure box, well before the screen. The OS boot chunk shrinks (§6.2). In the worker host GL rendering is off-thread, and both layers stall together, never misaligned. |
 | On touch, the OS boots as the monitor scrolls into view. It can boot during load if the figure is already half visible (a short viewport or a mid-page reload), and its hydration then competes with the page | That is by design (owner: the screen never sits dark while being looked at). The boot chunk is smaller after §6.2, and Lighthouse's mobile viewport does not have the figure half in view at load. Desktop/pointer visitors who never approach the desk see the powered-off CRT. |
-| The font fallback gate cannot be met by tuning | The implementer stops and reports the residual shift for an owner decision. No automatic `display: 'optional'` (§4.1). |
+| The font fallback cannot be tuned to wrap like Inter on every platform | Happened (Liberation Sans on Linux, §4.1). The owner chose `display: 'optional'`: no font swap anywhere; a first visit on a slow link keeps the matched fallback for that page view. |
 | AV1 decode cost on low-end devices | `<source>` order lets a device without AV1 hardware choose VP9 or H.264 (Chrome uses dav1d in software; at 640×480 that is light). The parity gate is per codec. |
 | `inlineCss` is experimental | Isolated in Task 1.3 with a before/after HTML check; reverting it is one line. |
 | Encoder differences between machines | Outputs are committed; `manifest.lock.json` records tool versions; `assets:check` guards drift. |
@@ -717,9 +735,9 @@ load failure maps to the same `load_error`. A lost context (new: today it is not
 - CSS/canvas noise instead of the videos (rejected by the owner).
 - KTX2/Basis textures (13× the download for UASTC; ETC1S fails parity), see §2.
 - Draco (larger decoder for tiny meshes).
-- `font-display: optional`, automatically or as a first resort: it removes the shift, but first-time
-  visitors on slow links keep the fallback face. It is only one of the options the owner may choose
-  if the gate fails (§4.1).
+- `font-display: optional` as a first resort: it removes the shift, but first-time visitors on slow
+  links keep the fallback face. Rejected until the tuned fallbacks were shown not to wrap like Inter
+  on Linux; the owner then chose it (§4.1, item 3).
 - Tap or dwell triggers on touch (the owner's decision: boot as the monitor scrolls into view, so
   it never sits dark while seen).
 - `font-display: block`: invisible text for up to 3 s, which hurts FCP and LCP.

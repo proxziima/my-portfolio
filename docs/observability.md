@@ -145,7 +145,7 @@ The `lighthouse` job in `.github/workflows/ci.yml` runs on every PR and push, af
 |---|---|---|---|
 | Performance score | ≥ 0.75 | ≥ 0.9 | 82 / 100 |
 | Accessibility, best practices, SEO | 1 | 1 | 100 / 100 / 100 |
-| CLS | ≤ 0.05 | ≤ 0.05 | 0.000 / 0.000 (the real-throttling recorder: 0.0017 at 412 px, 0.045 at 1350 px) |
+| CLS | ≤ 0.05 | ≤ 0.05 | 0.000 / 0.000 (the real-throttling recorder: 0.0000 at 412 and 1350 px; Inter is `display: optional`, so the font adds no shift and 0.05 is a ceiling) |
 | TBT | ≤ 650 ms | ≤ 150 ms | 520 ms / 43 ms |
 | Total bytes | ≤ 1.6 MB | ≤ 1.6 MB | 1.03 MB |
 | Script transfer | ≤ 460 KB | ≤ 460 KB | 342 KB |
