@@ -47,12 +47,15 @@ type Send = (client: Client) => void
 /** Enough for everything a visit does before the library arrives; beyond it the oldest go first. */
 const QUEUE_MAX = 100
 let client: Client | null = null
+/** No client will ever come for this document (no token, or the chunk failed): events are dropped at once. */
+let disabled = false
 const queue: Send[] = []
 
-/** Sends now, or once the client is attached; nothing leaves without a token (no attach, then a discard). */
+/** Sends now, or once the client is attached; with analytics disabled, nothing is kept. */
 function send(fn: Send): void {
   if (typeof window === 'undefined') return
   if (client) return fn(client)
+  if (disabled) return
   queue.push(fn)
   if (queue.length > QUEUE_MAX) queue.shift()
 }
@@ -63,10 +66,17 @@ export function attach(next: Client): void {
   for (const fn of queue.splice(0)) fn(next)
 }
 
-/** Analytics is off for this document (no token): drop what waited for a client that never comes. */
-export function discardQueue(): void {
+/**
+ * Analytics is off for this document (no token, or posthog-js could not load): drop what waited for
+ * a client that never comes, and stop queueing what follows.
+ */
+export function disable(): void {
+  disabled = true
   queue.length = 0
 }
+
+/** How many sends wait for the client (for tests). */
+export const pending = (): number => queue.length
 
 /** Sends one catalog event; before posthog-js has loaded it waits in a short in-memory queue. */
 export const track: Track = (event, properties) => {

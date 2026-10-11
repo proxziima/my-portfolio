@@ -31,13 +31,27 @@ describe('track before posthog-js has loaded', () => {
     expect(client.capture.mock.calls[99]).toEqual(['section_viewed', { section: 's100' }])
   })
 
-  it('sends nothing once the queue is discarded (no token)', () => {
+  it('counts what waits for the client', () => {
+    events.track('section_viewed', { section: 'work' })
+    events.captureException(new Error('boom'))
+    expect(events.pending()).toBe(2)
+  })
+
+  it('sends nothing once analytics is disabled (no token)', () => {
     events.track('section_viewed', { section: 'work' })
     events.trackOnExit('section_engaged', { section: 'work', seconds: 3 })
-    events.discardQueue()
+    events.disable()
     const client = fake()
     events.attach(client)
     expect(client.capture).not.toHaveBeenCalled()
+  })
+
+  it('stops queueing once disabled: later events are dropped at once, not held for a client that never comes', () => {
+    events.disable()
+    events.track('section_viewed', { section: 'work' })
+    events.trackOnExit('section_engaged', { section: 'work', seconds: 3 })
+    events.captureException(new Error('boom'))
+    expect(events.pending()).toBe(0)
   })
 
   it('queues an exit event too and flushes it over a beacon: a hidden tab may well come back', () => {

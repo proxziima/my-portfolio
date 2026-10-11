@@ -1,7 +1,7 @@
 'use client'
 import { useEffect } from 'react'
 import { installDelegatedTracking } from '@/lib/analytics/delegated'
-import { discardQueue, track, trackOnExit } from '@/lib/analytics/events'
+import { disable, track, trackOnExit } from '@/lib/analytics/events'
 import { initPostHog, type ClientAnalyticsConfig } from '@/lib/analytics/init'
 import { trackOsEngagement } from '@/lib/analytics/os-engagement'
 import { trackSectionEngagement } from '@/lib/analytics/section-engagement'
@@ -25,7 +25,7 @@ export function Analytics({ config, surface }: { config: ClientAnalyticsConfig |
   const token = config?.token
   const uiHost = config?.uiHost
   useEffect(() => {
-    if (!token || !uiHost) return discardQueue()
+    if (!token || !uiHost) return disable()
     // the /os desktop iframed on the desk monitor
     const embedded = window.self !== window.top
     // posthog-js arrives in its own chunk; until then the trackers below queue their events
