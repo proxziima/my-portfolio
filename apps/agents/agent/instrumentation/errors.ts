@@ -12,7 +12,7 @@ export default defineInstrumentation({
     'turn.failed': (e) => reportAgentFailure(captureServerError, 'turn', { error: e.error, sessionId: e.sessionId, turnId: e.turnId }),
     'session.failed': (e) => reportAgentFailure(captureServerError, 'session', { error: e.error, sessionId: e.sessionId, turnId: e.turnId }),
     'model.call.failed': (e) => reportAgentFailure(captureServerError, 'model', { error: e.error, sessionId: e.scope.sessionId, turnId: e.scope.turnId }),
-    'action.failed': (e) => reportAgentFailure(captureServerError, 'action', { error: e.error, sessionId: e.scope.sessionId, turnId: e.scope.turnId, outcome: e.outcome }),
+    'tool.call.failed': (e) => reportAgentFailure(captureServerError, 'tool', { error: e.error, sessionId: e.scope.sessionId, turnId: e.scope.turnId, outcome: e.outcome }),
   },
   flush: () => serverPostHog().flush(),
 })
