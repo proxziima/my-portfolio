@@ -15,8 +15,11 @@ export interface LockEntry {
   tools: Record<string, string>
   /** `/assets/…` paths are served from `public/`; others are relative to `apps/web`. */
   outputs: string[]
-  /** What `ASSETS` holds for this id: the manifest is regenerated from the lock alone. */
-  value: ManifestValue
+  /**
+   * What `ASSETS` holds for this id: the manifest is regenerated from the lock alone. Absent when
+   * code never imports the output (the OS fonts: `next/font/local` needs a literal path).
+   */
+  value?: ManifestValue
   /** The parity numbers each output passed with. */
   parity?: ManifestValue
 }
@@ -96,10 +99,15 @@ export function toManifestSource(values: Record<string, ManifestValue> | Readonl
   ].join('\n')
 }
 
+/** `lib/assets/manifest.ts` as the lock defines it: built recipes with a value, in recipe order. */
+export function manifestSource(recipes: readonly Recipe[], lock: Lock): string {
+  return toManifestSource(recipes.flatMap((r) => (lock[r.id]?.value === undefined ? [] : [[r.id, lock[r.id]!.value!] as const])))
+}
+
 /** Writes `lib/assets/manifest.ts` and `assets-src/manifest.lock.json`, both in recipe order. */
 export function writeManifest(recipes: readonly Recipe[], lock: Lock): void {
   const built = recipes.filter((r) => lock[r.id])
-  writeFileSync(MANIFEST_FILE, toManifestSource(built.map((r) => [r.id, lock[r.id]!.value] as const)))
+  writeFileSync(MANIFEST_FILE, manifestSource(recipes, lock))
   const ordered = Object.fromEntries(built.map((r) => [r.id, lock[r.id]]))
   writeFileSync(LOCK_FILE, `${JSON.stringify(ordered, null, 2)}\n`)
 }

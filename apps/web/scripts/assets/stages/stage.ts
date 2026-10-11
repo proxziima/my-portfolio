@@ -10,7 +10,8 @@ export interface StageOutput {
 
 export interface StageResult {
   outputs: StageOutput[]
-  value: ManifestValue
+  /** What `ASSETS` holds; none for an output code never imports. */
+  value?: ManifestValue
   parity?: ManifestValue
   /** Encoder versions, recorded in the lock. */
   tools?: Record<string, string>

@@ -85,7 +85,7 @@ for (const recipe of selected) {
     writeFileSync(file, o.bytes)
   }
   for (const o of previous?.outputs ?? []) if (!outputs.includes(o) && existsSync(outputFile(o))) unlinkSync(outputFile(o))
-  lock[recipe.id] = { source, recipe: recipeSha, tools: result.tools ?? {}, outputs, value: result.value, ...(result.parity === undefined ? {} : { parity: result.parity }) }
+  lock[recipe.id] = { source, recipe: recipeSha, tools: result.tools ?? {}, outputs, ...(result.value === undefined ? {} : { value: result.value }), ...(result.parity === undefined ? {} : { parity: result.parity }) }
   // written per recipe, so an interrupted run keeps what it finished
   writeManifest(RECIPES, lock)
   rows.push(`${recipe.id}: ${kb(bytes.byteLength)} → ${result.outputs.map((o) => `${o.label ?? o.path.split('.').at(-1)} ${kb(o.bytes.byteLength)}`).join(', ')}`)

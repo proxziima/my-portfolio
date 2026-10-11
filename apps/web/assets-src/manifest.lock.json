@@ -1100,8 +1100,7 @@
     },
     "outputs": [
       "app/(os)/fonts/Millennium.woff2"
-    ],
-    "value": "app/(os)/fonts/Millennium.woff2"
+    ]
   },
   "osFonts.millenniumBold": {
     "source": "7cc0f2a1b4395791195ac582dd22781a0b69001be7eeaf0626839ec608da81d5",
@@ -1111,7 +1110,6 @@
     },
     "outputs": [
       "app/(os)/fonts/Millennium-Bold.woff2"
-    ],
-    "value": "app/(os)/fonts/Millennium-Bold.woff2"
+    ]
   }
 }
