@@ -20,9 +20,26 @@ const engine = vi.hoisted(() => ({
   loaded: undefined as (() => void) | undefined,
 }))
 
+const gl = vi.hoisted(() => ({
+  kind: 'worker' as 'worker' | 'main',
+  throws: false,
+  /** The scene's `onFail` subscription on the host it selected. */
+  fail: undefined as ((reason: 'webgl_unavailable' | 'load_error' | 'context_lost') => void) | undefined,
+}))
+
 vi.mock('@/features/desk/engine', () => ({ createDeskEngine: (options: EngineOptions) => engine.create(options) }))
 // jsdom has no WebGL; the fake engine never draws, so the host it is handed is a bare stand-in
-vi.mock('@/features/desk/gl/main-host', () => ({ createMainHost: () => ({ kind: 'main' }) }))
+vi.mock('@/features/desk/gl/select-host', () => ({
+  selectHost: () => {
+    if (gl.throws) throw new Error('Error creating WebGL context.')
+    return {
+      get kind() {
+        return gl.kind
+      },
+      onFail: (cb: typeof gl.fail) => (gl.fail = cb),
+    }
+  },
+}))
 vi.mock('@/lib/assets/texture-format', () => ({ textureFormat: () => Promise.resolve('webp') }))
 vi.mock('@/features/desk/audio', () => ({
   createDeskAudio: () => ({ dispose: vi.fn(), setDistance: vi.fn(), setMuted: vi.fn(), unlock: vi.fn(), mouse: vi.fn(), key: vi.fn(), keyUp: vi.fn() }),
@@ -82,6 +99,9 @@ beforeEach(() => {
   onFail.mockClear()
   onReady.mockClear()
   onPower.mockClear()
+  gl.kind = 'worker'
+  gl.throws = false
+  gl.fail = undefined
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
   host = document.createElement('div')
@@ -94,13 +114,21 @@ afterEach(() => {
 })
 
 describe('DeskScene outcome', () => {
-  it('reports ready on the first frame drawn with the models', async () => {
+  it('reports ready on the first frame drawn with the models, with the thread that drew it', async () => {
     engine.create = fakeEngine(async () => {})
     await mount()
     expect(onReady).not.toHaveBeenCalled()
     act(() => engine.options?.onFirstFrame?.())
     expect(onReady).toHaveBeenCalledTimes(1)
+    expect(onReady).toHaveBeenCalledWith('worker')
     expect(onFail).not.toHaveBeenCalled()
+  })
+
+  it('fails as webgl_unavailable, on the main thread, when no host can draw', async () => {
+    gl.throws = true
+    engine.create = fakeEngine(async () => {})
+    await mount()
+    expect(onFail).toHaveBeenCalledWith('webgl_unavailable', 'main')
   })
 
   it('fails as webgl_unavailable when the engine cannot be created', async () => {
@@ -108,13 +136,38 @@ describe('DeskScene outcome', () => {
       throw new Error('Error creating WebGL context.')
     }
     await mount()
-    expect(onFail).toHaveBeenCalledWith('webgl_unavailable')
+    expect(onFail).toHaveBeenCalledWith('webgl_unavailable', 'main')
   })
 
   it('fails as load_error when the models do not load', async () => {
+    gl.kind = 'main'
     engine.create = fakeEngine(() => Promise.reject(new Error('404')))
     await mount()
-    expect(onFail).toHaveBeenCalledWith('load_error')
+    expect(onFail).toHaveBeenCalledWith('load_error', 'main')
+  })
+
+  it("fails with the host's own reason when its load knows it", async () => {
+    const { GlHostError } = await import('@/features/desk/gl/host')
+    engine.create = fakeEngine(() => Promise.reject(new GlHostError('webgl_unavailable')))
+    await mount()
+    expect(onFail).toHaveBeenCalledWith('webgl_unavailable', 'main')
+  })
+
+  it('fails as context_lost when the host loses its context', async () => {
+    gl.kind = 'main'
+    engine.create = fakeEngine(async () => {})
+    await mount()
+    act(() => gl.fail?.('context_lost'))
+    expect(onFail).toHaveBeenCalledWith('context_lost', 'main')
+  })
+
+  it('reports nothing after unmount', async () => {
+    engine.create = fakeEngine(async () => {})
+    await mount()
+    act(() => root.unmount())
+    gl.fail?.('context_lost')
+    expect(onFail).not.toHaveBeenCalled()
+    root = createRoot(host)
   })
 })
 

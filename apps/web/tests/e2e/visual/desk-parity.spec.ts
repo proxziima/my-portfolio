@@ -11,15 +11,27 @@ const UPDATE = process.env.PARITY_UPDATE === '1'
 /** ≤ 0.5 % of pixels may differ, and no differing blob may exceed 64 px² (an edge sliver). */
 const MAX_RATIO = 0.005
 const MAX_CLUSTER = 64
+/** `PARITY_QUERY=deskHost=main` runs the same shots on the main-thread host; by default the worker draws. */
+const QUERY = process.env.PARITY_QUERY ?? ''
+const HOST = new URLSearchParams(QUERY).get('deskHost') === 'main' ? 'main' : 'worker'
 
 /** Freezes everything time-based so two runs of the same code produce the same pixels. */
 async function freeze(page: Page) {
   await page.addStyleTag({ content: '*{animation-play-state:paused!important;transition:none!important} .screen-jitter{animation:none!important}' })
   await page.evaluate(async () => {
-    for (const v of document.querySelectorAll('video')) {
+    // a seek is asynchronous, and so is putting its frame on screen: wait until the frame at 0 is the
+    // one presented, or the shot can catch the frame the video was paused on
+    const seeks = [...document.querySelectorAll('video')].map((v) => {
       v.pause()
+      if (v.currentTime === 0 && !v.seeking) return Promise.resolve()
+      const presented = new Promise<void>((r) => {
+        const check: VideoFrameRequestCallback = (_, frame) => (frame.mediaTime === 0 ? r() : void v.requestVideoFrameCallback(check))
+        v.requestVideoFrameCallback(check)
+      })
       v.currentTime = 0
-    }
+      return Promise.race([presented, new Promise<void>((r) => setTimeout(r, 3000))])
+    })
+    await Promise.all(seeks)
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
   })
 }
@@ -31,6 +43,9 @@ async function poweredOff(page: Page) {
   await expect(scene).toHaveAttribute('data-loaded', 'true', { timeout: 60_000 })
   await expect(scene).toHaveAttribute('data-power', 'off')
   await expect(scene.locator('iframe')).toHaveCount(0)
+  // the worker host's canvas holds a bitmaprenderer context, the main host's a WebGL one
+  const host = await scene.locator('canvas').evaluate((c: HTMLCanvasElement) => (c.getContext('webgl2') ? 'main' : 'worker'))
+  expect(host, 'the host these shots are of').toBe(HOST)
 }
 
 /**
@@ -70,7 +85,7 @@ for (const { width, height } of [{ width: 1440, height: 900 }, { width: 390, hei
       test.setTimeout(180_000)
       await page.setViewportSize({ width, height })
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'no-preference' })
-      await openPortfolio(page)
+      await openPortfolio(page, QUERY ? `/?${QUERY}` : '/')
       await poweredOff(page)
       // new with boot-on-approach, so no pre-Phase-1 baseline: the first run records it for review
       await shoot(page, `desk-powered-off-${width}-${scheme}`)

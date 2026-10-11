@@ -23,7 +23,7 @@ export interface GlFrameCamera {
 
 /** Where the desk's WebGL lives. The engine drives it the same way whichever it is. */
 export interface GlHost {
-  /** Which thread draws the frames now (a worker host can hand over to the main thread). */
+  /** Which thread draws the frames from now on (a worker host can hand over to the main thread). */
   readonly kind: HostKind
   /** The element the engine stacks over the CSS3D layer. */
   readonly canvas: HTMLCanvasElement

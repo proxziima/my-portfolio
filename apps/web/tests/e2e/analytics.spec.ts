@@ -142,6 +142,21 @@ test.describe('analytics and SEO', () => {
     expect(embeddedEngaged()!.properties.seconds).toBeGreaterThanOrEqual(1)
   })
 
+  // Chromium renders the desk in a worker; `?deskHost=main` forces the main-thread host
+  for (const { query, host } of [{ query: '', host: 'worker' }, { query: '?deskHost=main', host: 'main' }]) {
+    test(`the desk scene reports its host (${host})`, async ({ page }) => {
+      test.setTimeout(60_000)
+      const events = await captureRelay(page)
+      await page.route('**/*.glb', (route) => route.continue())
+      await openPortfolio(page, `/${query}`)
+      await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
+      await expect(page.locator('[data-anchor="desk-scene"]')).toHaveAttribute('data-loaded', 'true', { timeout: 30_000 })
+      const ready = () => events.find((e) => e.event === 'experience_ready' && e.properties.experience === 'desk_scene')
+      await expect.poll(ready, { timeout: 15_000 }).toBeTruthy()
+      expect(ready()!.properties).toMatchObject({ host, ms: expect.any(Number) })
+    })
+  }
+
   test('home has canonical, JSON-LD, and robots/sitemap are served', async ({ page, request }) => {
     await page.goto('/')
     // Next prints the root canonical as the bare origin; for http(s) that is the same URL as `<origin>/`

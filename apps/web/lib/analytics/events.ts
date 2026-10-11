@@ -9,6 +9,9 @@ export type LinkChannel = 'github' | 'linkedin' | 'email' | 'calendar' | 'other'
  */
 export type Experience = 'desk_scene' | 'os_boot' | 'dos_app' | 'twin_first_reply' | 'os_app'
 
+/** Where the desk's WebGL draws: a worker (OffscreenCanvas) or, where that is not possible, the main thread. */
+export type DeskHost = 'worker' | 'main'
+
 /**
  * Every custom event the site sends and its properties. PostHog's defaults cover pageviews,
  * page leave (time on page, scroll depth), web vitals, autocapture and exceptions.
@@ -28,9 +31,10 @@ export interface AnalyticsEvents {
   twin_session_renewed: Record<string, never>
   booking_opened: Record<string, never>
   booking_completed: Record<string, never>
-  experience_ready: { experience: Experience; ms: number; app?: string }
-  /** `reason` is a short machine label, never error text. */
-  experience_failed: { experience: Experience; reason: string; app?: string }
+  /** `host`: for `desk_scene`, the thread that drew the first frame with the models. */
+  experience_ready: { experience: Experience; ms: number; app?: string; host?: DeskHost }
+  /** `reason` is a short machine label, never error text. `host`: for `desk_scene`, the thread that failed. */
+  experience_failed: { experience: Experience; reason: string; app?: string; host?: DeskHost }
 }
 
 export type AnalyticsEvent = keyof AnalyticsEvents

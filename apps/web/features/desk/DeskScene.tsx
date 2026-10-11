@@ -7,7 +7,8 @@ import { deskAssetUrls } from './assets'
 import { createDeskAudio, type DeskAudio } from './audio'
 import { DESK_ASSETS, OS_PATH } from './config'
 import { createDeskEngine, type DeskEngine } from './engine'
-import { createMainHost } from './gl/main-host'
+import { GlHostError, type GlFailure, type GlHost, type HostKind } from './gl/host'
+import { selectHost } from './gl/select-host'
 import { watchApproach } from './intent'
 import { cappedPixelRatio } from './pixel-ratio'
 import { reducePower, type Power } from './power'
@@ -17,11 +18,13 @@ import styles from './DeskScene.module.css'
 import './screen-fx.css'
 
 /** Why the scene gave up, for `experience_failed.reason`. */
-export type DeskFailure = 'webgl_unavailable' | 'load_error'
+export type DeskFailure = GlFailure
 
 export interface DeskSceneProps {
-  onFail: (reason: DeskFailure) => void
-  onReady: () => void
+  /** `host`: the thread that failed (`webgl_unavailable` is always the main one: a worker without WebGL is not a failure). */
+  onFail: (reason: DeskFailure, host: HostKind) => void
+  /** `host`: which thread drew the first frame with the models. */
+  onReady: (host: HostKind) => void
   muted: boolean
   /** The figure is in full screen: that is there to use the OS, so it boots the monitor. */
   fullscreen: boolean
@@ -37,8 +40,9 @@ export interface DeskSceneProps {
  * figure goes full screen; then the OS boots, its own boot console being the loading state. It also
  * owns the scene's sounds: key and mouse foley for what happens inside the OS, a startup chime and
  * an office ambience that muffles as the camera zooms in, all silent until the first gesture and
- * whenever `muted`. `onFail` fires if WebGL is missing or an asset fails, so the figure can
- * collapse to its caption; `onReady` fires on the first frame drawn with the models.
+ * whenever `muted`. The WebGL draws in a worker where the browser can, else on the main thread
+ * (`selectHost`). `onFail` fires if WebGL is missing, an asset fails or the context is lost, so the
+ * figure can collapse to its caption; `onReady` fires on the first frame drawn with the models.
  */
 export function DeskScene({ onFail, onReady, muted, fullscreen, onPower }: DeskSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -54,24 +58,31 @@ export function DeskScene({ onFail, onReady, muted, fullscreen, onPower }: DeskS
     if (!host) return
     let live = true
     const audio = createDeskAudio()
+    let gl: GlHost
     let created: DeskEngine
     try {
+      gl = selectHost(textureFormat().then((format) => deskAssetUrls(DESK_ASSETS, format)))
       created = createDeskEngine({
         container: host,
-        host: createMainHost(textureFormat().then((format) => deskAssetUrls(DESK_ASSETS, format))),
+        host: gl,
         screenSrc: OS_PATH,
         onFirstFrame: () => {
           if (!live) return
           setLoaded(true)
-          onReady()
+          onReady(gl.kind)
         },
         onFrame: (distance) => audio.setDistance(distance),
       })
     } catch {
       audio.dispose()
-      onFail('webgl_unavailable')
+      onFail('webgl_unavailable', 'main')
       return
     }
+    // a lost context collapses the figure as a load error does (a worker's loss is not one: the main thread takes over)
+    const fail = (reason: DeskFailure) => {
+      if (live) onFail(reason, reason === 'webgl_unavailable' ? 'main' : gl.kind)
+    }
+    gl.onFail(fail)
     audioRef.current = audio
     const engine = created
     const fit = () => {
@@ -121,7 +132,7 @@ export function DeskScene({ onFail, onReady, muted, fullscreen, onPower }: DeskS
       engine.setPointer({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: ((e.clientY - r.top) / r.height) * 2 - 1 })
     }
     host.addEventListener('pointermove', onMove)
-    engine.load().catch(() => { if (live) onFail('load_error') })
+    engine.load().catch((e: unknown) => fail(e instanceof GlHostError ? e.reason : 'load_error'))
     setEngine(engine)
     return () => {
       live = false

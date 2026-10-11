@@ -248,8 +248,8 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 
 | | |
 | --- | --- |
-| Properties, ready | `experience` (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), `ms` (integer milliseconds since the start, `1463`), `app` (string, DOS only: `resume`, `doom`, `autocad`) |
-| Properties, failed | `experience` (the above, plus `os_app`, which only fails), `reason` (short machine label, never error text or user data; per experience below), `app` (`dos_app`: the DOS app id; `os_app`: any OS app id, `messenger`, `credits`, `doom`…) |
+| Properties, ready | `experience` (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), `ms` (integer milliseconds since the start, `1463`), `app` (string, DOS only: `resume`, `doom`, `autocad`), `host` (`desk_scene` only: `worker` or `main`, see below) |
+| Properties, failed | `experience` (the above, plus `os_app`, which only fails), `reason` (short machine label, never error text or user data; per experience below), `app` (`dos_app`: the DOS app id; `os_app`: any OS app id, `messenger`, `credits`, `doom`…), `host` (`desk_scene` only) |
 | Notes | Inside the desk-monitor iframe the `embedded: true` super property rides along (the embedded `os_boot` is the iframe's own boot) |
 | Suggested insight | p50 and p95 of `ms` per `experience` (SQL: `quantile(0.95)(properties.ms)` grouped by `properties.experience`); failure rate = `experience_failed` / (`experience_ready` + `experience_failed`) per `experience`; both broken down by `$device_type` and `$browser`; for `dos_app`, by `app`; `experience_failed` by `reason` |
 
@@ -258,9 +258,9 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 | | |
 | --- | --- |
 | Start | The figure box comes within 200 px of the viewport and the lazy `DeskScene` (three.js, `next/dynamic`, `ssr: false`) is mounted, so the chunk download is included ([Figure.tsx:39](../apps/web/features/figure/Figure.tsx#L39)) |
-| Ready | The first frame drawn with the models in place (`onFirstFrame`, the same moment as `data-loaded="true"`; [DeskScene.tsx:59](../apps/web/features/desk/DeskScene.tsx#L59)) |
-| Failed | `webgl_unavailable` when the engine cannot be created ([DeskScene.tsx:68](../apps/web/features/desk/DeskScene.tsx#L68)); `load_error` when the models fail to load ([DeskScene.tsx:120](../apps/web/features/desk/DeskScene.tsx#L120)). Both are where the figure already collapses to its caption ([Figure.tsx:39](../apps/web/features/figure/Figure.tsx#L39)) |
-| Notes | Frames render only while the box is on screen, so a visitor who stops inside the 200 px margin without scrolling the box into view adds that wait to `ms`. A failure to download the scene's code chunk goes to the error boundary (`$exception`), not here |
+| Ready | The first frame with the models in place on the canvas (`onFirstFrame`, the same moment as `data-loaded="true"`; [DeskScene.tsx:72](../apps/web/features/desk/DeskScene.tsx#L72)). `host` is the thread that drew it: `worker` where the browser renders WebGL in a worker (OffscreenCanvas: Chromium, Safari 17+, Firefox), else `main`. A worker frame is on the canvas only once the GPU has finished it, so on the same device `worker` timings include the first frame's GPU work (texture uploads) that a `main` frame hands to the GPU after it is committed |
+| Failed | `webgl_unavailable` when nothing can draw: the main thread has no WebGL (a worker without it is not a failure, the main thread takes over; [DeskScene.tsx:78](../apps/web/features/desk/DeskScene.tsx#L78)); `load_error` when the models fail to load ([DeskScene.tsx:135](../apps/web/features/desk/DeskScene.tsx#L135)); `context_lost` when the main thread's WebGL context is lost (a worker's lost context is not a failure either: the main thread takes over, [DeskScene.tsx:83](../apps/web/features/desk/DeskScene.tsx#L83)). All three collapse the figure to its caption ([Figure.tsx:39](../apps/web/features/figure/Figure.tsx#L39)). `host` is the thread that failed, so `main` in practice |
+| Notes | Frames render only while the box is on screen, so a visitor who stops inside the 200 px margin without scrolling the box into view adds that wait to `ms`. A failure to download the scene's code chunk goes to the error boundary (`$exception`), not here. Suggested insight: p50 and p95 of `ms` by `properties.host`, and the share of `host = main` by `$browser` (where the worker is not available) |
 
 #### `os_boot`
 
@@ -492,7 +492,7 @@ Open PostHog, Activity, Live events, with a token set in a dev project ([observa
 | `twin_refusal` | Exceed a limit, or stop the agent | `reason` = `throttled`, `too_long`, `ended`, `offline` |
 | `twin_session_renewed` | Clear the server session, then send | Fires once |
 | `booking_opened`, `booking_completed` | Ask the twin to schedule, book in the booker | One each, no properties |
-| `experience_ready` | Scroll to the desk; open `/os`; open Doom; send the twin a message | One each: `desk_scene`, `os_boot` (and an embedded one after hovering the desk), `dos_app` with `app` = `doom`, `twin_first_reply`; `ms` an integer |
+| `experience_ready` | Scroll to the desk; open `/os`; open Doom; send the twin a message | One each: `desk_scene` (with `host` = `worker` in Chrome, `main` with `?deskHost=main`), `os_boot` (and an embedded one after hovering the desk), `dos_app` with `app` = `doom`, `twin_first_reply`; `ms` an integer |
 | `experience_failed` | Block `*.glb` or `/js-dos/js-dos.js` in the Network tab, then load the desk or open a DOS app; on `/os`, go offline in DevTools before opening Credits for the first time | `reason` = `load_error` (desk, or DOS with `app`); a refused twin message gives its refusal kind; Credits: `experience` = `os_app`, `reason` = `chunk_load_error`, `app` = `credits`, the window shows Retry and the rest of the desktop works |
 | `$ai_generation` | After a twin reply, LLM analytics, Traces | `chat <model>` generations plus `twin.gate` and `twin.intent`; `distinctId` equals the visitor's; no prompt text, no canary |
 | MCP `$ai_span` | A twin turn that searches | `$ai_span` with `mcp_tool` `twinSearch`, `$ai_trace_id` equal to the turn's trace, `$ai_parent_id` set, `mcp_input_keys` names only |

@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { OS_PATH } from '@/features/desk/config'
 import type { DeskFailure } from '@/features/desk/DeskScene'
+import type { HostKind } from '@/features/desk/gl/host'
 import type { Power } from '@/features/desk/power'
 import { useMuted } from '@/features/desk/use-muted'
 import { useFullscreen } from '@/lib/dom/use-fullscreen'
@@ -34,10 +35,12 @@ export function Figure() {
   // timed from the near-viewport mount (when the scene's code starts loading) to its first frame
   const timing = useExperience('desk_scene', { active: near })
   const [failed, setFailed] = useState(false)
-  const fail = useCallback((reason: DeskFailure) => {
-    timing.failed(reason)
+  // a lost context collapses the figure as a load error does
+  const fail = useCallback((reason: DeskFailure, host: HostKind) => {
+    timing.failed(reason, { host })
     setFailed(true)
   }, [timing])
+  const ready = useCallback((host: HostKind) => timing.ready({ host }), [timing])
   const [muted, toggleMuted] = useMuted()
 
   // leaving full screen hands focus back to the button that entered it (the Exit button unmounts)
@@ -58,7 +61,7 @@ export function Figure() {
     <figure className={styles.plate} data-anchor="figure">
       {!failed && (
         <div ref={box} className={styles.box} data-anchor="figure-box" data-full={full.on}>
-          {near && <DeskScene onFail={fail} onReady={timing.ready} muted={muted} fullscreen={full.on} onPower={setPower} />}
+          {near && <DeskScene onFail={fail} onReady={ready} muted={muted} fullscreen={full.on} onPower={setPower} />}
           {full.on && (
             <span className={styles.bar}>
               <button type="button" className={styles.barButton} aria-pressed={muted} onClick={toggleMuted}>

@@ -76,4 +76,18 @@ describe('useExperience', () => {
     expect(track).toHaveBeenCalledTimes(1)
     expect(track).toHaveBeenCalledWith('experience_ready', { experience: 'dos_app', ms: 200 })
   })
+
+  it("passes each outcome's own properties through", () => {
+    render()
+    timer.failed('context_lost', { host: 'main' })
+    expect(track).toHaveBeenCalledWith('experience_failed', { experience: 'dos_app', reason: 'context_lost', host: 'main' })
+  })
+
+  it('passes the host on ready too', () => {
+    t = 0
+    render()
+    t = 40
+    timer.ready({ host: 'worker' })
+    expect(track).toHaveBeenCalledWith('experience_ready', { experience: 'dos_app', ms: 40, host: 'worker' })
+  })
 })

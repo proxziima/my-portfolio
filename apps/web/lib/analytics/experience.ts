@@ -1,16 +1,22 @@
-import { track, type Experience, type Track } from './events'
+import { track, type DeskHost, type Experience, type Track } from './events'
 
 export type { Experience }
 
+/** What an outcome learned that the start could not know (where the desk's WebGL ended up). */
+export interface OutcomeExtra {
+  host?: DeskHost
+}
+
 /** One measurement in flight: the first of `ready` or `failed` is reported, later calls are ignored. */
 export interface ExperienceTimer {
-  ready(): void
-  failed(reason: string): void
+  ready(extra?: OutcomeExtra): void
+  failed(reason: string, extra?: OutcomeExtra): void
 }
 
 /**
  * Starts timing an experience from now, for its load-time (`experience_ready.ms`, whole milliseconds)
- * and failure (`experience_failed.reason`) insights. `extra` rides along on either event (the DOS app id).
+ * and failure (`experience_failed.reason`) insights. `extra` rides along on either event (the DOS app id),
+ * and each outcome can add its own (the desk's host).
  */
 export function startExperience(
   experience: Experience,
@@ -22,11 +28,11 @@ export function startExperience(
   /** True the first time only, so an experience is reported once whatever calls in later. */
   const settle = () => !settled && (settled = true)
   return {
-    ready: () => {
-      if (settle()) send('experience_ready', { experience, ms: Math.round(now() - start), ...extra })
+    ready: (outcome = {}) => {
+      if (settle()) send('experience_ready', { experience, ms: Math.round(now() - start), ...extra, ...outcome })
     },
-    failed: (reason) => {
-      if (settle()) send('experience_failed', { experience, reason, ...extra })
+    failed: (reason, outcome = {}) => {
+      if (settle()) send('experience_failed', { experience, reason, ...extra, ...outcome })
     },
   }
 }

@@ -69,8 +69,8 @@ New env vars follow the `apps/agents/CLAUDE.md` rule: `agentsEnvSchema`, the `.e
 | `twin_refusal` | use-twin (`refuse` helper, every refusal) | reason |
 | `twin_session_renewed` | use-twin, when the chat auto-renews a dead session | none |
 | `booking_opened` / `booking_completed` | BookingDialog | none |
-| `experience_ready` | Figure/DeskScene, Desktop, DosPlayer, use-twin | experience (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), ms, app (DOS only) |
-| `experience_failed` | the same, plus the OS window boundary (AppBoundary) | experience (the above, plus `os_app`), reason (`webgl_unavailable`, `load_error`, `run_error`, `timeout`, the refusal kind, or for `os_app` `chunk_load_error` / `render_error`), app (DOS and OS apps) |
+| `experience_ready` | Figure/DeskScene, Desktop, DosPlayer, use-twin | experience (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), ms, app (DOS only), host (`desk_scene` only: `worker` or `main`) |
+| `experience_failed` | the same, plus the OS window boundary (AppBoundary) | experience (the above, plus `os_app`), reason (`webgl_unavailable`, `load_error`, `context_lost`, `run_error`, `timeout`, the refusal kind, or for `os_app` `chunk_load_error` / `render_error`), app (DOS and OS apps), host (`desk_scene` only) |
 | `$ai_generation`, `$ai_span`, `$ai_trace` | agents (OTel), Payload MCP | PostHog LLM schema |
 | `mcp_request` | Payload MCP, methods other than `tools/call`, `initialize` and `notifications/*` | method, status |
 
