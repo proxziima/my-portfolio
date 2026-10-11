@@ -30,7 +30,7 @@ export function findLeaks(
   return leaks
 }
 
-/** Server-only env names: none may appear in anything the browser downloads. */
+/** Server-only env names: none may appear in anything the browser downloads. turbo.json's `build.passThroughEnv` mirrors this list, so the CI build sees the values it scans for. */
 export const SECRET_NAMES = [
   'TWIN_JWT_SECRET',
   'TWIN_COOKIE_SECRET',

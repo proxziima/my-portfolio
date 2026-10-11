@@ -17,14 +17,12 @@ WORKDIR /app
 FROM base AS build
 COPY package.json bun.lock .npmrc ./
 COPY apps/agents/package.json apps/agents/
-COPY apps/docs/package.json apps/docs/
 COPY apps/payload/package.json apps/payload/
 COPY apps/web/package.json apps/web/
 COPY packages/cms-types/package.json packages/cms-types/
 COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/twin/package.json packages/twin/
 COPY packages/typescript-config/package.json packages/typescript-config/
-COPY packages/ui/package.json packages/ui/
 RUN bun install --frozen-lockfile
 
 COPY . .
@@ -42,6 +40,9 @@ ENV NODE_ENV=production \
 # /data is the volume (database + uploads). A new named volume copies this directory, owner included.
 RUN mkdir -p /data/media /data/scenes /data/favicons \
   && chown -R node:node /data apps/payload/.next
+# The release (e.g. 0.0.1) CI built this image for. Last, so a new value reuses every layer above.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 USER node
 WORKDIR /app/apps/payload
 EXPOSE 3001
