@@ -17,6 +17,8 @@
  * every raw report (`<form>-<n>.json`) and one `summary.json` with the medians, the main-thread
  * breakdown, the top scripts by evaluation time, layout-shift culprits and the heaviest requests.
  * `--compare` prints the deltas against an earlier summary. Never use ports 3000/3001 (main checkout).
+ * CI (`.github/workflows/ci.yml`, job `lighthouse`) runs it with `--calibrate --lhci` and asserts
+ * `lighthouserc.<form>.json` on those runs with `lhci assert`; see docs/observability.md, "Performance budgets".
  */
 import { spawnSync, type ChildProcess } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -45,6 +47,9 @@ const { values } = parseArgs({
     // `devtools` applies real network throttling, so late web fonts shift layout the way they do on a
     // slow connection (simulated throttling measures CLS from an unthrottled load and never sees it)
     throttling: { type: 'string', default: 'simulate' },
+    // also writes each measured run as `<out>/<form>/.lighthouseci/lhr-*.json`, where `lhci assert`
+    // (run from `<out>/<form>`) reads them: CI asserts the budgets on exactly these runs
+    lhci: { type: 'boolean', default: false },
   },
 })
 
@@ -154,6 +159,11 @@ try {
       cpu = Math.round(PRESET_CPU[form] * (probe.environment.benchmarkIndex / PSI_BENCHMARK) * 10) / 10
     }
     for (let i = 1; i <= runs; i++) reports.push(lighthouse(form, join(out, `${form}-${i}.json`), cpu))
+    if (values.lhci) {
+      const dir = join(out, form, '.lighthouseci')
+      mkdirSync(dir, { recursive: true })
+      reports.forEach((r, i) => writeFileSync(join(dir, `lhr-${Date.now()}${i}.json`), JSON.stringify(r)))
+    }
     const perf = reports.map((r) => Math.round((r.categories.performance?.score ?? 0) * 100))
     const target = median(perf)
     const representative = summarise(reports[perf.indexOf(target)]!)

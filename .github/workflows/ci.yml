@@ -65,10 +65,102 @@ jobs:
           TWIN_PROMPT_CANARY: ci-canary-0123456789
           CMS_URL: http://127.0.0.1:3001
         run: bunx turbo run build --filter=web && bun scripts/scan-client-bundle.ts apps/web/.next/static
-      # needs the build above; the pages render without the CMS (their reads fall back), so nothing else is up
+
+  # Lighthouse budgets on the production build of the letter, against a throwaway CMS seeded in this runner:
+  # no secret is read and the real CMS is never touched. Budgets and how to update them: docs/observability.md,
+  # "Performance budgets".
+  lighthouse:
+    needs: checks
+    runs-on: ubuntu-latest
+    env:
+      # the same throwaway values as checks' bundle step; the CMS's own secret is generated below
+      TWIN_JWT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-00
+      TWIN_COOKIE_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-11
+      TWIN_REDACT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-22
+      TWIN_STABLE_KEY_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-33
+      TWIN_BOOKING_REF_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-44
+      IMESSAGE_PROJECT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-55
+      IMESSAGE_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-88
+      CAL_WEBHOOK_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-66
+      PAYLOAD_MCP_API_KEY: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-77
+      TWIN_PROMPT_CANARY: ci-canary-0123456789
+      CMS_URL: http://127.0.0.1:3001
+      SITE_URL: http://127.0.0.1:3100
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.3.10 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 }
+      - run: bun install --frozen-lockfile
+      # the Lighthouse runner drives Playwright's Chromium, the browser every checkpoint was measured with
+      - run: bunx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: generate the cms secret
+        run: |
+          value=$(openssl rand -hex 32)
+          echo "::add-mask::$value"
+          echo "PAYLOAD_SECRET=$value" >> "$GITHUB_ENV"
+      # NODE_ENV=production: the seed applies the committed migrations to the empty database (see live-evals)
+      - name: throwaway cms (build, migrate, seed)
+        env:
+          DATABASE_URL: file:./.tmp/lighthouse.db
+          NODE_ENV: production
+          NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
+        run: |
+          mkdir -p apps/payload/.tmp
+          bun run --cwd apps/payload build
+          bun run --cwd apps/payload seed
+      - name: start the cms
+        env:
+          DATABASE_URL: file:./.tmp/lighthouse.db
+          NODE_ENV: production
+          NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3001
+        run: |
+          nohup bun run --cwd apps/payload start > "$RUNNER_TEMP/cms.log" 2>&1 &
+          for _ in $(seq 60); do
+            curl -fsS http://127.0.0.1:3001/api/globals/profile > /dev/null && exit 0
+            sleep 2
+          done
+          tail -n 100 "$RUNNER_TEMP/cms.log"
+          exit 1
+      # the image's server: standalone carries neither static files nor public/, laid out as the Dockerfile does
+      - name: build and start web
+        run: |
+          bunx turbo run build --filter=web
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+          PORT=3100 HOSTNAME=127.0.0.1 nohup node apps/web/.next/standalone/apps/web/server.js > "$RUNNER_TEMP/web.log" 2>&1 &
+          for _ in $(seq 60); do
+            curl -fsS http://127.0.0.1:3100/ > /dev/null && exit 0
+            sleep 2
+          done
+          tail -n 100 "$RUNNER_TEMP/web.log"
+          exit 1
       - name: initial JS keeps posthog, three, eve and zod out, within budget
-        env: *web-env
-        run: bun run --cwd apps/web perf:chunks
+        working-directory: apps/web
+        run: node scripts/perf/chunks.ts --url http://127.0.0.1:3100
+      # Five runs per form factor with Lighthouse 13.5.0 (the checkpoints' version), CPU calibrated to
+      # PageSpeed's hardware class from this runner's benchmark index, so budgets hold across runner types;
+      # each assertion takes the median of the five.
+      - name: lighthouse (mobile and desktop, 5 runs each)
+        working-directory: apps/web
+        run: node scripts/perf/lighthouse.ts --url http://127.0.0.1:3100/ --runs 5 --calibrate --lhci --out .perf/ci
+      - name: budgets (mobile)
+        working-directory: apps/web/.perf/ci/mobile
+        run: bunx @lhci/cli@0.15.1 assert --config=../../../lighthouserc.mobile.json
+      - name: budgets (desktop)
+        if: success() || failure()
+        working-directory: apps/web/.perf/ci/desktop
+        run: bunx @lhci/cli@0.15.1 assert --config=../../../lighthouserc.desktop.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: lighthouse, path: apps/web/.perf/ci, include-hidden-files: true }
+      - name: service logs
+        if: failure()
+        run: |
+          tail -n 200 "$RUNNER_TEMP/cms.log" || true
+          tail -n 200 "$RUNNER_TEMP/web.log" || true
 
   # Live evals against a real model, with a throwaway CMS and agent inside this runner: production
   # agents are internal-only, so nothing outside the compose network can reach them. Spends model credit.

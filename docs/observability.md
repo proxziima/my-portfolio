@@ -104,6 +104,33 @@ Create these PostHog actions:
 - LLM analytics: cost per day, p95 latency, error rate, generations by `gen_ai.agent.name`
 - `$ai_span` count by `mcp_tool`
 
+## Performance budgets
+
+The `lighthouse` job in `.github/workflows/ci.yml` runs on every PR and push, after `checks`. It needs no secret: it builds and seeds a throwaway CMS in the runner (SQLite under `apps/payload/.tmp`, never `payload.db`), builds the web app, and starts the standalone server the Docker image runs. Then:
+
+1. `scripts/perf/chunks.ts` asserts what the letter and the OS load up front (no posthog, three, eve or zod; initial JS within budget).
+2. `scripts/perf/lighthouse.ts --runs 5 --calibrate --lhci` measures the letter five times per form factor with Lighthouse 13.5.0, the version every phase checkpoint used. `--calibrate` scales the CPU slowdown by the runner's benchmark index (`environment.benchmarkIndex`) over PageSpeed's (about 1250), so a fast or slow runner type is measured as PageSpeed's hardware class; without it, TBT moved with whichever machine GitHub assigned.
+3. `lhci assert` checks `apps/web/lighthouserc.mobile.json` and `lighthouserc.desktop.json` against the **median** of the five runs, each assertion on its own (`aggregationMethod: median`), so one noisy run cannot fail the job.
+4. The `lighthouse` artifact holds every report (`<form>-<n>.json`, open them in the [Lighthouse viewer](https://googlechrome.github.io/lighthouse/viewer/)), `summary.json` and `<form>/.lighthouseci/assertion-results.json`.
+
+| Budget | Mobile | Desktop | Measured, mobile / desktop |
+|---|---|---|---|
+| Performance score | ≥ 0.75 | ≥ 0.9 | 82 / 100 |
+| Accessibility, best practices, SEO | 1 | 1 | 100 / 100 / 100 |
+| CLS | ≤ 0.05 | ≤ 0.05 | 0.000 / 0.000 (the real-throttling recorder: 0.0017 at 412 px, 0.045 at 1350 px) |
+| TBT | ≤ 650 ms | ≤ 150 ms | 520 ms / 43 ms |
+| Total bytes | ≤ 1.6 MB | ≤ 1.6 MB | 1.03 MB |
+| Script transfer | ≤ 460 KB | ≤ 460 KB | 342 KB |
+
+Measured: the job's exact procedure run locally at the end of Phase 3 (five calibrated runs each, against the seeded throwaway CMS; mobile runs 82 to 84, TBT 469 to 528 ms). Every assertion is an error: a budget that only warns gets ignored. The score floors sit under the measured medians by more than a run's spread; PageSpeed's ≥ 90 target is checked on production at each checkpoint, not here. TBT is median + 25 % (mobile) and the Phase 3 target (desktop). CLS (owner's decision: 0.05) and the byte budgets are never relaxed. These numbers come from a workstation calibrated to PageSpeed's class, not from a GitHub runner: after the job's first three runs, re-derive the TBT budget from their medians as below.
+
+**Updating a budget.** A budget changes in the PR that changes what it measures, with the numbers in the PR description:
+
+- Tighter, after an improvement: take the medians of three CI runs of the PR (re-run the job), set the new budget at median + 25 % for TBT, at the median minus five points (rounded down to 0.05) for a score floor, and with about 10 % headroom for bytes. Tightening is always fine.
+- Looser, for a real feature cost: same evidence, plus a line in the PR saying what the visitor gets for it. Never for CLS or the bytes without the owner's sign-off.
+- After bumping Lighthouse (`LIGHTHOUSE` in `scripts/perf/lighthouse.ts`) or `PSI_BENCHMARK`, re-measure the baseline and every budget in the same PR: scores move between Lighthouse versions.
+- Reproduce a CI run locally: production build plus CMS (see `scripts/perf/lighthouse.ts`), then `node scripts/perf/lighthouse.ts --serve --runs 5 --calibrate --lhci --out .perf/ci`, then from `apps/web/.perf/ci/mobile`: `bunx @lhci/cli@0.15.1 assert --config=../../../lighthouserc.mobile.json` (and the same for desktop).
+
 ## Reading a twin trace
 
 Open LLM analytics, Traces, and filter by person. The tree is:
