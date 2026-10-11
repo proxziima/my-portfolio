@@ -31,7 +31,7 @@
 
 @font-face {
   font-family: 'Inter Fallback Arial';
-  src: local('Arial'), local('ArialMT');
+  src: local('Arial'), local('ArialMT'), local('Arimo'), local('Arimo Regular'), local('Arimo-Regular'), local('Liberation Sans'), local('LiberationSans');
   size-adjust: 106.8053%;
   ascent-override: 90.7024%;
   descent-override: 22.5842%;

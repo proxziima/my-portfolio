@@ -1,6 +1,6 @@
 /**
  * Generates `styles/font-fallbacks.css`: one `@font-face` per platform system font (Segoe UI, Roboto,
- * Helvetica Neue, Arial), each scaled and re-metricked to wrap the site's text like Inter does, so
+ * Helvetica Neue, Arial or its clones Arimo and Liberation Sans), each scaled and re-metricked to wrap the site's text like Inter does, so
  * the swap to Inter moves nothing (spec §4.1). Run with node (Playwright launches hang under bun on
  * Windows), against a running site whose CMS has the seed content:
  *
@@ -19,6 +19,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import arial from '@capsizecss/metrics/arial'
+import arimo from '@capsizecss/metrics/arimo'
 import helveticaNeue from '@capsizecss/metrics/helveticaNeue'
 import roboto from '@capsizecss/metrics/roboto'
 import segoeUI from '@capsizecss/metrics/segoeUI'
@@ -33,21 +34,36 @@ const WIDTHS = [360, 390, 412, 768, 1350, 1440]
 /** The correction grid: ±5 % around the average-width ratio, in steps far below one pixel per line. */
 const GRID = Array.from({ length: 401 }, (_, i) => 0.95 + i * 0.00025)
 
+type Named = Metrics & { familyName: string; fullName: string; postscriptName: string }
+
 interface Face {
   key: string
   family: string
-  metrics: Metrics & { familyName: string; fullName: string; postscriptName: string }
+  metrics: Named
+  /** Metric-compatible clones: the same advance widths, so the same overrides wrap them identically. */
+  clones?: string[]
 }
+
+const names = (m: Named) => [m.familyName, m.fullName, m.postscriptName]
 
 /** Order is the CSS stack's: the first family a platform has wins. */
 const FACES: Face[] = [
   { key: 'segoeUI', family: 'Inter Fallback Segoe', metrics: segoeUI },
   { key: 'roboto', family: 'Inter Fallback Roboto', metrics: roboto },
   { key: 'helveticaNeue', family: 'Inter Fallback Helvetica', metrics: helveticaNeue },
-  { key: 'arial', family: 'Inter Fallback Arial', metrics: arial },
+  // Arimo, and Liberation Sans (which is built from it), are Arial's metric-compatible clones: Capsize's
+  // metrics for Arial and Arimo agree on every advance and vertical metric. Linux desktops, ChromeOS and
+  // CI's Ubuntu runner have them where Windows and macOS have Arial; with no `local()` of their own the
+  // stack fell through to the platform's generic sans-serif with no overrides at all.
+  {
+    key: 'arial',
+    family: 'Inter Fallback Arial',
+    metrics: arial,
+    clones: [...names(arimo), 'Liberation Sans', 'LiberationSans'],
+  },
 ]
 
-const localNames = (m: Face['metrics']) => [...new Set([m.familyName, m.fullName, m.postscriptName])]
+const localNames = (f: Face) => [...new Set([...names(f.metrics), ...(f.clones ?? [])])]
 
 /** One layout of the page: block heights (what the gate compares) and the width of every unbreakable run, with its line. */
 interface Layout {
@@ -217,7 +233,7 @@ try {
       await selectRole(probePage, role)
       const want = await layout(interPage)
       for (const face of FACES) {
-        const local = localNames(face.metrics)
+        const local = localNames(face)
         for (const [i, c] of GRID.entries()) {
           if (!(await applyFallback(probePage, local, overrides(inter, face.metrics, c), `${face.key}${i}`))) break
           installed.add(face.key)
@@ -272,7 +288,7 @@ try {
     '/* Per-platform fallbacks for Inter: each system font scaled and re-metricked to wrap the site text like Inter (spec §4.1). */',
     formatCorrections(corrections),
     '',
-    FACES.map((f) => fallbackFace(f.family, localNames(f.metrics), overrides(inter, f.metrics, corrections[f.key]!))).join('\n\n'),
+    FACES.map((f) => fallbackFace(f.family, localNames(f), overrides(inter, f.metrics, corrections[f.key]!))).join('\n\n'),
     '',
   ].join('\n')
   writeFileSync(OUT, css)

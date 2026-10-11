@@ -153,9 +153,39 @@ order, each gated by measurement:
 3. **Line-count equivalence gate** (`tests/e2e/font-fallback.spec.ts`): for every discipline (from
    the drum), at 390, 768 and 1440 wide, it lays the page out with the woff2 blocked (fallback) and
    with it loaded, and asserts that every bio paragraph and the `h1` have the same height in both.
-   It runs in CI's Chromium on Linux (fallback: Arial, i.e. Liberation Sans, which is metric-identical)
-   and locally on Windows (Segoe UI). This test reproduces today's bug: it fails on `main` at 1440
-   for the default role.
+   This test reproduces today's bug: it fails on `main` at 1440 for the default role.
+
+   **What CI verifies (revised after the first Linux run).** The original assumption, "CI's
+   fallback is Arial, i.e. Liberation Sans", was wrong: Chromium on Linux matches `local()` on a
+   font's exact full or PostScript name, with no fontconfig aliasing, so `local('Arial')` does not
+   find Liberation Sans. No family of the stack matched on the Ubuntu runner and the text fell
+   through to the generic `sans-serif` with no overrides at all: every width failed, the fallback
+   always *shorter* (fewer lines, e.g. bio 72 px against Inter's 96 px at 1440, where the tuned
+   Arial matches), which is an Arial-width face without the tuning's ~7 % `size-adjust`
+   (fontconfig's `sans-serif` there is Liberation Sans or FreeSans, both Arial/Helvetica-width).
+   Two changes follow:
+   - The Arial family also lists its metric-compatible clones, Arimo and Liberation Sans
+     (Capsize's Arial and Arimo metrics agree on every advance and vertical metric), which Linux
+     desktops, ChromeOS and the runner (`playwright install --with-deps` installs
+     `fonts-liberation`) have. `scripts/fonts/fallbacks.ts` generates them (`clones`).
+   - The gate tests the user-facing property on every platform. It reads the face Chromium
+     actually rendered (CDP `CSS.getPlatformFontsForNode`, the face with the most glyphs; emoji
+     and symbol fallbacks are ignored) and names it in the report. (a) At 390, 412, 768, 1350 and
+     1440, for every role, a face with a committed tuning (any `local()` name in
+     `font-fallbacks.css`) must give Inter's block heights exactly; an untuned face is reported as
+     skipped with its name, never silently passed. (b) On every platform, tuned or not, the swap
+     itself is measured: the woff2 are held until the page has laid out and hydrated in the
+     fallback, then released, and the layout shifts after the release must sum to ≤ 0.05 at
+     1350×940 and 412×823 (the recorder's sizes). It asserts the fonts were still loading and that
+     Inter took over, so it cannot pass with no swap. On Windows (Segoe UI) it measures 0.0449 and
+     0.0017, the numbers of the owner decision below.
+   - **Arial and its clones cannot meet the gate** (measured on Windows' real Arial with the Segoe
+     face removed, and by `fonts:fallbacks`): no size-adjust in ±5 % keeps every height; the best
+     (1.0105, committed) still differs at 390 px role 2 (bio p1: 5 lines vs 6) and 412 px role 1
+     (bio p3: 3 vs 4), and the swap CLS is 0.0357 at 1350×940 but **0.1753 at 412×823**. CI on
+     Linux (Liberation Sans) is therefore expected to fail (a) at 390/412 and (b) at 412×823 until
+     the owner decides (step 4). Roboto and Helvetica Neue keep untested corrections (1.0000): no
+     machine here has them, and no CI runner verifies them.
 4. **If the gate fails, stop (owner decision):** the font loading strategy never changes
    automatically. `display: 'optional'` is **not** applied. If the tuned per-platform fallbacks
    still fail the gate for some role and width, the implementer stops and reports:
