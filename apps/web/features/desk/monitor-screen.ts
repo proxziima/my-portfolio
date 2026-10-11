@@ -11,7 +11,7 @@ export interface MonitorScreen {
   element: HTMLDivElement
   /** The OS's iframe, once powered on. */
   readonly iframe: HTMLIFrameElement | null
-  /** Boots the OS: appends its iframe under the CRT layers. Idempotent; returns the iframe. */
+  /** Boots the OS: appends its iframe under the CRT layers and starts the still layers' download. Idempotent; returns the iframe. */
   powerOn(): HTMLIFrameElement
   /** `cb` runs once, when the OS's first document has loaded. Returns the unsubscribe. */
   onLoaded(cb: () => void): () => void
@@ -33,14 +33,20 @@ const DESKTOP_TIMEOUT_MS = 20_000
  * Shows the CRT layers only while the OS shows its desktop: the boot and shutdown screens are black
  * consoles; the CRT layers over them read as a broken texture. Watches the iframe's document (same
  * origin) on every load; where it cannot be read, or the desktop never appears, the layers come on
- * so they are never lost. `onFirstReady` runs the first time they come on. Returns the cleanup.
+ * so they are never lost. They also wait for `stills` (the still layers decoded), so the fade-in
+ * never starts with a layer missing. `onFirstReady` runs the first time they come on. Returns the cleanup.
  */
-function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement, onFirstReady: () => void): () => void {
+function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement, stills: Promise<void>, onFirstReady: () => void): () => void {
   let observer: MutationObserver | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
   let shown = false
+  let stopped = false
+  /** What the OS's state asks for; the layers follow it once the stills are in. */
+  let wanted = false
+  let stillsIn = false
   // every mutation in the OS lands here: write only on a change
-  const set = (ready: boolean) => {
+  const apply = () => {
+    const ready = wanted && stillsIn
     const value = String(ready)
     if (fx.dataset.ready !== value) fx.dataset.ready = value
     if (ready && !shown) {
@@ -48,6 +54,14 @@ function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement, onFirstReady:
       onFirstReady()
     }
   }
+  const set = (ready: boolean) => {
+    wanted = ready
+    apply()
+  }
+  void stills.then(() => {
+    stillsIn = true
+    if (!stopped) apply()
+  })
   const stop = () => {
     observer?.disconnect()
     observer = null
@@ -87,6 +101,7 @@ function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement, onFirstReady:
   }
   iframe.addEventListener('load', onLoad)
   return () => {
+    stopped = true
     iframe.removeEventListener('load', onLoad)
     stop()
   }
@@ -96,20 +111,12 @@ function gateOnDesktop(iframe: HTMLIFrameElement, fx: HTMLElement, onFirstReady:
 const LAYER_SIZES = `${SCREEN.width}px`
 
 /**
- * A still layer as `<picture>`: AVIF, else the `<img>`'s own candidates, picked by density for the
- * screen's layout width. Decorative, never dragged or announced. The `<img>` joins the `<picture>`
- * before it gets a source, so the AVIF `<source>` takes part in the first (and only) pick.
+ * A still layer as `<picture>` with no candidates yet: nothing downloads while the screen is
+ * powered off, when the layers are invisible anyway (`attachStill`). Decorative, never dragged or
+ * announced.
  */
-function layerPicture(className: string, asset: ImageAsset): HTMLPictureElement {
+function layerPicture(className: string, asset: ImageAsset): { picture: HTMLPictureElement; img: HTMLImageElement } {
   const picture = document.createElement('picture')
-  const avif = srcset(asset, 'avif')
-  if (avif) {
-    const source = document.createElement('source')
-    source.type = 'image/avif'
-    source.srcset = avif
-    source.sizes = LAYER_SIZES
-    picture.append(source)
-  }
   const img = document.createElement('img')
   picture.append(img)
   img.className = className
@@ -118,10 +125,28 @@ function layerPicture(className: string, asset: ImageAsset): HTMLPictureElement 
   img.draggable = false
   img.width = asset.width
   img.height = asset.height
+  return { picture, img }
+}
+
+/**
+ * Gives a still layer its candidates: AVIF, else the `<img>`'s own, picked by density for the
+ * screen's layout width. The `<source>` goes in before the `<img>` gets a `src`, so the AVIF takes
+ * part in the first (and only) pick. Resolves once the picked image is decoded, or failed to: the
+ * layers then never wait for it.
+ */
+function attachStill(img: HTMLImageElement, asset: ImageAsset): Promise<void> {
+  const avif = srcset(asset, 'avif')
+  if (avif) {
+    const source = document.createElement('source')
+    source.type = 'image/avif'
+    source.srcset = avif
+    source.sizes = LAYER_SIZES
+    img.before(source)
+  }
   img.sizes = LAYER_SIZES
   img.srcset = srcset(asset, 'fallback')
   img.src = fallbackSrc(asset)
-  return picture
+  return img.decode().catch(() => {})
 }
 
 /**
@@ -170,7 +195,7 @@ const POWERED_OFF_LABEL = 'Desktop (powered off)'
  * Powered off, the slab is the screen's tab stop, announced as a picture. The OS's iframe joins it
  * only on power-on (`createOsFrame`).
  */
-function createScreenElement(screen: ScreenSpec): { element: HTMLDivElement; fx: HTMLDivElement; videos: HTMLVideoElement[] } {
+function createScreenElement(screen: ScreenSpec): { element: HTMLDivElement; fx: HTMLDivElement; videos: HTMLVideoElement[]; stills: Array<{ img: HTMLImageElement; asset: ImageAsset }> } {
   const element = document.createElement('div')
   Object.assign(element.style, {
     width: `${screen.width}px`,
@@ -186,9 +211,15 @@ function createScreenElement(screen: ScreenSpec): { element: HTMLDivElement; fx:
   fx.style.pointerEvents = 'none' // inline too: the iframe must stay clickable even before the stylesheet applies
   fx.dataset.ready = 'false'
   const videos = LAYERS.map((l) => layerVideo(l.className))
-  fx.append(layerPicture('screen-shadow', ASSETS.desk.screen.shadow), ...videos, layerPicture('screen-smudges', ASSETS.desk.screen.smudges))
+  const shadow = layerPicture('screen-shadow', ASSETS.desk.screen.shadow)
+  const smudges = layerPicture('screen-smudges', ASSETS.desk.screen.smudges)
+  fx.append(shadow.picture, ...videos, smudges.picture)
   element.append(fx)
-  return { element, fx, videos }
+  const stills = [
+    { img: shadow.img, asset: ASSETS.desk.screen.shadow },
+    { img: smudges.img, asset: ASSETS.desk.screen.smudges },
+  ]
+  return { element, fx, videos, stills }
 }
 
 /** The OS's iframe, inset by `padding` in the slab. */
@@ -223,7 +254,7 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
     // a rejected play (autoplay policy, a pause racing it) leaves the static still, nothing worse
     for (const v of videos) v.play().catch(() => {})
   }
-  const { element, fx, videos } = createScreenElement(screen)
+  const { element, fx, videos, stills } = createScreenElement(screen)
   let iframe: HTMLIFrameElement | null = null
   let stopGate = () => {}
   let loaded = false
@@ -259,8 +290,10 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
       if (iframe) return iframe
       const frame = createOsFrame(src, screen)
       iframe = frame
+      // the still layers start downloading with the boot: the OS's boot console covers their fetch
+      const stillsIn = Promise.all(stills.map((s) => attachStill(s.img, s.asset))).then(() => {})
       // the gate keeps its own load listener, for the OS's later reloads
-      stopGate = gateOnDesktop(frame, fx, onFirstReady)
+      stopGate = gateOnDesktop(frame, fx, stillsIn, onFirstReady)
       frame.addEventListener('load', () => handOver(frame), { once: true })
       element.insertBefore(frame, fx)
       return frame
