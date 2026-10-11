@@ -1,11 +1,12 @@
 import { mcpPlugin } from '@payloadcms/plugin-mcp'
+import { mcpOnEvent } from './observability'
 import { twinTools } from './twin-tools'
 
 const crud = { find: true, create: true, update: true, delete: true }
 const readWrite = { find: true, update: true }
 
 export const portfolioMcp = mcpPlugin({
-  mcp: { tools: twinTools },
+  mcp: { tools: twinTools, handlerOptions: { onEvent: mcpOnEvent } },
   collections: {
     disciplines: {
       enabled: crud,

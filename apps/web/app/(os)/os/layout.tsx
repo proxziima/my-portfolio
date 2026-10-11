@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import localFont from 'next/font/local'
 import { Ultra } from 'next/font/google'
+import { Analytics } from '@/features/analytics/Analytics'
+import { clientAnalyticsConfig } from '@/lib/analytics/request'
 import '@/features/os/os.css'
 
 /** The reference Showcase's text face (Millennium, regular and bold). */
@@ -24,7 +26,10 @@ export default function OsLayout({ children }: { children: ReactNode }) {
       <head>
         <base target="_top" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics config={clientAnalyticsConfig()} surface="os" />
+      </body>
     </html>
   )
 }

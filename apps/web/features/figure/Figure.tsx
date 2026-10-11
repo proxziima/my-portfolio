@@ -2,10 +2,12 @@
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { OS_PATH } from '@/features/desk/config'
+import type { DeskFailure } from '@/features/desk/DeskScene'
 import { useMuted } from '@/features/desk/use-muted'
 import { useFullscreen } from '@/lib/dom/use-fullscreen'
 import { useInView } from '@/lib/dom/use-in-view'
 import { useRole } from '@/features/role/RoleProvider'
+import { useExperience } from '@/lib/analytics/use-experience'
 import styles from './Figure.module.css'
 
 // three and the engine load only when the box comes near
@@ -26,8 +28,13 @@ export function Figure() {
   const box = useRef<HTMLDivElement>(null)
   const near = useInView(box, { rootMargin: NEAR_MARGIN, once: true })
   const full = useFullscreen(box)
+  // timed from the near-viewport mount (when the scene's code starts loading) to its first frame
+  const timing = useExperience('desk_scene', { active: near })
   const [failed, setFailed] = useState(false)
-  const fail = useCallback(() => setFailed(true), [])
+  const fail = useCallback((reason: DeskFailure) => {
+    timing.failed(reason)
+    setFailed(true)
+  }, [timing])
   const [muted, toggleMuted] = useMuted()
 
   // leaving full screen hands focus back to the button that entered it (the Exit button unmounts)
@@ -48,7 +55,7 @@ export function Figure() {
     <figure className={styles.plate} data-anchor="figure">
       {!failed && (
         <div ref={box} className={styles.box} data-anchor="figure-box" data-full={full.on}>
-          {near && <DeskScene onFail={fail} muted={muted} />}
+          {near && <DeskScene onFail={fail} onReady={timing.ready} muted={muted} />}
           {full.on && (
             <span className={styles.bar}>
               <button type="button" className={styles.barButton} aria-pressed={muted} onClick={toggleMuted}>
@@ -65,16 +72,16 @@ export function Figure() {
         <span key={current.slug} className={styles.captionText}>{current.caption}</span>
         <span className={styles.actions}>
           {!failed && (
-            <button type="button" className={styles.action} aria-pressed={muted} onClick={toggleMuted}>
+            <button type="button" className={styles.action} aria-pressed={muted} data-track="desk_mute" onClick={toggleMuted}>
               {muted ? 'Unmute' : 'Mute'}
             </button>
           )}
           {!failed && (
-            <button ref={trigger} type="button" className={styles.action} onClick={full.enter}>
+            <button ref={trigger} type="button" className={styles.action} data-track="desk_fullscreen" onClick={full.enter}>
               Full screen
             </button>
           )}
-          <a className={styles.action} href={OS_PATH}>Open the desktop →</a>
+          <a className={styles.action} href={OS_PATH} data-track="open_desktop">Open the desktop →</a>
         </span>
       </figcaption>
     </figure>

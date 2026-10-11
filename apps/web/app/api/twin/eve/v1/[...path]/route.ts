@@ -1,7 +1,10 @@
+import type { PostHogIds } from '@repo/observability/cookie'
+import { captureServerError } from '@repo/observability/server'
 import { REFUSAL_STATUS, TwinRefusal } from '@repo/twin/contract'
 import { createConversation, ownsSession, touchVisitor, updateConversation } from '@repo/twin/db'
 import { fetchRedactionRules } from '@repo/twin/redact'
 import { z } from 'zod'
+import { posthogIdsFromRequest } from '@/lib/analytics/request'
 import { twinDb } from '@/lib/twin/db'
 import { twinEnv } from '@/lib/twin/env'
 import { createEventFilter, filterStream } from '@/lib/twin/filter'
@@ -47,7 +50,8 @@ const relay = async (r: Response) => {
 
 /**
  * Any failure past validation (agent unreachable or 5xx, redaction rules unavailable, database)
- * reaches the visitor as the `offline` refusal; the cause is only logged.
+ * reaches the visitor as the `offline` refusal; the cause is only logged. Nothing in the catch may
+ * throw, or the refusal becomes a 500: `posthogIdsFromRequest` and `captureServerError` never do.
  */
 const failSafe =
   (name: string, handler: (request: Request, context: Context) => Promise<Response>) =>
@@ -56,21 +60,22 @@ const failSafe =
       return await handler(request, context)
     } catch (error) {
       console.error(`[twin] ${name} failed`, error)
+      captureServerError(error, { distinctId: posthogIdsFromRequest(request)?.distinctId, properties: { handler: `twin.${name}` } })
       return refuse('offline')
     }
   }
 
 /** Creates the eve session and records ownership; if recording fails the orphan is reset. */
-async function createSession(visitorId: string, tz: string | null): Promise<{ created: Response; sessionId: string }> {
+async function createSession(visitorId: string, tz: string | null, analytics: PostHogIds | null): Promise<{ created: Response; sessionId: string }> {
   // Create without a message first, so the ownership row exists before any turn runs.
-  const created = await agentFetch('session', visitorId, { method: 'POST', body: {}, tz })
+  const created = await agentFetch('session', visitorId, { method: 'POST', body: {}, tz, analytics })
   if (!created.ok) return { created, sessionId: '' }
   const { sessionId } = z.object({ sessionId: z.string().regex(SESSION) }).parse(await created.clone().json())
   try {
     await createConversation(twinDb(), sessionId, visitorId)
   } catch (error) {
     // Nobody could ever reach a session without its ownership row: retire it rather than leak it.
-    const reset = await agentFetch(`session/${sessionId}/reset`, visitorId, { method: 'POST', body: { reason: 'ownership not recorded' } }).then(
+    const reset = await agentFetch(`session/${sessionId}/reset`, visitorId, { method: 'POST', body: { reason: 'ownership not recorded' }, analytics }).then(
       (r) => `answered ${r.status}`,
       (e: unknown) => `failed: ${String(e)}`,
     )
@@ -85,6 +90,7 @@ export const POST = failSafe('send', async (request, { params }) => {
   const { path } = await params
   const env = twinEnv()
   const tz = request.headers.get('x-twin-tz')
+  const analytics = posthogIdsFromRequest(request)
   const ip = clientIp(request)
   const now = new Date()
 
@@ -99,9 +105,9 @@ export const POST = failSafe('send', async (request, { params }) => {
       (message ? await checkMessage(twinDb(), { ip, sessionId: null, text: message, dailySpendUsd: env.TWIN_DAILY_SPEND_USD, now }) : null)
     if (refusal) return refuse(refusal)
     const visitorId = await currentVisitor()
-    const { created, sessionId } = await createSession(visitorId, tz)
+    const { created, sessionId } = await createSession(visitorId, tz, analytics)
     if (!created.ok || !message) return relay(created)
-    return relay(await agentSendWhenReady(sessionId, visitorId, { body: turnOf(message), tz }))
+    return relay(await agentSendWhenReady(sessionId, visitorId, { body: turnOf(message), tz, analytics }))
   }
 
   if (path.length === 2 && path[0] === 'session' && SESSION.test(path[1] ?? '')) {
@@ -113,7 +119,7 @@ export const POST = failSafe('send', async (request, { params }) => {
     const refusal = await checkMessage(twinDb(), { ip, sessionId, text: parsed.data.message, dailySpendUsd: env.TWIN_DAILY_SPEND_USD, now })
     if (refusal) return refuse(refusal)
     await touchVisitor(twinDb(), visitorId, now)
-    return relay(await agentFetch(`session/${sessionId}`, visitorId, { method: 'POST', body: turnOf(parsed.data.message), tz }))
+    return relay(await agentFetch(`session/${sessionId}`, visitorId, { method: 'POST', body: turnOf(parsed.data.message), tz, analytics }))
   }
   return notFound()
 })
@@ -135,7 +141,7 @@ export const GET = failSafe('stream', async (request, { params }) => {
   const env = twinEnv()
   // Rules first: without them nothing may stream, and no upstream connection is left dangling.
   const rules = await fetchRedactionRules(env.CMS_URL, env.TWIN_REDACT_SECRET)
-  const upstream = await agentFetch(`session/${sessionId}/stream`, visitorId, { method: 'GET', search: new URL(request.url).search, signal: request.signal })
+  const upstream = await agentFetch(`session/${sessionId}/stream`, visitorId, { method: 'GET', search: new URL(request.url).search, signal: request.signal, analytics: posthogIdsFromRequest(request) })
   if (!upstream.ok || !upstream.body) return relay(upstream)
   const headers = new Headers({ 'content-type': upstream.headers.get('content-type') ?? 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' })
   for (const h of ['x-eve-session-id', 'x-eve-stream-format', 'x-eve-stream-version', 'x-eve-stream-tail-index']) {

@@ -1,0 +1,24 @@
+{
+  "name": "@repo/observability",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./config": "./src/config.ts",
+    "./cookie": "./src/cookie.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "posthog-node": "5.55.1"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/node": "24.x",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

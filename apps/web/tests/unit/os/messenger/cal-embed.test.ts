@@ -46,10 +46,10 @@ describe('cal embed', () => {
     mountInline(el, 'twin1', booking)
     mountInline(el, 'twin1', booking)
     const api = window.Cal?.ns.twin1
-    expect(api?.q.map((c) => c[0])).toEqual(['init', 'inline', 'ui'])
+    expect(api?.q.map((c) => c[0])).toEqual(['init', 'inline', 'ui', 'on'])
     expect(api?.q[1]).toEqual(['inline', { elementOrSelector: el, calLink: 'owner/intro', config: embedConfig({ bookingRef: 'r.s' }) }])
     const again = document.createElement('div')
     mountInline(again, 'twin1', booking)
-    expect(api?.q.map((c) => c[0])).toEqual(['init', 'inline', 'ui', 'inline', 'ui'])
+    expect(api?.q.map((c) => c[0])).toEqual(['init', 'inline', 'ui', 'on', 'inline', 'ui', 'on'])
   })
 })

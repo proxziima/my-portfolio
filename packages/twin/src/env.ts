@@ -112,6 +112,9 @@ const agentsEnvObject = z.object({
   TWIN_CLASSIFIER_TIMEOUT_MS: z.coerce.number().int().positive().default(4_000),
   // Shorter than the intent classifier's: the abuse check is on the critical path before every reply.
   TWIN_ABUSE_TIMEOUT_MS: z.coerce.number().int().positive().default(2_500),
+  // PostHog (LLM traces, errors). Optional: blank disables observability. Read by @repo/observability.
+  POSTHOG_PROJECT_TOKEN: z.string().min(1).optional(),
+  POSTHOG_REGION: z.enum(['us', 'eu']).default('us'),
 })
 
 /** Every variable the agents service reads. Parsed once, lazily, on first use at runtime. */

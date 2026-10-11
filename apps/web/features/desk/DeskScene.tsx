@@ -11,15 +11,18 @@ import styles from './DeskScene.module.css'
 // global: the screen's DOM is built imperatively, so its CRT layers cannot take module class names
 import './screen-fx.css'
 
+/** Why the scene gave up, for `experience_failed.reason`. */
+export type DeskFailure = 'webgl_unavailable' | 'load_error'
+
 /**
  * The desk in the figure box. Builds the engine once per mount, sizes it to the box, drives the
  * camera from the pointer and the screen's events, and renders only while on screen. It also owns
  * the scene's sounds: key and mouse foley for what happens inside the OS, a startup chime and an
  * office ambience that muffles as the camera zooms in, all silent until the first gesture and
  * whenever `muted`. `onFail` fires if WebGL is missing or an asset fails, so the figure can
- * collapse to its caption.
+ * collapse to its caption; `onReady` fires on the first frame drawn with the models.
  */
-export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolean }) {
+export function DeskScene({ onFail, onReady, muted }: { onFail: (reason: DeskFailure) => void; onReady: () => void; muted: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<DeskAudio | null>(null)
   const [engine, setEngine] = useState<DeskEngine | null>(null)
@@ -37,12 +40,16 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
       created = createDeskEngine({
         host,
         screenSrc: OS_PATH,
-        onFirstFrame: () => { if (live) setLoaded(true) },
+        onFirstFrame: () => {
+          if (!live) return
+          setLoaded(true)
+          onReady()
+        },
         onFrame: (distance) => audio.setDistance(distance),
       })
     } catch {
       audio.dispose()
-      onFail()
+      onFail('webgl_unavailable')
       return
     }
     audioRef.current = audio
@@ -86,7 +93,7 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
       engine.setPointer({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: ((e.clientY - r.top) / r.height) * 2 - 1 })
     }
     host.addEventListener('pointermove', onMove)
-    engine.load().catch(() => { if (live) onFail() })
+    engine.load().catch(() => { if (live) onFail('load_error') })
     setEngine(engine)
     return () => {
       live = false
@@ -101,7 +108,7 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
       setEngine(null)
       engine.dispose()
     }
-  }, [onFail])
+  }, [onFail, onReady])
 
   // depends on `engine` too: the audio is created with it, so the choice is re-applied once it exists
   useEffect(() => {

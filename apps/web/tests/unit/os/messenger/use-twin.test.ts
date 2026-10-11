@@ -27,6 +27,9 @@ vi.mock('eve/react', () => ({
   },
 }))
 
+const track = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/analytics/events', () => ({ track }))
+
 const { useTwin } = await import('@/features/os/apps/messenger/use-twin')
 
 const fresh = (): FakeAgent => ({ data: { messages: [] }, events: [], status: 'ready', error: undefined, send: vi.fn(async () => {}), reset: vi.fn() })
@@ -56,6 +59,7 @@ const mount = () => {
 
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  track.mockClear()
   window.localStorage.clear()
   agent = fresh()
   eve.agent = agent
@@ -294,6 +298,98 @@ describe('useTwin', () => {
       await act(async () => update({ status: 'ready' }))
       expect(agent.send).toHaveBeenCalledTimes(1)
       expect(agent.send).toHaveBeenCalledWith('oi')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('useTwin first reply timing', () => {
+  const said = (id: string, role: 'user' | 'assistant', text: string) => ({ id, role, parts: [{ type: 'text', text }] })
+  const experiences = () => track.mock.calls.filter(([event]) => String(event).startsWith('experience_'))
+  let t = 0
+
+  beforeEach(() => {
+    t = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => t)
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('is ready when the twin first shows text after the send, not for an earlier reply', async () => {
+    agent.data = { messages: [said('u0', 'user', 'hey'), said('a0', 'assistant', 'Hi!')] }
+    mount()
+    t = 1_000
+    await act(() => api.send('how are you?'))
+    update({ data: { messages: [...agent.data.messages, said('u1', 'user', 'how are you?')] } })
+    update({ data: { messages: [...agent.data.messages, said('a1', 'assistant', '')] } })
+    expect(experiences()).toEqual([])
+    t = 3_500
+    update({ data: { messages: [...agent.data.messages.slice(0, 3), said('a1', 'assistant', 'Good, you?')] } })
+    t = 4_000
+    update({ data: { messages: [...agent.data.messages.slice(0, 3), said('a1', 'assistant', 'Good, you?\n\nBusy day.')] } })
+    expect(experiences()).toEqual([['experience_ready', { experience: 'twin_first_reply', ms: 2_500 }]])
+  })
+
+  it('keeps measuring the first message when another is sent before the reply', async () => {
+    mount()
+    t = 100
+    await act(() => api.send('one'))
+    t = 200
+    await act(() => api.send('two'))
+    t = 900
+    update({ data: { messages: [said('u1', 'user', 'one'), said('u2', 'user', 'two'), said('a1', 'assistant', 'Both!')] } })
+    expect(experiences()).toEqual([['experience_ready', { experience: 'twin_first_reply', ms: 800 }]])
+  })
+
+  it('fails with the refusal kind when the turn is refused', async () => {
+    mount()
+    agent.send.mockRejectedValueOnce(new ClientError(429, ''))
+    await act(() => api.send('hi'))
+    expect(experiences()).toEqual([['experience_failed', { experience: 'twin_first_reply', reason: 'throttled' }]])
+  })
+
+  it('fails with the refusal kind when a first turn fails through the agent error', async () => {
+    mount()
+    await act(() => api.send('hi'))
+    update({ status: 'error', error: new ClientError(413, '') })
+    expect(experiences()).toEqual([['experience_failed', { experience: 'twin_first_reply', reason: 'too_long' }]])
+  })
+
+  it('keeps measuring across a renewed session and its resend', async () => {
+    mount()
+    agent.send.mockRejectedValueOnce(new ClientError(404, ''))
+    await act(() => api.send('hello'))
+    expect(agent.reset).toHaveBeenCalledTimes(1)
+    t = 2_000
+    update({ data: { messages: [said('u9', 'user', 'hello'), said('a9', 'assistant', 'Hello!')] } })
+    expect(experiences()).toEqual([['experience_ready', { experience: 'twin_first_reply', ms: 2_000 }]])
+  })
+
+  it('gives up as timeout after 60 s without a reply, and a late reply reports nothing more', async () => {
+    vi.useFakeTimers()
+    try {
+      mount()
+      await act(() => api.send('hi'))
+      act(() => vi.advanceTimersByTime(59_999))
+      expect(experiences()).toEqual([])
+      act(() => vi.advanceTimersByTime(1))
+      expect(experiences()).toEqual([['experience_failed', { experience: 'twin_first_reply', reason: 'timeout' }]])
+      update({ data: { messages: [said('a1', 'assistant', 'Sorry, late.')] } })
+      expect(experiences()).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports nothing once the window closes before the reply', async () => {
+    vi.useFakeTimers()
+    try {
+      mount()
+      await act(() => api.send('hi'))
+      act(() => root.unmount())
+      act(() => vi.advanceTimersByTime(60_000))
+      expect(experiences()).toEqual([])
+      root = createRoot(host)
     } finally {
       vi.useRealTimers()
     }

@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useMemo, useReducer, type React
 import type { Discipline } from '@/lib/cms/types'
 import { initialRoleState, roleIndex, roleReducer } from './role-state'
 import { useRolePersistence } from './use-role-persistence'
+import { useRoleAnalytics } from './use-role-analytics'
 
 interface RoleContextValue {
   disciplines: Discipline[]
@@ -35,7 +36,8 @@ export function RoleProvider({ disciplines, defaultSlug, children }: Props) {
   const select = useCallback(
     (slug: string) => {
       const i = slugs.indexOf(slug)
-      if (i >= 0) dispatch({ type: 'select', index: i })
+      if (i < 0) return
+      dispatch({ type: 'select', index: i })
     },
     [slugs],
   )
@@ -48,6 +50,7 @@ export function RoleProvider({ disciplines, defaultSlug, children }: Props) {
   )
 
   useRolePersistence({ slugs, currentSlug: slugs[index] ?? '', hydrate, select })
+  useRoleAnalytics(slugs[index] ?? '', state.animate)
 
   const value = useMemo<RoleContextValue>(
     () => ({

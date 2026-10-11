@@ -1,4 +1,4 @@
-import { jwtVerify } from 'jose'
+import { decodeJwt, jwtVerify } from 'jose'
 import { describe, expect, it } from 'vitest'
 import { mintVisitorJwt, safeTimeZone } from '@/lib/twin/jwt'
 
@@ -18,5 +18,26 @@ describe('visitor jwt', () => {
     expect(safeTimeZone('Mars/Base')).toBeUndefined()
     expect(safeTimeZone('America/Sao_Paulo')).toBe('America/Sao_Paulo')
     expect(safeTimeZone(null)).toBeUndefined()
+  })
+})
+
+describe('mintVisitorJwt analytics claims', () => {
+  const VISITOR = '11111111-1111-4111-8111-111111111111'
+
+  it('carries the PostHog ids when the browser has them', async () => {
+    const token = await mintVisitorJwt(VISITOR, 'Europe/Lisbon', secret, 1_000, { distinctId: 'd-1', sessionId: 's-1' })
+    expect(decodeJwt(token)).toMatchObject({ sub: VISITOR, tz: 'Europe/Lisbon', ph_did: 'd-1', ph_sid: 's-1' })
+  })
+
+  it('omits them otherwise', async () => {
+    const claims = decodeJwt(await mintVisitorJwt(VISITOR, undefined, secret, 1_000, null))
+    expect(claims).not.toHaveProperty('ph_did')
+    expect(claims).not.toHaveProperty('ph_sid')
+  })
+
+  it('omits the session id when there is none', async () => {
+    const claims = decodeJwt(await mintVisitorJwt(VISITOR, undefined, secret, 1_000, { distinctId: 'd-1', sessionId: null }))
+    expect(claims).toMatchObject({ ph_did: 'd-1' })
+    expect(claims).not.toHaveProperty('ph_sid')
   })
 })

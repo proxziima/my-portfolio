@@ -6,6 +6,7 @@ import { applyTheme, currentTheme, stampThemeTransition } from './theme-dom'
 import { useRocker } from './use-rocker'
 import { useTheme } from './use-theme'
 import styles from './WallSwitch.module.css'
+import { track } from '@/lib/analytics/events'
 
 const RAPID_MS = 300
 
@@ -39,6 +40,7 @@ export const WallSwitch = forwardRef<HTMLDivElement, Props>(function WallSwitch(
     lastToggle.current = t
     if (!reduce) stampThemeTransition()
     applyTheme(next)
+    track('theme_changed', { theme: next })
     playClick(next)
     flipTo(next === 'dark' ? 1 : 0, rapid)
     onToggled?.()

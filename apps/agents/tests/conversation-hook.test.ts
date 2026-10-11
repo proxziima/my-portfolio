@@ -18,7 +18,7 @@ const completed = (finishReason: string) => ({
   data: { finishReason, message: 'Happy to talk.', sequence: 3, stepIndex: 0, turnId: 't1' },
   meta: { id: 'evt_3', at: '' },
 })
-const ctxOf = (cancel = vi.fn()) => ({ session: { id: 's1', auth: { current: null } }, cancel })
+const ctxOf = (cancel = vi.fn(), current: unknown = null) => ({ session: { id: 's1', auth: { current } }, cancel })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -79,8 +79,14 @@ describe('conversation hook', () => {
     intent.evaluateCallIntent.mockImplementationOnce(async () => void order.push('evaluate'))
     await messageCompleted(completed('stop'), ctxOf())
     expect(transcript.recordMessage).toHaveBeenCalledWith('s1', 'twin', 't1', 3, 'Happy to talk.')
-    expect(intent.evaluateCallIntent).toHaveBeenCalledWith('s1', 't1', 3)
+    expect(intent.evaluateCallIntent).toHaveBeenCalledWith('s1', 't1', 3, { distinctId: 'twin-session:s1', conversationId: 's1', replaySessionId: null })
     expect(order).toEqual(['record', 'evaluate'])
+  })
+
+  it("ties the intent classifier's trace to the visitor's PostHog ids", async () => {
+    const visitor = { principalType: 'user', principalId: 'web:v-1', authenticator: 'visitor', attributes: { ph_did: 'ph-1', ph_sid: 'replay-1' } }
+    await messageCompleted(completed('stop'), ctxOf(vi.fn(), visitor))
+    expect(intent.evaluateCallIntent).toHaveBeenCalledWith('s1', 't1', 3, { distinctId: 'ph-1', conversationId: 's1', replaySessionId: 'replay-1' })
   })
 
   it('logs with the session id and rethrows without cancelling when evaluation fails', async () => {

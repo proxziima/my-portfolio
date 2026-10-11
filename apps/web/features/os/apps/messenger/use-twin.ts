@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ClientError } from 'eve/client'
 import { useEveAgent } from 'eve/react'
 import { REFUSAL_STATUS, type TwinRefusal } from '@repo/twin/contract'
+import { track } from '@/lib/analytics/events'
+import { startExperience, type ExperienceTimer } from '@/lib/analytics/experience'
+import { hasNewReply, messageSentProps, replyIds } from './twin-analytics'
 import { hasFailed, isParked, toLines, type Line } from './parts'
 
 const SESSION_KEY = 'twin-session'
@@ -14,6 +17,9 @@ const SESSION_KEY = 'twin-session'
  * because its stream serves no events up to the tail index eve waits for.
  */
 const RESUME_STALL_MS = 10_000
+
+/** How long a sent message may wait for the twin's first text before it is reported as a timeout. */
+export const TWIN_REPLY_TIMEOUT_MS = 60_000
 
 type Refusal = TwinRefusal['kind']
 
@@ -41,6 +47,7 @@ function isGone(error: unknown): boolean {
 }
 
 interface MessageLike {
+  id: string
   role: string
   metadata?: unknown
   parts: readonly { type: string; text?: string }[]
@@ -62,6 +69,9 @@ function acknowledged(messages: readonly MessageLike[], text: string): boolean {
  */
 export function useTwin() {
   const [initial] = useState(savedSession)
+  useEffect(() => {
+    track('twin_session_started', { resumed: initial !== undefined })
+  }, [initial])
   const [refusal, setRefusal] = useState<Refusal | null>(null)
   const agent = useEveAgent({
     host: `${window.location.origin}/api/twin`,
@@ -84,6 +94,23 @@ export function useTwin() {
   const typing = agent.status === 'submitted' || (agent.status === 'streaming' && !isParked(agent.events))
 
   const { send: sendTurn, reset: resetAgent } = agent
+  // The first-reply measurement in flight, one at a time: a message sent before the reply keeps
+  // timing the first. `before` is what the twin had already said at the send.
+  const reply = useRef<{ timer: ExperienceTimer; before: ReadonlySet<string>; giveUp: ReturnType<typeof setTimeout> } | null>(null)
+  /** Closes the open measurement with `end`, or silently without it. */
+  const endReply = useCallback((end?: (timer: ExperienceTimer) => void) => {
+    const open = reply.current
+    if (!open) return
+    reply.current = null
+    clearTimeout(open.giveUp)
+    end?.(open.timer)
+  }, [])
+  /** Shows the visitor a refusal and records it; one place so the two can't drift. */
+  const refuse = useCallback((reason: Refusal) => {
+    setRefusal(reason)
+    track('twin_refusal', { reason })
+    endReply((timer) => timer.failed(reason))
+  }, [endReply])
   // Read inside callbacks, which must not be recreated on every status change.
   const status = useRef(agent.status)
   status.current = agent.status
@@ -102,6 +129,7 @@ export function useTwin() {
   const renew = useCallback((): boolean => {
     if (renewed.current) return false
     renewed.current = true
+    track('twin_session_renewed', {})
     reset()
     return true
   }, [reset])
@@ -109,10 +137,10 @@ export function useTwin() {
   const fail = useCallback(
     (error: unknown): boolean => {
       if (isGone(error) && renew()) return true
-      setRefusal(refusalOf(error))
+      refuse(refusalOf(error))
       return false
     },
-    [renew],
+    [renew, refuse],
   )
 
   // The last text submitted through `send`, so a first turn whose session turned out to be gone
@@ -128,10 +156,10 @@ export function useTwin() {
       try {
         await sendTurn(text)
       } catch (retryError) {
-        setRefusal(refusalOf(retryError))
+        refuse(refusalOf(retryError))
       }
     },
-    [sendTurn],
+    [sendTurn, refuse],
   )
 
   const send = useCallback(
@@ -145,6 +173,12 @@ export function useTwin() {
         return
       }
       lastSent.current = text
+      track('twin_message_sent', messageSentProps(text, messages.current.filter((m) => m.role === 'user').length))
+      reply.current ??= {
+        timer: startExperience('twin_first_reply'),
+        before: replyIds(messages.current),
+        giveUp: setTimeout(() => endReply((timer) => timer.failed('timeout')), TWIN_REPLY_TIMEOUT_MS),
+      }
       // A first turn's HTTP failure lands in `agent.error`; a follow-up sent mid-turn rejects instead.
       try {
         await sendTurn(text)
@@ -156,8 +190,16 @@ export function useTwin() {
         await resend(text)
       }
     },
-    [sendTurn, fail, resend],
+    [sendTurn, fail, resend, endReply],
   )
+
+  // the first twin text that was not on screen at the send ends the measurement (a renewal keeps it open)
+  useEffect(() => {
+    const open = reply.current
+    if (open && hasNewReply(agent.data.messages, open.before)) endReply((timer) => timer.ready())
+  }, [agent.data.messages, endReply])
+  // a window closed before the reply reports nothing
+  useEffect(() => () => endReply(), [endReply])
 
   // A failed session never answers the message that was in flight, so it goes to the fresh one.
   // A saved session found already failed on load renews without resending anything.
@@ -166,12 +208,12 @@ export function useTwin() {
     if (!failed) return
     const text = lastSent.current
     if (!renew()) {
-      setRefusal('offline')
+      refuse('offline')
       return
     }
     lastSent.current = null
     if (text !== null) void resend(text)
-  }, [failed, renew, resend])
+  }, [failed, renew, resend, refuse])
 
   useEffect(() => {
     // A failed session is handled above, from the stream; its error must not also become a refusal.
@@ -191,10 +233,11 @@ export function useTwin() {
   useEffect(() => {
     if (agent.status !== 'resuming') return
     const timer = setTimeout(() => {
-      if (!renew()) setRefusal('offline')
+      if (renew()) return
+      refuse('offline')
     }, RESUME_STALL_MS)
     return () => clearTimeout(timer)
-  }, [agent.status, renew])
+  }, [agent.status, renew, refuse])
 
   // Delivers the held message once the session can take it (resumed, or renewed and ready).
   useEffect(() => {

@@ -22,6 +22,8 @@ services:
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
       # Shared with web and agents: authenticates the twin's redact-terms endpoint.
       TWIN_REDACT_SECRET: ${TWIN_REDACT_SECRET:?set TWIN_REDACT_SECRET}
+      POSTHOG_PROJECT_TOKEN: ${POSTHOG_PROJECT_TOKEN:-}
+      POSTHOG_REGION: ${POSTHOG_REGION:-us}
     volumes:
       # SQLite database (/data/payload.db) and uploads (/data/media, /data/scenes, /data/favicons).
       - cms-data:/data
@@ -56,6 +58,11 @@ services:
       TWIN_REDACT_SECRET: ${TWIN_REDACT_SECRET:?set TWIN_REDACT_SECRET}
       TWIN_PROMPT_CANARY: ${TWIN_PROMPT_CANARY:?set TWIN_PROMPT_CANARY}
       TWIN_DAILY_SPEND_USD: ${TWIN_DAILY_SPEND_USD:-5}
+      POSTHOG_PROJECT_TOKEN: ${POSTHOG_PROJECT_TOKEN:-}
+      POSTHOG_REGION: ${POSTHOG_REGION:-us}
+      # Canonical URLs, sitemap and Open Graph.
+      SITE_URL: ${WEB_PUBLIC_URL:?set WEB_PUBLIC_URL}
+      GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
     depends_on:
       cms:
         condition: service_healthy
@@ -128,6 +135,8 @@ services:
       IMESSAGE_WEBHOOK_SECRET: ${IMESSAGE_WEBHOOK_SECRET:-}
       OWNER_PHONE_NUMBER: ${OWNER_PHONE_NUMBER:-}
       EXA_API_KEY: ${EXA_API_KEY:-}
+      POSTHOG_PROJECT_TOKEN: ${POSTHOG_PROJECT_TOKEN:-}
+      POSTHOG_REGION: ${POSTHOG_REGION:-us}
     depends_on:
       postgres:
         condition: service_healthy
