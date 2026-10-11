@@ -5,6 +5,8 @@
  * up front (`<script src>` and script preloads), reads them from `.next/static` and asserts what must stay
  * out of that initial JS: the heavy libraries that load on demand. It also keeps the initial JS of each
  * document under a size budget, so a dependency that creeps into the boot path shows up as a number.
+ * Then, in Chromium, it brings the desk on screen and asserts that the main thread loaded neither
+ * three's renderer nor the glTF loader for it: with the worker drawing, those belong to the worker.
  * Neither page needs the CMS to render (it falls back), so this runs in CI beside the build.
  *
  *   node scripts/perf/chunks.ts [--port 3100] [--url http://host:port]
@@ -31,6 +33,7 @@ const origin = values.url ?? `http://localhost:${port}`
 const MARKERS = {
   posthog: '__PosthogExtensions__',
   three: 'THREE.WebGLRenderer',
+  gltf: 'THREE.GLTFLoader',
   css3d: 'isCSS3DObject',
   eve: 'useEveAgent',
   zod: 'ZodError',
@@ -42,8 +45,40 @@ type Marker = keyof typeof MARKERS
  * three (WebGL and CSS3D) comes with the desk scene's dynamic import; eve and zod with the Messenger window.
  */
 const FORBIDDEN: Record<string, Marker[]> = {
-  '/': ['posthog', 'three', 'css3d', 'eve', 'zod'],
-  '/os': ['posthog', 'three', 'css3d', 'eve', 'zod'],
+  '/': ['posthog', 'three', 'gltf', 'css3d', 'eve', 'zod'],
+  '/os': ['posthog', 'three', 'gltf', 'css3d', 'eve', 'zod'],
+}
+
+/**
+ * What the main thread must never load once the desk has drawn in its worker: three's renderer and
+ * the glTF loader (with the meshopt decoder beside it) run in the worker, and only the main-thread
+ * fallback host imports them. The camera rig and CSS3D need three's core, which stays allowed.
+ */
+const MAIN_THREAD_WITH_WORKER: Marker[] = ['three', 'gltf']
+
+/**
+ * Loads `/` in Chromium, brings the desk on screen and waits for its first frame with the models,
+ * then lists the scripts the page's own thread fetched (the window's resource timeline holds no
+ * worker request). Returns which host drew and those script paths, relative to `.next/static`.
+ */
+async function deskMainThreadScripts(): Promise<{ host: 'worker' | 'main'; scripts: string[] }> {
+  const { chromium } = await import('@playwright/test')
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    await page.goto(`${origin}/`)
+    await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
+    const scene = page.locator('[data-anchor="desk-scene"]')
+    await scene.locator('canvas').waitFor({ state: 'attached', timeout: 30_000 })
+    await page.waitForFunction(() => document.querySelector('[data-anchor="desk-scene"]')?.getAttribute('data-loaded') === 'true', null, { timeout: 30_000 })
+    // the worker host's canvas holds a bitmaprenderer context, the main host's a WebGL one
+    const host = await scene.locator('canvas').evaluate((c: HTMLCanvasElement) => (c.getContext('webgl2') ? 'main' : 'worker'))
+    const urls = await page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name))
+    const scripts = urls.filter((u) => u.includes('/_next/static/') && u.endsWith('.js')).map((u) => decodeURIComponent(new URL(u).pathname.split('/_next/static/')[1]!))
+    return { host, scripts }
+  } finally {
+    await browser.close()
+  }
 }
 
 /**
@@ -118,6 +153,20 @@ try {
     if (raw > budget.raw) failures.push(`${path}: initial JS ${kib(raw)} raw is over the ${kib(budget.raw)} budget`)
     if (gzip > budget.gzip) failures.push(`${path}: initial JS ${kib(gzip)} gzip is over the ${kib(budget.gzip)} budget`)
   }
+
+  const desk = await deskMainThreadScripts()
+  let deskRaw = 0
+  for (const script of desk.scripts) {
+    const text = files.get(script)
+    if (text === undefined) continue // not a build chunk (a runtime-generated URL): nothing to scan
+    deskRaw += Buffer.byteLength(text)
+    for (const marker of MAIN_THREAD_WITH_WORKER) {
+      if (text.includes(MARKERS[marker])) failures.push(`/ with the desk drawn in its worker: main-thread chunk ${script} contains ${marker} (${MARKERS[marker]})`)
+    }
+  }
+  console.log(`desk ${desk.host.padEnd(6)} ${String(desk.scripts.length).padStart(2)} main-thread scripts after the first desk frame, raw ${kib(deskRaw)}`)
+  // Chromium draws in the worker; the main host here would make the assertion above vacuous
+  if (desk.host !== 'worker') failures.push(`/: the desk drew on the ${desk.host} thread in Chromium, expected its worker`)
 } finally {
   if (server) stop(server)
 }

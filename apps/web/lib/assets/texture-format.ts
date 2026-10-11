@@ -9,7 +9,9 @@ export type TextureFormat = 'avif' | 'webp'
 
 let cached: Promise<TextureFormat> | null = null
 
-/** Probed once per session; any failure (no AVIF decoder, no createImageBitmap) means WebP, which every context decodes. */
+/**
+ * Probed once per context, in the context that decodes the textures (the desk worker, or the main
+ * thread when it draws): a window and a worker need not agree. Any failure (no AVIF decoder, no createImageBitmap) means WebP, which every context decodes. */
 export function textureFormat(
   fetchImpl: (url: string) => Promise<Response> = (url) => globalThis.fetch(url),
   decode: (blob: Blob) => Promise<ImageBitmap> = (blob) => globalThis.createImageBitmap(blob),

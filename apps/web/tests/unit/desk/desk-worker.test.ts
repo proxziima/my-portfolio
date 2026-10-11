@@ -24,7 +24,7 @@ beforeEach(() => {
   posted = []
   models = false
   scope = { onmessage: null, postMessage: (message, transfer) => posted.push({ message, transfer }) }
-  desk = { load: vi.fn(async () => {}), resize: vi.fn(), render: vi.fn(() => models), dispose: vi.fn() }
+  desk = { load: vi.fn(async () => 'webp'), resize: vi.fn(), render: vi.fn(() => models), dispose: vi.fn() }
 })
 
 const serve = (fail = false) =>
@@ -57,13 +57,13 @@ describe('the desk worker', () => {
     expect(posted.at(-1)!.message).toMatchObject({ id: 8, models: true })
   })
 
-  it('loads the URLs it is sent and says so, or fails as load_error', async () => {
+  it('loads the assets it is sent, reports the texture format it probed and decoded, or fails as load_error', async () => {
     serve()
     send({ type: 'init', canvas: fakeCanvas() })
-    const urls = [{ model: '/m.glb', texture: '/t.avif' }]
+    const urls = [{ model: '/m.glb', texture: { avif: '/t.avif', webp: '/t.webp', width: 2048, height: 2048 } }]
     send({ type: 'load', assets: urls })
     expect(desk.load).toHaveBeenCalledWith(urls)
-    await vi.waitFor(() => expect(types()).toContain('loaded'))
+    await vi.waitFor(() => expect(posted.at(-1)!.message).toEqual({ type: 'loaded', format: 'webp' }))
     desk.load.mockRejectedValueOnce(new Error('404'))
     send({ type: 'load', assets: urls })
     await vi.waitFor(() => expect(posted.at(-1)!.message).toEqual({ type: 'failed', reason: 'load_error' }))

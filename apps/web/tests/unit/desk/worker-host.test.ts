@@ -50,7 +50,7 @@ let bitmapRenderer: typeof bitmapView | null
 
 const { createWorkerHost } = await import('@/features/desk/gl/worker-host')
 
-const URLS = [{ model: '/m.glb', texture: '/t.avif' }]
+const URLS = [{ model: '/m.glb', texture: { avif: '/t.avif', webp: '/t.webp', width: 2048, height: 2048 } }]
 const camera = { view: new Float64Array(16).fill(1), projection: new Float64Array(16).fill(2) }
 const bitmap = (n: number) => ({ n, close: vi.fn() }) as unknown as ImageBitmap
 
@@ -189,29 +189,17 @@ describe('createWorkerHost', () => {
     expect([host.canvas.style.width, host.canvas.style.height]).toEqual(['', ''])
   })
 
-  it('loads once the URLs are known; loaded resolves it, load_error rejects it', async () => {
+  it('sends both texture encodes for the worker to choose; loaded resolves with the format it decoded, load_error rejects', async () => {
     const { host, worker } = await readyHost()
     const loading = host.load()
-    await vi.waitFor(() => expect(worker.types()).toContain('load'))
     expect(worker.sent.find((s) => s.message.type === 'load')!.message).toEqual({ type: 'load', assets: URLS })
-    worker.answer({ type: 'loaded' })
-    await expect(loading).resolves.toBeUndefined()
+    worker.answer({ type: 'loaded', format: 'avif' })
+    await expect(loading).resolves.toBe('avif')
 
     const other = await readyHost()
     const failing = other.host.load()
     other.worker.answer({ type: 'failed', reason: 'load_error' })
     await expect(failing).rejects.toThrow()
-  })
-
-  it('takes URLs that are still being resolved', async () => {
-    let resolve: (u: typeof URLS) => void = () => {}
-    const host = createWorkerHost(new Promise((r) => (resolve = r)))
-    const worker = FakeWorker.last
-    void host.load()
-    await Promise.resolve()
-    expect(worker.types()).not.toContain('load')
-    resolve(URLS)
-    await vi.waitFor(() => expect(worker.types()).toContain('load'))
   })
 
   it('reports a lost context or a dead worker after ready, once, stops asking for frames and rejects a pending load', async () => {

@@ -1,9 +1,7 @@
 'use client'
 import { useEffect, useReducer, useRef, useState } from 'react'
-import { textureFormat } from '@/lib/assets/texture-format'
 import { useInView } from '@/lib/dom/use-in-view'
 import { useReducedMotion } from '@/lib/dom/use-reduced-motion'
-import { deskAssetUrls } from './assets'
 import { createDeskAudio, type DeskAudio } from './audio'
 import { DESK_ASSETS, OS_PATH } from './config'
 import { createDeskEngine, type DeskEngine } from './engine'
@@ -61,7 +59,8 @@ export function DeskScene({ onFail, onReady, muted, fullscreen, onPower }: DeskS
     let gl: GlHost
     let created: DeskEngine
     try {
-      gl = selectHost(textureFormat().then((format) => deskAssetUrls(DESK_ASSETS, format)))
+      // the drawing thread picks AVIF or WebP itself: it is the one that decodes them
+      gl = selectHost(DESK_ASSETS)
       created = createDeskEngine({
         container: host,
         host: gl,

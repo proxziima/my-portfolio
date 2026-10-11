@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Camera, Scene } from 'three'
 import type { GlFrameCamera, GlHost } from '@/features/desk/gl/host'
+import type { TextureFormat } from '@/lib/assets/texture-format'
 
 const css = vi.hoisted(() => ({ renders: [] as Array<{ view: number[]; inverse: number[]; projection: number[] }> }))
 
@@ -27,11 +28,12 @@ const { Matrix4 } = await import('three')
 /** A host whose frames land when the test says: `land(models)` commits the oldest pending one. */
 function fakeHost(accept = true) {
   const pending: Array<{ camera: GlFrameCamera; commit: (models: boolean) => void }> = []
-  let loaded: () => void = () => {}
+  let resolveLoad: (format: TextureFormat) => void = () => {}
+  const loaded = () => resolveLoad('webp')
   const host = {
     kind: 'main' as const,
     canvas: document.createElement('canvas'),
-    load: vi.fn(() => new Promise<void>((r) => (loaded = r))),
+    load: vi.fn(() => new Promise<TextureFormat>((r) => (resolveLoad = r))),
     resize: vi.fn(),
     render: vi.fn((camera: GlFrameCamera, commit: (models: boolean) => void) => {
       if (!accept) return false

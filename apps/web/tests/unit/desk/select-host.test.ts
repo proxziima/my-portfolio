@@ -5,7 +5,7 @@ import type { GlFailure, GlFrameCamera, HostKind } from '@/features/desk/gl/host
 /** A host stand-in: frames commit when the test lands them (main: at once, as the real one). */
 function fakeHost(kind: HostKind) {
   const failed: Array<(r: GlFailure) => void> = []
-  let settleLoad: { resolve: () => void; reject: (e: Error) => void } = { resolve: () => {}, reject: () => {} }
+  let settleLoad: { resolve: (format: 'avif' | 'webp') => void; reject: (e: Error) => void } = { resolve: () => {}, reject: () => {} }
   let settleReady: { resolve: () => void; reject: (e: Error) => void } = { resolve: () => {}, reject: () => {} }
   const pending: Array<(models: boolean) => void> = []
   const host = {
@@ -15,7 +15,7 @@ function fakeHost(kind: HostKind) {
     accepting: kind === 'main',
     /** Whether a main host's frames have the models (they commit synchronously). */
     models: false,
-    load: vi.fn(() => new Promise<void>((resolve, reject) => (settleLoad = { resolve, reject }))),
+    load: vi.fn(() => new Promise<'avif' | 'webp'>((resolve, reject) => (settleLoad = { resolve, reject }))),
     resize: vi.fn(),
     render: vi.fn((_: GlFrameCamera, commit: (models: boolean) => void) => {
       if (!host.accepting) return false
@@ -30,7 +30,7 @@ function fakeHost(kind: HostKind) {
   return {
     host,
     pending,
-    loaded: () => settleLoad.resolve(),
+    loaded: (format: 'avif' | 'webp' = kind === 'worker' ? 'avif' : 'webp') => settleLoad.resolve(format),
     loadFails: () => settleLoad.reject(new Error('404')),
     ready: () => {
       host.accepting = true
@@ -76,7 +76,7 @@ vi.mock('@/features/desk/gl/main-host', () => ({
 const { selectHost } = await import('@/features/desk/gl/select-host')
 const { GlHostError } = await import('@/features/desk/gl/host')
 
-const URLS = [{ model: '/m.glb', texture: '/t.avif' }]
+const URLS = [{ model: '/m.glb', texture: { avif: '/t.avif', webp: '/t.webp', width: 2048, height: 2048 } }]
 const camera = { view: new Float64Array(16), projection: new Float64Array(16) }
 const flush = () => new Promise((r) => setTimeout(r, 0))
 
@@ -119,6 +119,15 @@ describe('selectHost', () => {
     expect(host.render(camera, commit)).toBe(true)
     made.worker[0]!.land(true)
     expect(commit).toHaveBeenCalledWith(true)
+    expect(made.main).toHaveLength(0)
+  })
+
+  it('resolves the load with the texture format the worker probed and decoded', async () => {
+    const host = mount()
+    const loading = host.load()
+    made.worker[0]!.ready()
+    made.worker[0]!.loaded('avif')
+    await expect(loading).resolves.toBe('avif')
     expect(made.main).toHaveLength(0)
   })
 
@@ -247,7 +256,8 @@ describe('loading through a fallback', () => {
     await flush()
     expect(made.main).toHaveLength(1)
     made.main[0]!.loaded()
-    await expect(loading).resolves.toBeUndefined()
+    // the format the main thread probed: it decodes the textures now
+    await expect(loading).resolves.toBe('webp')
   })
 
   it('rejects the load when the main thread fails it too', async () => {
@@ -280,7 +290,8 @@ describe('loading through a fallback', () => {
     const loading = host.load()
     expect(made.main[0]!.host.load).toHaveBeenCalledTimes(1)
     made.main[0]!.loaded()
-    await expect(loading).resolves.toBeUndefined()
+    // the format the main thread probed: it decodes the textures now
+    await expect(loading).resolves.toBe('webp')
   })
 })
 

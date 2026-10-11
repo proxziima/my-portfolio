@@ -1,9 +1,8 @@
-import type { DeskAssetUrls } from '../assets'
+import type { TextureFormat } from '@/lib/assets/texture-format'
+import type { DeskAsset } from '../config'
 import { GlHostError, type GlFailure, type GlHost } from './host'
 import { createMainHost } from './main-host'
 import { createWorkerHost, type WorkerHost } from './worker-host'
-
-type Urls = DeskAssetUrls | Promise<DeskAssetUrls>
 
 /** A worker can draw the desk where it gets an OffscreenCanvas it can hand frames back from. */
 const workerCanDraw = () =>
@@ -14,9 +13,10 @@ const workerCanDraw = () =>
  * the main thread with the same scene. The worker is tried first and the main thread takes over if
  * it cannot render, or fails later; neither is a failure, the visitor sees the same scene.
  * `?deskHost=main` forces the main thread (debugging). Throws only if the main host is needed at
- * once and has no WebGL.
+ * once and has no WebGL. The main host is cheap to hold here: it loads the scene's code (three's
+ * renderer and loaders) only when it is created, i.e. only on the main-thread path.
  */
-export function selectHost(assets: Urls, search: string = globalThis.location?.search ?? ''): GlHost {
+export function selectHost(assets: readonly DeskAsset[], search: string = globalThis.location?.search ?? ''): GlHost {
   const main = () => createMainHost(assets)
   if (new URLSearchParams(search).get('deskHost') === 'main' || !workerCanDraw()) return main()
   let worker: WorkerHost
@@ -42,9 +42,9 @@ function withFallback(primary: WorkerHost, makeFallback: () => GlHost): GlHost {
   let gaveUp = false
   let disposed = false
   let size: [width: number, height: number, pixelRatio: number] | null = null
-  let loading: Promise<void> | null = null
+  let loading: Promise<TextureFormat> | null = null
   let primaryLoaded = false
-  let fallbackLoad: Promise<void> | null = null
+  let fallbackLoad: Promise<TextureFormat> | null = null
   let fallbackLoaded = false
   /** A frame with the models has been on screen: the fallback must not show less. */
   let shownModels = false
@@ -54,8 +54,9 @@ function withFallback(primary: WorkerHost, makeFallback: () => GlHost): GlHost {
   }
 
   const loadFallback = (host: GlHost) =>
-    (fallbackLoad ??= host.load().then(() => {
+    (fallbackLoad ??= host.load().then((format) => {
       fallbackLoaded = true
+      return format
     }))
 
   /** The primary cannot draw (any more): build the fallback, sized, and loading if the models were asked for. */
@@ -81,18 +82,18 @@ function withFallback(primary: WorkerHost, makeFallback: () => GlHost): GlHost {
   primary.ready.catch(failOver)
   primary.onFail(failOver)
 
-  async function load() {
+  async function load(): Promise<TextureFormat> {
     if (!fallback && !gaveUp) {
       try {
-        await primary.load()
+        const format = await primary.load()
         primaryLoaded = true
-        return
+        return format
       } catch {
         failOver()
       }
     }
     if (!fallback) throw new GlHostError('webgl_unavailable')
-    await loadFallback(fallback)
+    return loadFallback(fallback)
   }
 
   return {

@@ -1,7 +1,25 @@
+import type { TextureFormat } from '@/lib/assets/texture-format'
+
 export type HostKind = 'worker' | 'main'
 
 /** Why the desk's WebGL gave up, for `experience_failed.reason`. */
 export type GlFailure = 'webgl_unavailable' | 'load_error' | 'context_lost'
+
+/**
+ * The desk's WebGL2 context, as three's WebGLRenderer would ask for it with the desk's options
+ * (alpha, antialias, high-performance; its defaults for the rest). Whoever creates the context uses
+ * exactly these, so the main host's early support check and the renderer get the same one.
+ */
+export const GL_CONTEXT_ATTRIBUTES: WebGLContextAttributes = {
+  alpha: true,
+  antialias: true,
+  powerPreference: 'high-performance',
+  depth: true,
+  stencil: false,
+  premultipliedAlpha: true,
+  preserveDrawingBuffer: false,
+  failIfMajorPerformanceCaveat: false,
+}
 
 /** A host's rejection that knows its reason (anything else a load rejects with is a `load_error`). */
 export class GlHostError extends Error {
@@ -27,8 +45,11 @@ export interface GlHost {
   readonly kind: HostKind
   /** The element the engine stacks over the CSS3D layer. */
   readonly canvas: HTMLCanvasElement
-  /** Fetches the models into the scene; rejects on any failure. */
-  load(): Promise<void>
+  /**
+   * Fetches the models into the scene; resolves with the texture format the drawing thread probed
+   * and decoded (AVIF or WebP), rejects on any failure.
+   */
+  load(): Promise<TextureFormat>
   /** CSS size of the box and the (capped) pixel ratio the canvas renders at. */
   resize(width: number, height: number, pixelRatio: number): void
   /**

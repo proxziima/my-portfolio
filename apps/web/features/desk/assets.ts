@@ -1,15 +1,8 @@
 import { ImageBitmapLoader, Mesh, MeshBasicMaterial, SRGBColorSpace, Texture, type Group, type Material } from 'three'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import type { TextureFormat } from '@/lib/assets/texture-format'
-import { MODEL_SCALE, type DeskAsset } from './config'
-
-/** The desk's files with the texture format already chosen: plain URLs a worker can take as they are. */
-export type DeskAssetUrls = ReadonlyArray<{ model: string; texture: string; drop?: readonly string[] }>
-
-/** Each asset's texture in `format`: the AVIF where there is one and the context decodes it, else the WebP. */
-export const deskAssetUrls = (assets: readonly DeskAsset[], format: TextureFormat): DeskAssetUrls =>
-  assets.map((asset) => ({ model: asset.model, texture: (format === 'avif' && asset.texture.avif) || asset.texture.webp, drop: asset.drop }))
+import { MODEL_SCALE } from './config'
+import type { DeskAssetUrls } from './desk-assets'
 
 export interface LoadedDesk {
   objects: Group[]

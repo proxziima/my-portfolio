@@ -53,7 +53,8 @@ vi.mock('three', async () => {
   return { ...three, ImageBitmapLoader }
 })
 
-const { deskAssetUrls, loadDesk } = await import('@/features/desk/assets')
+const { loadDesk } = await import('@/features/desk/assets')
+const { deskAssetUrls } = await import('@/features/desk/desk-assets')
 const { MODEL_SCALE } = await import('@/features/desk/config')
 
 const ASSETS = [
@@ -75,21 +76,6 @@ beforeEach(() => {
   loaders.images.length = 0
   loaders.imageOptions.length = 0
   loaders.bitmaps.length = 0
-})
-
-describe('deskAssetUrls', () => {
-  it('takes the AVIF when the context decodes it, else the WebP', () => {
-    // the environment has no AVIF (none passed parity at fewer bytes): its WebP either way
-    expect(deskAssetUrls(ASSETS, 'avif').map((a) => a.texture)).toEqual(['/t/computer.avif', '/t/environment.webp'])
-    expect(deskAssetUrls(ASSETS, 'webp').map((a) => a.texture)).toEqual(['/t/computer.webp', '/t/environment.webp'])
-  })
-
-  it('keeps the model and the drop list as they are', () => {
-    expect(deskAssetUrls(ASSETS, 'webp')).toEqual([
-      { model: '/m/computer.glb', texture: '/t/computer.webp' },
-      { model: '/m/environment.glb', texture: '/t/environment.webp', drop: ['Background'] },
-    ])
-  })
 })
 
 describe('loadDesk', () => {

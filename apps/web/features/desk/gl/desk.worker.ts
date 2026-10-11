@@ -38,8 +38,9 @@ export function serveDesk(scope: DeskWorkerScope, create: (canvas: OffscreenCanv
         return
       }
       case 'load':
+        // the texture format is probed here, in the worker, which is what decodes the textures
         gl?.load(data.assets).then(
-          () => post({ type: 'loaded' }),
+          (format) => post({ type: 'loaded', format }),
           () => post({ type: 'failed', reason: 'load_error' }),
         )
         return

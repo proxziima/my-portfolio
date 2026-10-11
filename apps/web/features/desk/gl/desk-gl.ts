@@ -1,7 +1,9 @@
 import { DoubleSide, Group, MathUtils, Mesh, MeshBasicMaterial, NoBlending, PerspectiveCamera, PlaneGeometry, Scene, WebGLRenderer, type Object3D } from 'three'
-import { loadDesk, type DeskAssetUrls, type LoadedDesk } from '../assets'
-import { SCREEN, type Vec3 } from '../config'
-import type { GlFrameCamera } from './host'
+import { textureFormat, type TextureFormat } from '@/lib/assets/texture-format'
+import { loadDesk, type LoadedDesk } from '../assets'
+import { SCREEN, type DeskAsset, type Vec3 } from '../config'
+import { deskAssetUrls } from '../desk-assets'
+import { GL_CONTEXT_ATTRIBUTES, type GlFrameCamera } from './host'
 
 type ScreenSpec = typeof SCREEN
 
@@ -76,8 +78,11 @@ export function createScreenGl(screen: ScreenSpec = SCREEN): { group: Group; dis
 /** The desk's WebGL side, wherever it runs. */
 export interface DeskGl {
   readonly canvas: HTMLCanvasElement | OffscreenCanvas
-  /** Fetches these models into the scene; rejects on any failure. */
-  load(assets: DeskAssetUrls): Promise<void>
+  /**
+   * Fetches these models into the scene, the textures in the format this context decodes (probed
+   * here, where they are decoded); resolves with that format, rejects on any failure.
+   */
+  load(assets: readonly DeskAsset[]): Promise<TextureFormat>
   /** CSS size and pixel ratio; the canvas's own CSS size is left to its owner. */
   resize(width: number, height: number, pixelRatio: number): void
   /** Draws one frame with exactly this camera. Returns whether the models are in it. */
@@ -89,10 +94,13 @@ export interface DeskGl {
  * The desk's GL scene: the screen's planes and the models, drawn by a camera that is only matrices,
  * so the frame is drawn from the very numbers the CSS3D side uses. No DOM: it runs as well on an
  * OffscreenCanvas in a worker (its globals are `fetch`, `createImageBitmap` and `WebAssembly`).
- * Throws if the canvas gives no WebGL context.
+ * Throws if the canvas gives no WebGL2 context. The context is created with `GL_CONTEXT_ATTRIBUTES`
+ * (the main host may have created it already, to know at once whether it can draw: the same one).
  */
 export function createDeskGl(canvas: HTMLCanvasElement | OffscreenCanvas): DeskGl {
-  const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' })
+  const context = canvas.getContext('webgl2', GL_CONTEXT_ATTRIBUTES) as WebGL2RenderingContext | null
+  if (!context) throw new Error('no WebGL2 context')
+  const renderer = new WebGLRenderer({ canvas, context, alpha: true, antialias: true, powerPreference: 'high-performance' })
   renderer.setClearColor(0x000000, 0)
   const scene = new Scene()
   const screen = createScreenGl(SCREEN)
@@ -108,13 +116,15 @@ export function createDeskGl(canvas: HTMLCanvasElement | OffscreenCanvas): DeskG
   return {
     canvas,
     async load(assets) {
-      const loaded = await loadDesk(assets)
+      const format = await textureFormat()
+      const loaded = await loadDesk(deskAssetUrls(assets, format))
       if (disposed) {
         loaded.dispose()
-        return
+        return format
       }
       desk = loaded
       scene.add(...loaded.objects)
+      return format
     },
     resize(width, height, pixelRatio) {
       if (pixelRatio !== renderer.getPixelRatio()) renderer.setPixelRatio(pixelRatio)

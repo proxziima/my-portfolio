@@ -2,6 +2,7 @@
 import { Matrix4, NoBlending, PerspectiveCamera, type Camera, type Mesh, type MeshBasicMaterial, type Scene } from 'three'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SCREEN } from '@/features/desk/config'
+import { GL_CONTEXT_ATTRIBUTES } from '@/features/desk/gl/host'
 
 const gl = vi.hoisted(() => ({
   renderers: [] as Array<{
@@ -14,6 +15,9 @@ const gl = vi.hoisted(() => ({
     lost: number
   }>,
   load: undefined as unknown as (assets: unknown) => Promise<unknown>,
+  /** What textureFormat() answers in the context the scene runs in. */
+  format: 'avif' as 'avif' | 'webp',
+  probes: 0,
 }))
 
 vi.mock('three', async () => {
@@ -52,12 +56,18 @@ vi.mock('three', async () => {
 })
 
 vi.mock('@/features/desk/assets', () => ({ loadDesk: (assets: unknown) => gl.load(assets) }))
+vi.mock('@/lib/assets/texture-format', () => ({
+  textureFormat: async () => {
+    gl.probes++
+    return gl.format
+  },
+}))
 
 const { createDeskGl, createScreenGl, screenPlanes } = await import('@/features/desk/gl/desk-gl')
 const { createMonitorScreen } = await import('@/features/desk/monitor-screen')
 const three = await import('three')
 
-const URLS = [{ model: '/m.glb', texture: '/t.webp' }]
+const DESK = [{ model: '/m.glb', texture: { avif: '/t.avif', webp: '/t.webp', width: 2048, height: 2048 } }]
 
 /** A loaded desk: one object, a dispose spy. */
 const fakeDesk = () => ({ objects: [new three.Group()], dispose: vi.fn() })
@@ -126,11 +136,20 @@ describe('createScreenGl', () => {
 })
 
 describe('createDeskGl', () => {
-  const canvas = () => document.createElement('canvas')
+  /** jsdom has no WebGL2: a stand-in context, or none (`null`) for a browser without it. */
+  let context: object | null
+  const canvas = () => {
+    const c = document.createElement('canvas')
+    vi.spyOn(c, 'getContext').mockImplementation(() => context as RenderingContext)
+    return c
+  }
 
   beforeEach(() => {
     gl.renderers.length = 0
     gl.load = async () => fakeDesk()
+    gl.format = 'avif'
+    gl.probes = 0
+    context = { webgl2: true }
   })
 
   afterEach(() => {
@@ -141,7 +160,9 @@ describe('createDeskGl', () => {
     const c = canvas()
     const desk = createDeskGl(c)
     expect(desk.canvas).toBe(c)
-    expect(gl.renderers[0]!.options).toEqual({ canvas: c, alpha: true, antialias: true, powerPreference: 'high-performance' })
+    // the context made with the shared attributes (the main host may have made it first: the same one)
+    expect(c.getContext).toHaveBeenCalledWith('webgl2', GL_CONTEXT_ATTRIBUTES)
+    expect(gl.renderers[0]!.options).toEqual({ canvas: c, context, alpha: true, antialias: true, powerPreference: 'high-performance' })
     expect(gl.renderers[0]!.clear).toEqual([0x000000, 0])
   })
 
@@ -165,7 +186,7 @@ describe('createDeskGl', () => {
     const desk = createDeskGl(canvas())
     const { view, projection } = frameCamera()
     expect(desk.render({ view, projection })).toBe(false)
-    await desk.load(URLS)
+    await desk.load(DESK)
     expect(desk.render({ view, projection })).toBe(true)
     const scene = gl.renderers[0]!.renders[1]!.scene
     // the screen first, then the models, as the scene was always built
@@ -173,21 +194,30 @@ describe('createDeskGl', () => {
     expect(scene.children[1]).toBe(loaded.objects[0])
   })
 
-  it('loads the URLs it is given', async () => {
+  it('throws without a WebGL2 context, so a worker answers unsupported and the main host is not used', () => {
+    context = null
+    expect(() => createDeskGl(canvas())).toThrow()
+    expect(gl.renderers).toHaveLength(0)
+  })
+
+  it('probes the texture format where it runs, loads that encode and resolves with it', async () => {
     const seen: unknown[] = []
     gl.load = async (assets) => {
       seen.push(assets)
       return fakeDesk()
     }
-    await createDeskGl(canvas()).load(URLS)
-    expect(seen).toEqual([URLS])
+    await expect(createDeskGl(canvas()).load(DESK)).resolves.toBe('avif')
+    gl.format = 'webp'
+    await expect(createDeskGl(canvas()).load(DESK)).resolves.toBe('webp')
+    expect(gl.probes).toBe(2)
+    expect(seen).toEqual([[{ model: '/m.glb', texture: '/t.avif' }], [{ model: '/m.glb', texture: '/t.webp' }]])
   })
 
   it('rejects when the models fail', async () => {
     gl.load = async () => {
       throw new Error('404')
     }
-    await expect(createDeskGl(canvas()).load(URLS)).rejects.toThrow('404')
+    await expect(createDeskGl(canvas()).load(DESK)).rejects.toThrow('404')
   })
 
   it('sizes the drawing buffer by the pixel ratio and leaves the CSS size alone', () => {
@@ -201,7 +231,7 @@ describe('createDeskGl', () => {
     const loaded = fakeDesk()
     gl.load = async () => loaded
     const desk = createDeskGl(canvas())
-    await desk.load(URLS)
+    await desk.load(DESK)
     desk.dispose()
     expect(loaded.dispose).toHaveBeenCalledTimes(1)
     expect(gl.renderers[0]!.disposed).toBe(1)
@@ -213,7 +243,7 @@ describe('createDeskGl', () => {
     let arrive: ((d: typeof loaded) => void) | null = null
     gl.load = () => new Promise((r) => (arrive = r))
     const desk = createDeskGl(canvas())
-    const loading = desk.load(URLS)
+    const loading = desk.load(DESK)
     await vi.waitFor(() => expect(arrive).not.toBeNull())
     desk.dispose()
     arrive!(loaded)

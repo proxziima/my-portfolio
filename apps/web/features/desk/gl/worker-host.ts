@@ -1,4 +1,5 @@
-import type { DeskAssetUrls } from '../assets'
+import type { TextureFormat } from '@/lib/assets/texture-format'
+import type { DeskAsset } from '../config'
 import { FrameRing } from './frame-ring'
 import type { GlFailure, GlHost } from './host'
 import type { FromWorker, ToWorker } from './protocol'
@@ -16,15 +17,15 @@ interface InFlight {
   height: number
 }
 
-interface Deferred {
-  promise: Promise<void>
-  resolve: () => void
+interface Deferred<T = void> {
+  promise: Promise<T>
+  resolve: (value: T) => void
   reject: (e: Error) => void
 }
 
-function deferred(): Deferred {
-  const d = {} as Deferred
-  d.promise = new Promise<void>((resolve, reject) => Object.assign(d, { resolve, reject }))
+function deferred<T = void>(): Deferred<T> {
+  const d = {} as Deferred<T>
+  d.promise = new Promise<T>((resolve, reject) => Object.assign(d, { resolve, reject }))
   return d
 }
 
@@ -40,7 +41,7 @@ const READY_TIMEOUT_MS = 3000
  * keeps the last frame at the size it was drawn for, where the CSS3D layer still is.
  * Throws at once where a canvas has no `bitmaprenderer` (no worker is started then).
  */
-export function createWorkerHost(assets: DeskAssetUrls | Promise<DeskAssetUrls>, timeoutMs = READY_TIMEOUT_MS): WorkerHost {
+export function createWorkerHost(assets: readonly DeskAsset[], timeoutMs = READY_TIMEOUT_MS): WorkerHost {
   const canvas = document.createElement('canvas')
   canvas.style.display = 'block' // as the main host's
   const view = canvas.getContext('bitmaprenderer', { alpha: true })
@@ -56,7 +57,7 @@ export function createWorkerHost(assets: DeskAssetUrls | Promise<DeskAssetUrls>,
   let size = { width: 0, height: 0 }
   /** The CSS size of the frame on the canvas (the CSS3D layer's too). */
   let shown: { width: number; height: number } | null = null
-  let loading: Deferred | null = null
+  let loading: Deferred<TextureFormat> | null = null
   const ready = deferred()
   ready.promise.catch(() => {}) // the caller decides what a worker that never got ready means
 
@@ -90,7 +91,7 @@ export function createWorkerHost(assets: DeskAssetUrls | Promise<DeskAssetUrls>,
       case 'unsupported':
         return stop(new Error('no WebGL in the desk worker'))
       case 'loaded':
-        return loading?.resolve()
+        return loading?.resolve(data.format)
       case 'failed':
         if (data.reason === 'load_error') return loading?.reject(new Error('desk models failed to load'))
         return stop(new Error('the desk worker lost its WebGL context'))
@@ -123,15 +124,10 @@ export function createWorkerHost(assets: DeskAssetUrls | Promise<DeskAssetUrls>,
     ready: ready.promise,
     load() {
       if (loading) return loading.promise
-      const load = (loading = deferred())
+      const load = (loading = deferred<TextureFormat>())
+      // both texture encodes go: the worker probes which one it decodes before it fetches
       if (state === 'stopped') load.reject(new Error('the desk worker is stopped'))
-      else
-        Promise.resolve(assets).then(
-          (urls) => {
-            if (state !== 'stopped') send({ type: 'load', assets: urls })
-          },
-          (e: unknown) => load.reject(e instanceof Error ? e : new Error(String(e))),
-        )
+      else send({ type: 'load', assets })
       return load.promise
     },
     resize(width, height, pixelRatio) {
