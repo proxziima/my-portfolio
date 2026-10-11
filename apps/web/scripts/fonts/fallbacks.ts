@@ -6,7 +6,7 @@
  *
  *   node scripts/fonts/fallbacks.ts [--url http://localhost:3100/]
  *
- * Inter's metrics come from the woff2 the page itself loads (the file next/font ships). Each system
+ * Inter's metrics come from the woff2 the page itself loads (the self-hosted app/fonts/Inter-latin.woff2). Each system
  * font starts from Capsize's average-width ratio; the script then lays the real page out in
  * Chromium, at every width in WIDTHS and for every role, once in Inter and once in the fallback
  * with a candidate `correction` on top of that ratio, and keeps, from the widest range of

@@ -32,7 +32,7 @@ const STAGES: Partial<Record<Recipe['kind'], Stage>> = {
   texture: (recipe, bytes) => textureStage(recipe as Extract<Recipe, { kind: 'texture' }>, bytes),
   model: (recipe, bytes) => modelStage(recipe as Extract<Recipe, { kind: 'model' }>, bytes),
   video: (recipe, bytes) => videoStage(recipe as Extract<Recipe, { kind: 'video' }>, bytes),
-  font: (recipe, bytes) => fontStage(recipe.source, bytes),
+  font: (recipe, bytes) => fontStage(recipe.source, (recipe as Extract<Recipe, { kind: 'font' }>).dir, bytes),
 }
 
 const { values } = parseArgs({

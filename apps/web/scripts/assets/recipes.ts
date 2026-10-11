@@ -19,7 +19,8 @@ export type Recipe =
   | { id: string; kind: 'texture'; source: string; parity: ImageParity }
   | { id: string; kind: 'model'; source: string; quantize: { position: number; texcoord: number } }
   | { id: string; kind: 'video'; source: string; codecs: Array<'av1' | 'vp9' | 'h264'>; layer: { opacity: number } }
-  | { id: string; kind: 'font'; source: string }
+  /** `dir`: where the woff2 lands, relative to `apps/web` (next to the layout whose `next/font/local` names it). */
+  | { id: string; kind: 'font'; source: string; dir: string }
 
 const AUDIO = ['key-1', 'key-2', 'key-3', 'key-4', 'key-5', 'key-6', 'mouse-down', 'mouse-up', 'office']
 const camel = (name: string) => name.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
@@ -44,6 +45,15 @@ export const RECIPES: readonly Recipe[] = [
   { id: 'theme.rockerOff', kind: 'image', source: 'theme-switch/rocker-off.webp', widths: [64, 128, 192], formats: ['avif', 'webp'], parity: { ssim: 0.99 } },
   // the canvas loads the atlas with `new Image()`, which has no <picture> fallback: WebP only
   { id: 'theme.rockerAtlas', kind: 'image', source: 'theme-switch/rocker-atlas.webp', widths: 'source', formats: ['webp'], parity: { ssim: 0.995 } },
-  { id: 'osFonts.millennium', kind: 'font', source: 'fonts/Millennium.ttf' },
-  { id: 'osFonts.millenniumBold', kind: 'font', source: 'fonts/Millennium-Bold.ttf' },
+  // the site's faces, self-hosted so no build fetches from Google: each is Google's own `latin` subset, byte for byte
+  // what next/font/google shipped (fetched with its user agent; licences beside each file). Latin only: no CMS text the
+  // faces render has a character in the other subsets' unicode-ranges (formulas set in Times New Roman, emoji fall back)
+  // https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2 (variable, wght 100–900; OFL)
+  { id: 'siteFonts.inter', kind: 'font', source: 'fonts/Inter-latin.woff2', dir: 'app/fonts' },
+  // https://fonts.gstatic.com/s/caveat/v23/Wnz6HAc5bAfYB2Q7ZjYYiAzcPA.woff2 (variable, wght 400–700; OFL)
+  { id: 'siteFonts.caveat', kind: 'font', source: 'fonts/Caveat-latin.woff2', dir: 'app/fonts' },
+  { id: 'osFonts.millennium', kind: 'font', source: 'fonts/Millennium.ttf', dir: 'app/(os)/fonts' },
+  { id: 'osFonts.millenniumBold', kind: 'font', source: 'fonts/Millennium-Bold.ttf', dir: 'app/(os)/fonts' },
+  // https://fonts.gstatic.com/s/ultra/v25/zOLy4prXmrtY-uT9wrKh68xE.woff2 (wght 400; Apache-2.0)
+  { id: 'osFonts.ultra', kind: 'font', source: 'fonts/Ultra-latin.woff2', dir: 'app/(os)/fonts' },
 ]
