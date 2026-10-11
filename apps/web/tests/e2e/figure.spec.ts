@@ -54,12 +54,17 @@ test('keyboard reaches the OS through the powered-off screen', async ({ page }) 
   await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
   await expect(slab).toBeAttached({ timeout: 20_000 })
   await expect(scene.locator('iframe')).toHaveCount(0)
+  // The slab holds the focus only until the OS it boots has loaded, then hands it to the iframe: on a
+  // fast load that is before the next check could see it there. So the page records the focus event
+  // itself, and the Tab loop stops on that record instead of polling the transient focus.
+  await slab.evaluate((el) => el.addEventListener('focus', () => (el.dataset.e2eFocused = 'true'), { once: true }))
+  const screen = scene.locator('[data-e2e-focused="true"]')
   // Tab from the top of the page onto the screen
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   let reached = false
   for (let i = 0; i < 80 && !reached; i++) {
     await page.keyboard.press('Tab')
-    reached = await slab.evaluate((el) => el === document.activeElement).catch(() => false)
+    reached = (await screen.count()) > 0
   }
   expect(reached, 'Tab reaches the powered-off screen').toBe(true)
   // the OS boots and, once loaded, takes the focus at the same tab position
