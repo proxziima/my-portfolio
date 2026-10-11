@@ -15,7 +15,8 @@
     "check-types": "next typegen && tsc --noEmit",
     "resume:pdf": "bun scripts/resume-pdf/build.ts",
     "perf:lighthouse": "node scripts/perf/lighthouse.ts",
-    "perf:shifts": "node scripts/perf/layout-shifts.ts",
+    "perf:chunks": "node scripts/perf/chunks.ts",
+    "perf:shifts":"node scripts/perf/layout-shifts.ts",
     "fonts:fallbacks": "node scripts/fonts/fallbacks.ts",
     "assets:build": "bun scripts/assets/build.ts",
     "assets:check": "bun scripts/assets/build.ts --check"

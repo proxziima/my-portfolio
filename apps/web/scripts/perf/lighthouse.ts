@@ -18,11 +18,12 @@
  * breakdown, the top scripts by evaluation time, layout-shift culprits and the heaviest requests.
  * `--compare` prints the deltas against an earlier summary. Never use ports 3000/3001 (main checkout).
  */
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import { spawnSync, type ChildProcess } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { chromium } from '@playwright/test'
+import { build, start, stop, waitFor } from './server.ts'
 
 /** Pinned so numbers stay comparable across checkpoints; bump deliberately and re-baseline. */
 const LIGHTHOUSE = 'lighthouse@13.5.0'
@@ -133,31 +134,11 @@ function summarise(report: Report) {
 }
 type Summary = ReturnType<typeof summarise>
 
-function waitFor(target: string, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  return new Promise((done, fail) => {
-    const tick = () =>
-      fetch(target)
-        .then((r) => (r.ok ? done() : retry()))
-        .catch(retry)
-    const retry = () => (Date.now() > deadline ? fail(new Error(`${target} did not answer`)) : setTimeout(tick, 1000))
-    tick()
-  })
-}
-
-function stop(server: ChildProcess) {
-  if (!server.pid) return
-  // `next start` runs under a shell on Windows: kill the whole tree
-  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(server.pid), '/T', '/F'], { stdio: 'ignore' })
-  else server.kill('SIGTERM')
-}
-
 let server: ChildProcess | null = null
 try {
   if (values.serve) {
-    const build = spawnSync('bun', ['run', 'build'], { stdio: 'inherit', shell: process.platform === 'win32' })
-    if (build.status !== 0) throw new Error(`bun run build exited ${build.status}`)
-    server = spawn('bunx', ['next', 'start', '-p', String(port)], { stdio: 'ignore', shell: process.platform === 'win32' })
+    build()
+    server = start(port)
     await waitFor(url, 60_000)
   }
   // one warm-up request so the first measured run does not pay for the server's cold caches

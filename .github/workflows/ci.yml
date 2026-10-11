@@ -52,7 +52,7 @@ jobs:
       # Every web route that reads the CMS is force-dynamic, so `next build` never fetches it: CMS_URL
       # only has to parse. Page data is real at request time and nothing is stubbed.
       - name: client bundle carries no secrets or prompt fragments
-        env:
+        env: &web-env
           TWIN_JWT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-00
           TWIN_COOKIE_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-11
           TWIN_REDACT_SECRET: ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-ci-22
@@ -65,6 +65,10 @@ jobs:
           TWIN_PROMPT_CANARY: ci-canary-0123456789
           CMS_URL: http://127.0.0.1:3001
         run: bunx turbo run build --filter=web && bun scripts/scan-client-bundle.ts apps/web/.next/static
+      # needs the build above; the pages render without the CMS (their reads fall back), so nothing else is up
+      - name: initial JS keeps posthog, three, eve and zod out, within budget
+        env: *web-env
+        run: bun run --cwd apps/web perf:chunks
 
   # Live evals against a real model, with a throwaway CMS and agent inside this runner: production
   # agents are internal-only, so nothing outside the compose network can reach them. Spends model credit.
