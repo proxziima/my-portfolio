@@ -98,11 +98,39 @@ Create these PostHog actions:
 - Funnel: `$pageview`, `section_viewed` where section is work, `outbound_click`
 - Conversions trend
 - Web vitals p75 LCP, INP and CLS by `$pathname` and `$device_type`
-- Experience load time: p50 and p95 of `experience_ready.ms` by `experience` (and by `app` for `dos_app`), broken down by `$device_type` and `$browser`
+- Experience load time: p50 and p95 of `experience_ready.ms` by `experience` (and by `app` for `dos_app`), broken down by `$device_type` and `$browser`; for `desk_scene`, by `host` (see "Performance alerts")
 - Experience failure rate: `experience_failed` / (`experience_ready` + `experience_failed`) by `experience`, with `experience_failed` broken down by `reason`
 - Error tracking issues
 - LLM analytics: cost per day, p95 latency, error rate, generations by `gen_ai.agent.name`
 - `$ai_span` count by `mcp_tool`
+
+## Performance alerts
+
+The owner creates these in PostHog; nothing in the repo configures PostHog. posthog-js sends one `$web_vitals` event per page (`capture_performance.web_vitals`), with one property per metric: `$web_vitals_LCP_value`, `$web_vitals_INP_value`, `$web_vitals_CLS_value` and `$web_vitals_FCP_value` (the names posthog-js 1.438 builds as `$web_vitals_<METRIC>_value`; check them in Data management, Properties, before saving an insight).
+
+**Insights** (Product analytics, Trends, daily interval, last 30 days):
+
+| Insight | Series | Breakdown |
+|---|---|---|
+| LCP p75 | `$web_vitals`, aggregated by property value, p75 of `$web_vitals_LCP_value` | `$device_type` |
+| INP p75 | same, p75 of `$web_vitals_INP_value` | `$device_type` |
+| CLS p75 | same, p75 of `$web_vitals_CLS_value` | `$device_type` |
+| Desk scene load p95 | `experience_ready` where `experience = desk_scene`, p95 of `ms` | `host` (`worker` or `main`) |
+
+Filter `embedded` is not set on the vitals insights: the `/os` iframe reports its own `$web_vitals` with `embedded: true`, and they are not the letter's.
+
+**Alerts** (on each insight: Alerts, New alert; notify the owner by email):
+
+| Insight | Condition | Why |
+|---|---|---|
+| LCP p75 | above 2500 ms, 2 consecutive days | Google's "good" threshold |
+| INP p75 | above 200 ms, 2 consecutive days | same |
+| CLS p75 | above 0.1, 2 consecutive days | same; the budget in CI is the stricter 0.05 |
+| Desk scene load p95 | above 4000 ms | the desk taking that long reads as broken; a jump on `main` only points at the worker path failing over |
+
+Two consecutive days keeps a single bad day (one slow network, a crawler burst) from paging; a low-traffic day can still miss the threshold, so read the counts before acting.
+
+**Reading a regression.** Find the first day over the threshold, then the deploy before it and the PR it shipped. Download that PR's `lighthouse` artifact from its CI run (see "Performance budgets") and compare `summary.json` with the previous PR's: the metric that moved, the main-thread breakdown, the top scripts by evaluation time and the heaviest requests point at the change. A regression that only shows on one `$device_type`, or only on `host = main`, narrows it down before any of that.
 
 ## Performance budgets
 
