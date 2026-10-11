@@ -20,6 +20,7 @@ COPY apps/payload/package.json apps/payload/
 COPY apps/web/package.json apps/web/
 COPY packages/cms-types/package.json packages/cms-types/
 COPY packages/eslint-config/package.json packages/eslint-config/
+COPY packages/observability/package.json packages/observability/
 COPY packages/twin/package.json packages/twin/
 COPY packages/typescript-config/package.json packages/typescript-config/
 RUN bun install --frozen-lockfile
