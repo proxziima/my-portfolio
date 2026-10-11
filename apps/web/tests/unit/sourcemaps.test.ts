@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { removeSourceCopies, stripSourceMaps } from '@/scripts/sourcemaps'
+import { removeSourceCopies, stripInlinedCssMaps, stripSourceMaps } from '@/scripts/sourcemaps'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/turbopack')
 
@@ -52,6 +52,28 @@ describe('stripSourceMaps', () => {
     const stripped = readFileSync(join(dir, fixture), 'utf8')
     expect(stripped).not.toContain('sourceMappingURL')
     expect(stripped).toBe(`${source.slice(0, source.indexOf('/*#')).trimEnd()}\n`)
+  })
+
+  it('strips the map comments from the CSS the server inlines into HTML (inlineCss: client reference manifests)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'server-'))
+    const nested = join(dir, 'app/(os)/os')
+    mkdirSync(nested, { recursive: true })
+    const source = readFileSync(join(FIXTURES, 'page_client-reference-manifest.js'), 'utf8')
+    writeFileSync(join(nested, 'page_client-reference-manifest.js'), source)
+    writeFileSync(join(nested, 'page.js'), 'const s = "/*# sourceMappingURL=x.css.map*/"\n') // not a manifest: untouched
+    expect(stripInlinedCssMaps(dir)).toBe(1)
+    const stripped = readFileSync(join(nested, 'page_client-reference-manifest.js'), 'utf8')
+    expect(stripped).not.toContain('sourceMappingURL')
+    // the manifest is still the same script: only the comment (and the escaped newlines before it) left the CSS
+    const manifest = (code: string) => {
+      const scope = { __RSC_MANIFEST: undefined as unknown }
+      new Function('globalThis', code)(scope)
+      return scope.__RSC_MANIFEST as Record<string, { entryCSSFiles: Record<string, Array<{ content: string }>> }>
+    }
+    const before = manifest(source)['/(os)/os/page']!.entryCSSFiles['[project]/apps/web/app/global-not-found']![0]!.content
+    const after = manifest(stripped)['/(os)/os/page']!.entryCSSFiles['[project]/apps/web/app/global-not-found']![0]!.content
+    expect(after).toBe(before.slice(0, before.indexOf('/*#')).trimEnd())
+    expect(readFileSync(join(nested, 'page.js'), 'utf8')).toContain('sourceMappingURL')
   })
 
   it('leaves a sourceMappingURL that is not the trailing comment alone', () => {

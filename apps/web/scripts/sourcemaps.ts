@@ -14,10 +14,12 @@ import { join } from 'node:path'
  */
 const MAP_COMMENT = /\s*\/[/*][#@] sourceMappingURL=\S+?\.map\s*(?:\*\/)?\s*$/
 
+/** Every file under `dir`; `node_modules` (the standalone server's traced dependencies) is not ours to touch. */
 const walk = (dir: string): string[] =>
-  readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name)
-    return statSync(path).isDirectory() ? walk(path) : [path]
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : walk(path)
+    return entry.isFile() ? [path] : []
   })
 
 /** Deletes `*.map` under `dir` and the trailing comments that reference them; returns how many maps went. */
@@ -34,6 +36,31 @@ export function stripSourceMaps(dir: string): number {
     }
   }
   return removed
+}
+
+/**
+ * The same CSS map comment as a JSON-escaped string inside a server manifest: `inlineCss` copies
+ * each stylesheet's text into the client reference manifests at build time, before this script
+ * runs, and renders `<style>` from there. Turbopack writes it after `\n\n` or `\n` (escaped there).
+ */
+const INLINED_CSS_MAP_COMMENT = /(?:\\n)*\/\*# sourceMappingURL=[^\s"\\*]+\.css\.map\s*\*\//g
+
+/**
+ * Strips the CSS map comments from the client reference manifests under `dir` (`.next/server`, and
+ * its copy in `.next/standalone`), so the HTML of every dynamically rendered page inlines CSS without
+ * them. Returns how many manifests changed.
+ */
+export function stripInlinedCssMaps(dir: string): number {
+  let changed = 0
+  for (const file of walk(dir)) {
+    if (!file.endsWith('_client-reference-manifest.js')) continue
+    const text = readFileSync(file, 'utf8')
+    const stripped = text.replace(INLINED_CSS_MAP_COMMENT, '')
+    if (stripped === text) continue
+    writeFileSync(file, stripped)
+    changed++
+  }
+  return changed
 }
 
 /** TypeScript is never a browser asset: a file with one of these extensions under `media/` is a source copy. */
@@ -71,6 +98,9 @@ if (import.meta.main) {
     }
   } else console.log('[sourcemaps] no POSTHOG_CLI_TOKEN/POSTHOG_CLI_ENV_ID: upload skipped')
   console.log(`[sourcemaps] removed ${stripSourceMaps(dir)} map(s) from .next/static`)
+  // the server's copy of the CSS for inlineCss, and the standalone server's copy of that
+  const servers = [join(process.cwd(), '.next/server'), join(process.cwd(), '.next/standalone')].filter((d) => existsSync(d))
+  console.log(`[sourcemaps] stripped CSS map comments from ${servers.reduce((n, d) => n + stripInlinedCssMaps(d), 0)} server manifest(s)`)
   const copies = removeSourceCopies(dir)
   console.log(`[sourcemaps] removed ${copies.length} source copies from .next/static/media${copies.length ? `: ${copies.join(', ')}` : ''}`)
 }

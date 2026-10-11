@@ -1,0 +1,2 @@
+globalThis.__RSC_MANIFEST = globalThis.__RSC_MANIFEST || {};
+globalThis.__RSC_MANIFEST["/(os)/os/page"] = {"entryCSSFiles":{"[project]/apps/web/app/global-not-found":[{"path":"static/chunks/0ua8jn8zclbnc.css","inlined":true,"content":"@media (prefers-reduced-motion:reduce){*,:before,:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}\n\n/*# sourceMappingURL=3-5jik2mfjp7h.css.map*/"}]}};
