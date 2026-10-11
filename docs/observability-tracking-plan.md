@@ -330,15 +330,14 @@ One turn of a twin conversation:
 invoke_agent <agent>                       eve turn span (the trace root)
  └─ agent.step                             one model attempt; carries ai.settings.context.*
      ├─ chat <model>                       model call  ->  $ai_generation; carries ai.settings.context.*
-     └─ agent.action                       one tool or action
-         └─ execute_tool <tool>            eve's tool span (gen_ai.tool.*)
-             └─ tools/call <tool>          the twin's MCP client span (inSpan)
-                 └─ mcp tools/call <tool> the CMS's server span ($ai_span from Payload, joined by traceparent)
+     └─ execute_tool <tool>                one tool call: eve's tool span (gen_ai.tool.*, agent.action.*)
+         └─ tools/call <tool>              the twin's MCP client span (inSpan)
+             └─ mcp tools/call <tool>      the CMS's server span ($ai_span from Payload, joined by traceparent)
 ```
 
 Plus, per visitor message, two classifier generations that run before and after the turn, each inside its own `invoke_agent` span: `twin.gate` and `twin.intent` ([5.4](#54-classifier-generations)).
 
-Span names come from eve's tracing (`agent.step`, `agent.action`, `invoke_agent <name>`, `chat <model>`, `execute_tool <tool>`; checked against eve 0.71). The repo adds only the `tools/call <tool>` span ([payload-mcp.ts:27](../apps/agents/agent/lib/payload-mcp.ts#L27), tools `twinIdentity`, `twinSearch`, `twinDisclose`, [payload-mcp.ts:20](../apps/agents/agent/lib/payload-mcp.ts#L20)).
+Span names come from eve's tracing (`agent.step`, `invoke_agent <name>`, `chat <model>`, `execute_tool <tool>`; checked against eve 0.74, where a tool call is one `execute_tool` span with no `agent.action` wrapper). The repo adds only the `tools/call <tool>` span ([payload-mcp.ts:27](../apps/agents/agent/lib/payload-mcp.ts#L27), tools `twinIdentity`, `twinSearch`, `twinDisclose`, [payload-mcp.ts:20](../apps/agents/agent/lib/payload-mcp.ts#L20)).
 
 **What PostHog makes of them.** `PostHogSpanProcessor` exports only spans whose name or attribute keys start with `gen_ai.`, `llm.`, `ai.` or `traceloop.`; everything else is dropped. PostHog converts the exported OTLP spans server-side: model calls (`chat <model>`) become `$ai_generation`, other spans become `$ai_span`, and the trace is grouped by `$ai_trace_id`; the `$ai_trace` view is PostHog's. The exact server-side mapping cannot be tested in the repo, hence the [first-deploy checks](observability.md#verify-after-first-deploy).
 
@@ -434,12 +433,12 @@ All capture sites, each producing a PostHog `$exception`. Server sites use [`cap
 | Agent `turn.failed` | `twin-agent` | `kind: 'turn'`, `sessionId`, `turnId` | [errors.ts:12](../apps/agents/agent/instrumentation/errors.ts#L12) |
 | Agent `session.failed` | `twin-agent` | `kind: 'session'`, `sessionId`, `turnId` | [errors.ts:13](../apps/agents/agent/instrumentation/errors.ts#L13) |
 | Agent `model.call.failed` | `twin-agent` | `kind: 'model'`, `sessionId`, `turnId` | [errors.ts:14](../apps/agents/agent/instrumentation/errors.ts#L14) |
-| Agent `action.failed` | `twin-agent` | `kind: 'action'`, `sessionId`, `turnId`; **only when `outcome === 'failed'`** (rejections, cancellations and abandons are normal flow) | [errors.ts:15](../apps/agents/agent/instrumentation/errors.ts#L15), [errors.ts:19](../apps/agents/agent/lib/observability/errors.ts#L19) |
+| Agent `tool.call.failed` | `twin-agent` | `kind: 'tool'`, `sessionId`, `turnId`; **only when `outcome` is `failed` or absent** (rejections, cancellations and abandons are normal flow) | [errors.ts:15](../apps/agents/agent/instrumentation/errors.ts#L15), [errors.ts:22](../apps/agents/agent/lib/observability/errors.ts#L22) |
 | MCP `ERROR` event | `mcp:payload` | `source`, `severity`, `context` | [observability.ts:64-68](../apps/payload/src/mcp/observability.ts#L64) |
 
 Notes:
 
-- Agent reports go through [reportAgentFailure](../apps/agents/agent/lib/observability/errors.ts#L18); a non-`Error` value is wrapped as `new Error(String(...))`. They are bugs for the owner, found by `sessionId`, which is why they share one id. The module records outputs only because error details are an output; it reads no prompts ([errors.ts:10](../apps/agents/agent/instrumentation/errors.ts#L10)), and flushes on shutdown ([errors.ts:17](../apps/agents/agent/instrumentation/errors.ts#L17)).
+- Agent reports go through [reportAgentFailure](../apps/agents/agent/lib/observability/errors.ts#L21); a non-`Error` value is wrapped as `new Error(String(...))`. They are bugs for the owner, found by `sessionId`, which is why they share one id. The module records outputs only because error details are an output; it reads no prompts ([errors.ts:10](../apps/agents/agent/instrumentation/errors.ts#L10)), and flushes on shutdown ([errors.ts:17](../apps/agents/agent/instrumentation/errors.ts#L17)).
 - One failure can surface as several issues (the model call and the turn it killed). Different exception types stay separate issues; read them together by `sessionId`.
 - The `path` is sent without its query string, which can carry secrets such as `/api/preview?previewSecret=...`.
 - A failed twin send reaches the visitor as the `offline` refusal; the BFF `$exception` is the server-side cause, and the browser's `twin_refusal` with `reason = offline` is the visitor-side effect.

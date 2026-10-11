@@ -14,14 +14,19 @@ describe('reportAgentFailure', () => {
     expect(error).toBeInstanceOf(Error)
     expect((error as Error).message).toBe('rate limited')
   })
-  it('reports an action that genuinely failed', () => {
+  it('reports a tool call that genuinely failed', () => {
     const capture = vi.fn()
-    reportAgentFailure(capture, 'action', { error: new Error('x'), sessionId: 's-1', outcome: 'failed' })
+    reportAgentFailure(capture, 'tool', { error: new Error('x'), sessionId: 's-1', outcome: 'failed' })
+    expect(capture).toHaveBeenCalledWith(expect.any(Error), { distinctId: 'twin-agent', properties: { kind: 'tool', sessionId: 's-1' } })
+  })
+  it('treats a failed tool call without an outcome as a failure', () => {
+    const capture = vi.fn()
+    reportAgentFailure(capture, 'tool', { error: new Error('x'), sessionId: 's-1' })
     expect(capture).toHaveBeenCalledOnce()
   })
-  it.each(['cancelled', 'rejected', 'abandoned'])('skips actions that were %s', (outcome) => {
+  it.each(['cancelled', 'rejected', 'abandoned'])('skips tool calls that were %s', (outcome) => {
     const capture = vi.fn()
-    reportAgentFailure(capture, 'action', { error: new Error('x'), sessionId: 's-1', outcome })
+    reportAgentFailure(capture, 'tool', { error: new Error('x'), sessionId: 's-1', outcome })
     expect(capture).not.toHaveBeenCalled()
   })
 })
