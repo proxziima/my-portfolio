@@ -1,5 +1,88 @@
 # Changelog
 
+## [0.1.0](https://github.com/proxziima/my-portfolio/compare/v0.0.1...v0.1.0) (2026-10-11)
+
+
+### Features
+
+* **agents:** classifier generations and Payload MCP calls are traced spans ([528ec7b](https://github.com/proxziima/my-portfolio/commit/528ec7bab75cfe5fa8b8c5df89e3718ddea42587))
+* **agents:** eve traces go to PostHog LLM analytics, redacted and tied to the visitor ([fe2e55a](https://github.com/proxziima/my-portfolio/commit/fe2e55a46cc276ed563ed72f8b1a42521ce395a3))
+* **agents:** turn, session, model and tool failures reach PostHog Error Tracking ([7b33ca4](https://github.com/proxziima/my-portfolio/commit/7b33ca486f9339fbb32d7b99bd2af127e724ecd1))
+* **cms:** MCP tool calls become PostHog spans joined to the caller's trace; CMS errors tracked ([99c7f63](https://github.com/proxziima/my-portfolio/commit/99c7f6391ab6e7334c4a5ce0998ffa00087937cb))
+* **observability:** shared PostHog config, cookie parsing and server client ([22f3cec](https://github.com/proxziima/my-portfolio/commit/22f3cecec4174fc6b71ad55c1569b3bc379ee014))
+* PostHog observability (analytics, web vitals, errors, LLM and MCP traces) and SEO hygiene ([dbc9c08](https://github.com/proxziima/my-portfolio/commit/dbc9c083e378b76da6bc1c1ecbca179f7e4b26a7))
+* **twin:** the visitor JWT carries the browser's PostHog ids to the agent ([98c2286](https://github.com/proxziima/my-portfolio/commit/98c2286c31c4f4c12cc3f945b5f46a92bacb4467))
+* **web:** asset pipeline core with hashed outputs, generated manifest and a drift check ([e2ac5e5](https://github.com/proxziima/my-portfolio/commit/e2ac5e5b491bf23c048fec1981ccf489a7eaa9a6))
+* **web:** assets:check verifies output bytes, the manifest and orphans ([7753777](https://github.com/proxziima/my-portfolio/commit/7753777cfbc98d2d05e4f6ae4c6d53c7215c8d25))
+* **web:** client, server and BFF errors reach PostHog Error Tracking ([0b8a2e4](https://github.com/proxziima/my-portfolio/commit/0b8a2e4a5126daf8f61e7c324563d20b0ff41e10))
+* **web:** desk worker protocol, frame pairing ring and the worker host ([b696600](https://github.com/proxziima/my-portfolio/commit/b696600f23df5f65f2abc94d59d85995bfe65ccf))
+* **web:** engaged time per section and on the OS ([3077657](https://github.com/proxziima/my-portfolio/commit/307765729545025a33f6806c2d1af857490b8403))
+* **web:** first-party /relay proxy to PostHog resolved at runtime ([52e75a9](https://github.com/proxziima/my-portfolio/commit/52e75a9252ae7d141505105e199e0e8e84eaadc7))
+* **web:** load time and failures for desk, OS boot, DOS apps and twin replies ([dc71486](https://github.com/proxziima/my-portfolio/commit/dc714860fab6fa65475d2e667b94118ef4b29fa4))
+* **web:** metadataBase, canonical, robots, sitemap, Person JSON-LD, semantic footer and 404 ([c01f1ce](https://github.com/proxziima/my-portfolio/commit/c01f1ce431adbdbb0c728389589d5a04a072d59b))
+* **web:** PostHog client analytics with outbound, CTA and section tracking ([f48b044](https://github.com/proxziima/my-portfolio/commit/f48b0446fc0dc7abfdfcac925d700bd0804b1d3c))
+* **web:** power state machine and boot-on-approach watcher for the monitor ([d5033d4](https://github.com/proxziima/my-portfolio/commit/d5033d47dde61aa05a2bb597707d2f4b983bc90a))
+* **web:** private source maps for PostHog symbolication, never served ([e4fe1de](https://github.com/proxziima/my-portfolio/commit/e4fe1deec65d0b8f9d50d0957a7f87c5a410a893))
+* **web:** product events for role, theme, OS apps, desk CTAs, twin chat and booking ([4770003](https://github.com/proxziima/my-portfolio/commit/4770003a058bd2ec5b800202a2051736d81238a8))
+
+
+### Bug Fixes
+
+* **agents:** classifiers emit one native generation tied to the visitor ([28c0e1e](https://github.com/proxziima/my-portfolio/commit/28c0e1ed31ea3d2efe2a261d980ff37665b5b971))
+* **agents:** keep MCP tool error content out of exception text ([37d42ff](https://github.com/proxziima/my-portfolio/commit/37d42ff9f078d4047be8a0c3c975bd38c05edf63))
+* **agents:** PostHog export redacts events and status, keeps ids intact, scrubs the canary first ([288a0e9](https://github.com/proxziima/my-portfolio/commit/288a0e9e9b3fb3a1b8049feaebc82f3366b853e8))
+* **agents:** PostHog redactor expires with its rules after an hour, refresh survives a sync throw, composition tested through eve's real pipeline ([761a047](https://github.com/proxziima/my-portfolio/commit/761a047517b703a2d24bfd6ebec265d742f2069d))
+* **ci:** run the repo scripts' tests by path, not as a name filter ([ee875f9](https://github.com/proxziima/my-portfolio/commit/ee875f988bfe53e766859d4e3218c450da974431))
+* **cms:** keep zod 3 and eslint 9, which plugin-mcp and eslint-plugin-react require ([43c8455](https://github.com/proxziima/my-portfolio/commit/43c84551538cb1049a40947afe993c5cfba117f2))
+* **cms:** MCP spans record argument names, never values ([3757d1c](https://github.com/proxziima/my-portfolio/commit/3757d1cf62456046e902aa9925d4bbd5ccb473d7))
+* **cms:** report request errors without the query string ([d26c66a](https://github.com/proxziima/my-portfolio/commit/d26c66a3c91b11c42413c101596ed898e83a8a1e))
+* **cms:** skip MCP initialize and notifications in mcp_request ([931420f](https://github.com/proxziima/my-portfolio/commit/931420fce239064d366f7a7607d997f622dd9697))
+* **desk:** treat only a coarse, hover-less primary pointer as touch ([1021057](https://github.com/proxziima/my-portfolio/commit/102105795b044c58f4f5d542e3a0710c9583ee39))
+* **docker:** install the observability workspace with the rest of the manifests ([b0427a1](https://github.com/proxziima/my-portfolio/commit/b0427a195ce9d46b244f57efae8e7f3a53579754))
+* **fonts:** load Inter with display optional, so the font never moves the letter ([8b2c0e4](https://github.com/proxziima/my-portfolio/commit/8b2c0e4eb2d3e385005a78e4057c02f2f1d4dd5a))
+* **fonts:** reach Arial's Linux clones and gate the swap on every platform ([4dcf78a](https://github.com/proxziima/my-portfolio/commit/4dcf78a8431642922a0c7160b5931dd7c42f66f9))
+* **perf:** parse the initial scripts with an HTML parser, not a tag regex ([0eff8f0](https://github.com/proxziima/my-portfolio/commit/0eff8f071b57690f6aa7e3d675b1b3012f9964e0))
+* **web:** an OS app that fails to load fails in its own window ([1790daa](https://github.com/proxziima/my-portfolio/commit/1790daa263916df3ce060e857c7fcd7d4bf5a629))
+* **web:** analytics without a token stops queueing, not just clears once ([441a802](https://github.com/proxziima/my-portfolio/commit/441a8029dabfa969cc8e9c2e1dd5da89eb137d93))
+* **web:** drop the worker source copy Turbopack emits into static/media ([2573b1b](https://github.com/proxziima/my-portfolio/commit/2573b1b4613862f88ed9ff01e80279de16be4b6d))
+* **web:** keep the twin transcript and composer out of session replay ([478981d](https://github.com/proxziima/my-portfolio/commit/478981d8dfcb5e9ca0990fcf59e00840a8d169f5))
+* **web:** key the Analytics effect on token and UI host, not the object ([2bf7963](https://github.com/proxziima/my-portfolio/commit/2bf7963951b0b8b68dd687c9ed9e6a13f9a424d2))
+* **web:** name sections by id in section_viewed and outbound_click ([8a301b1](https://github.com/proxziima/my-portfolio/commit/8a301b13870644a483e04d1ff20912e2fa680989))
+* **web:** per-platform matched font fallbacks; the bio keeps its line count when Inter swaps in ([ed761f0](https://github.com/proxziima/my-portfolio/commit/ed761f0dc8eb877b1c99f5328a0dec9b133d7972))
+* **web:** quote spaced arguments in the Lighthouse runner on Windows ([7d5f2d1](https://github.com/proxziima/my-portfolio/commit/7d5f2d19a886490bfe86625693136af840ab48a7))
+* **web:** rails measure to the footer, safe preconnect, large Twitter card ([0dc2bf9](https://github.com/proxziima/my-portfolio/commit/0dc2bf98cad19fd19517fbfc52809c42020b25bc))
+* **web:** role_selected counts every settled role choice, picker included ([d38231b](https://github.com/proxziima/my-portfolio/commit/d38231b4a7249e104077ee9b71d22488b9191e8d))
+* **web:** self-host Inter, Caveat and Ultra so builds never fetch fonts ([80f536a](https://github.com/proxziima/my-portfolio/commit/80f536a8cfe83edb88064f083cd0b74f22761eb0))
+* **web:** self-host Inter, Caveat and Ultra so builds never fetch fonts ([d6d2b66](https://github.com/proxziima/my-portfolio/commit/d6d2b66f29e7aff5407967954ba6cf113ad59a32))
+* **web:** strip CSS map comments from the copy inlineCss renders from ([0115fc7](https://github.com/proxziima/my-portfolio/commit/0115fc7e319800279d115ae5e76365e6f864af47))
+* **web:** strip Turbopack's CSS map comment, which has no space before */ ([f951b84](https://github.com/proxziima/my-portfolio/commit/f951b84bc1ec5a219e8c40b51f00a235c148d899))
+* **web:** the figure caption keeps one line of height across roles ([e34a139](https://github.com/proxziima/my-portfolio/commit/e34a1394cf9c4b5596a0c44c6d763c7a14ed8ceb))
+* **web:** the global error boundary sits at the app root so it covers both root layouts ([8e2822a](https://github.com/proxziima/my-portfolio/commit/8e2822ab11bba94566f4fbce7733d0ce2017de58))
+* **web:** the PostHog relay never forwards site cookies ([cbfc470](https://github.com/proxziima/my-portfolio/commit/cbfc47037a83f967980073f33c764c7dd65566f8))
+* **web:** twin analytics names renewals honestly and tracks every refusal ([da2d263](https://github.com/proxziima/my-portfolio/commit/da2d263d6dbe8aee1d480204070f1631e3629a1b))
+* **web:** validate analytics and site env at boot; never throw per request ([739792d](https://github.com/proxziima/my-portfolio/commit/739792d6d6ed5c205aae8380ade5f5d20cde8b67))
+
+
+### Performance
+
+* chunks starts the production server, reads the scripts / and /os load at load, and fails when posthog-js, three, eve or zod are in them or the initial JS passes its budget. Runs in CI after the web build; no CMS needed. Server helpers move to scripts/perf/server.ts. ([673ef12](https://github.com/proxziima/my-portfolio/commit/673ef12e849de012dcf1044f1ca3164778071268))
+* PageSpeed — worker-rendered desk, boot on approach, asset pipeline, Lighthouse CI ([fd1b27d](https://github.com/proxziima/my-portfolio/commit/fd1b27da6689a583b12d1ced4465548d641af5c2))
+* **web:** CRT loop encodes chosen by a composited parity gate with grain statistics ([7b28310](https://github.com/proxziima/my-portfolio/commit/7b28310e1aa51cecbf3830658b5eb0e8574b8be8))
+* **web:** decode the rocker atlas with createImageBitmap, off the main thread ([af0b1ab](https://github.com/proxziima/my-portfolio/commit/af0b1ab904ee288f59de3e69b9ef3f5bb82ba652))
+* **web:** fetch the rocker atlas at an image's priority ([94546bd](https://github.com/proxziima/my-portfolio/commit/94546bd6af29a85a377065a3f6c301ae8a840b8d))
+* **web:** inline the CSS and give public media real cache lifetimes ([98bd3d8](https://github.com/proxziima/my-portfolio/commit/98bd3d851374ceb0771e4a2d1453ae1ebdadd253))
+* **web:** meshopt models and off-thread texture decode with AVIF where it passes parity ([5045b2e](https://github.com/proxziima/my-portfolio/commit/5045b2e8ac764bd68857ee3d56bcdd3604d87617))
+* **web:** OS apps load with their first window; the boot chunk drops eve and zod ([edb9690](https://github.com/proxziima/my-portfolio/commit/edb9690ec38e2f6d7a8ed89be36ab7bb0b72865a))
+* **web:** parity-gated AVIF/WebP for the screen layers and the switch fallbacks ([55ad15d](https://github.com/proxziima/my-portfolio/commit/55ad15dffeb46f0bbea3baeba984301bbdf87ec6))
+* **web:** posthog-js in its own chunk, events queue until it loads ([a8dfeef](https://github.com/proxziima/my-portfolio/commit/a8dfeef4accd1c67c2802a746a082b8d6b7f70ae))
+* **web:** the bulb sample goes through the asset pipeline, hashed and immutable ([64cb808](https://github.com/proxziima/my-portfolio/commit/64cb808832613716f990cbb264ba733e4cbb283a))
+* **web:** the CRT loops download only once the layers can show, best codec first ([69452c9](https://github.com/proxziima/my-portfolio/commit/69452c934f032f04e0eae330cbe334e316b5a328))
+* **web:** the desk renders in a worker where supported, main thread otherwise ([dc06730](https://github.com/proxziima/my-portfolio/commit/dc06730b590847debe9723970c696f51c3ba88ce))
+* **web:** the letter renders on the server; only stateful pieces hydrate ([cb29012](https://github.com/proxziima/my-portfolio/commit/cb29012000cc497d4928ef16676b3d8ac5ef19bb))
+* **web:** the main thread loads no renderer or loader when the worker draws ([008b573](https://github.com/proxziima/my-portfolio/commit/008b57311370054909fe29c3c8ac0a76004abc75))
+* **web:** the monitor's OS boots on approach instead of during load ([fa90ef7](https://github.com/proxziima/my-portfolio/commit/fa90ef7387ae63d480820a93852b38ea32112042))
+* **web:** the screen's still layers download on power-on, not at desk mount ([d6d0117](https://github.com/proxziima/my-portfolio/commit/d6d01179c5aa1a8bba8c4eed360a5c51c5230f56))
+
 ## 0.0.1 (2026-10-07)
 
 
