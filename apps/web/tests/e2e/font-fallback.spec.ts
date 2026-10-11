@@ -1,31 +1,28 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect, type Browser, type Page } from '@playwright/test'
-import { drum, openPortfolio, test } from './support'
+import { openPortfolio, test } from './support'
 
 /**
- * The font swap, gated two ways (spec §4.1):
+ * Inter is loaded with `font-display: optional` (spec §4.1): the face the letter first appears in is the face it keeps,
+ * so loading the font can never move the text. What a reader sees, on every platform:
  *
- * - Where the fallback is a face with a committed tuning (`styles/font-fallbacks.css`), it must wrap
- *   every role's headline and bio exactly like Inter: same block heights, so nothing below moves.
- * - On any platform, tuned face or not, the swap itself must shift the layout by at most `MAX_CLS`,
- *   the owner-accepted residual of words moving inside equal-height paragraphs.
+ * - a normal load (Inter preloaded and served promptly) shows the letter in Inter from its first paint, with no shift;
+ * - a load where Inter arrives after the block period stays in the matched fallback for the page's life: when the
+ *   font lands, nothing swaps and nothing moves.
  *
- * Each test names the system face the fallback resolved to, so a runner that changes fonts says so.
+ * Each test names the system face the text rendered in, so a runner that changes fonts says so.
  */
-const MAX_CLS = 0.05
+const MAX_CLS = 0.001
+const SIZES = [
+  { width: 1350, height: 940 },
+  { width: 412, height: 823 },
+] // the layout-shift recorder's sizes (scripts/perf/layout-shifts.ts)
 
 /** Every system face the fallbacks were tuned for (or are metric clones of one): each `local()` name. */
 const TUNED = new Set(
   [...readFileSync(fileURLToPath(new URL('../../styles/font-fallbacks.css', import.meta.url)), 'utf8').matchAll(/local\('([^']+)'\)/g)].map((m) => m[1]!),
 )
-
-/** Heights of the blocks above the figure; a font swap must not change any of them. */
-const blocks = (page: Page) =>
-  page.evaluate(() => ({
-    h1: Math.round(document.querySelector('h1')!.getBoundingClientRect().height),
-    bio: [...document.querySelectorAll('[data-anchor="bio"] p')].map((p) => Math.round(p.getBoundingClientRect().height)),
-  }))
 
 interface Face {
   family: string
@@ -33,9 +30,8 @@ interface Face {
 }
 
 /**
- * The system faces Chromium rendered the headline and the bio with (DevTools' "Rendered fonts"), by glyphs
- * drawn, most first. The first is the text face; the rest are per-character fallbacks (an emoji, a symbol)
- * that the text face lacks, the same whichever face sets the text.
+ * The faces Chromium rendered the headline and the bio with (DevTools' "Rendered fonts"), by glyphs drawn, most first.
+ * The first is the text face; the rest are per-character fallbacks (an emoji, a symbol) that the text face lacks.
  */
 async function renderedFaces(page: Page): Promise<Face[]> {
   const cdp = await page.context().newCDPSession(page)
@@ -58,95 +54,116 @@ async function renderedFaces(page: Page): Promise<Face[]> {
 
 const describeFaces = (faces: Face[]) => faces.map((f) => `${f.family} (${f.glyphs} glyphs)`).join(', ')
 
-async function roleCount(page: Page): Promise<number> {
-  await drum(page).click()
-  const n = await page.getByRole('option').count()
-  await page.keyboard.press('Escape')
-  return Math.max(1, n)
-}
-
-async function measure(browser: Browser, width: number, blockFonts: boolean) {
-  const context = await browser.newContext({ viewport: { width, height: 900 } })
-  const page = await context.newPage()
-  await page.route('**/*.glb', () => new Promise<void>(() => {}))
-  if (blockFonts) await page.route('**/*.woff2', (r) => r.abort())
-  await openPortfolio(page)
-  await page.evaluate(() => document.fonts.ready)
-  const faces = await renderedFaces(page)
-  const n = await roleCount(page)
-  const layouts = []
-  for (let i = 1; i <= n; i++) {
-    await page.keyboard.press(String(i))
-    await page.waitForTimeout(700) // the word morph settles
-    layouts.push(await blocks(page))
-  }
-  await context.close()
-  return { faces, layouts }
-}
-
-// 412 and 1350 are the layout-shift recorder's sizes (scripts/perf/layout-shifts.ts)
-for (const width of [390, 412, 768, 1350, 1440]) {
-  test(`a tuned fallback face wraps like Inter at ${width}px, for every role`, async ({ browser }) => {
-    test.setTimeout(120_000)
-    const fallback = await measure(browser, width, true)
-    const face = fallback.faces[0]?.family ?? 'nothing'
-    test.info().annotations.push({ type: 'fallback face', description: describeFaces(fallback.faces) })
-    // only a tuned face can be held to Inter's line breaks; the swap CLS tests below still bound any other
-    test.skip(!TUNED.has(face), `the fallback resolved to ${face}, which styles/font-fallbacks.css has no tuning for`)
-    const inter = await measure(browser, width, false)
-    expect(fallback.layouts, `the fallback (${face}) wraps every block like Inter`).toEqual(inter.layouts)
-  })
-}
-
 interface Shift {
   t: number
   value: number
   hadRecentInput: boolean
 }
 
-for (const { width, height } of [
-  { width: 1350, height: 940 },
-  { width: 412, height: 823 },
-]) {
-  test(`swapping the fallback for Inter shifts the layout by at most ${MAX_CLS} at ${width}×${height}`, async ({ browser }) => {
+/** A page at `size` that records every layout shift from the start of the load, the desk models held back. */
+async function recordingPage(browser: Browser, size: { width: number; height: number }) {
+  const context = await browser.newContext({ viewport: size })
+  const page = await context.newPage()
+  await page.route('**/*.glb', () => new Promise<void>(() => {}))
+  await page.addInitScript(() => {
+    const w = window as unknown as { __shifts: Shift[] }
+    w.__shifts = []
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries() as unknown as Array<PerformanceEntry & { value: number; hadRecentInput: boolean }>) {
+        w.__shifts.push({ t: e.startTime, value: e.value, hadRecentInput: e.hadRecentInput })
+      }
+    }).observe({ type: 'layout-shift', buffered: true })
+  })
+  return { context, page }
+}
+
+/** The load's CLS so far (every shift without recent input; a load this short is one session window). */
+const cls = async (page: Page) =>
+  (await page.evaluate(() => (window as unknown as { __shifts: Shift[] }).__shifts))
+    .filter((s) => !s.hadRecentInput)
+    .reduce((sum, s) => sum + s.value, 0)
+
+const frames = (page: Page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+
+/** Inter's `@font-face` rules as the page has them: display and source URLs. */
+const interFaces = (page: Page) =>
+  page.evaluate(() =>
+    [...document.styleSheets].flatMap((sheet) => {
+      let rules: CSSRule[] = []
+      try {
+        rules = [...sheet.cssRules]
+      } catch {
+        return [] // a cross-origin sheet
+      }
+      return rules
+        .filter((r): r is CSSFontFaceRule => r instanceof CSSFontFaceRule && /^['"]?Inter['"]?$/.test(r.style.getPropertyValue('font-family').trim()))
+        .map((r) => ({
+          display: r.style.getPropertyValue('font-display'),
+          urls: [...r.style.getPropertyValue('src').matchAll(/url\(["']?([^"')]+)["']?\)/g)].map((m) => new URL(m[1]!, sheet.href ?? location.href).href),
+        }))
+    }),
+  )
+
+for (const size of SIZES) {
+  test(`a normal load shows the letter in Inter from its first paint, with no shift, at ${size.width}×${size.height}`, async ({ browser }) => {
     test.setTimeout(60_000)
-    const context = await browser.newContext({ viewport: { width, height } })
-    const page = await context.newPage()
-    await page.route('**/*.glb', () => new Promise<void>(() => {}))
-    // the web fonts are held until the page has laid out and hydrated in the fallback, then all arrive at once
+    const { context, page } = await recordingPage(browser, size)
+    const documentResponse = page.waitForResponse((r) => r.request().resourceType() === 'document' && r.frame() === page.mainFrame())
+    await openPortfolio(page)
+    const faces = await interFaces(page)
+    expect(faces.length, "the page has Inter's @font-face").toBeGreaterThan(0)
+    for (const f of faces) expect(f.display, 'Inter is optional: the first face shown is the one kept').toBe('optional')
+    // the preload is what puts Inter there before the first paint: next/font sends it as a Link header (or a <link>)
+    const header = (await documentResponse).headers()['link'] ?? ''
+    const preloads = [
+      ...[...header.matchAll(/<([^>]+)>([^,]*)/g)].filter((m) => /rel="?preload/.test(m[2]!) && /as="?font/.test(m[2]!)).map((m) => new URL(m[1]!, page.url()).href),
+      ...(await page.evaluate(() => [...document.querySelectorAll<HTMLLinkElement>('link[rel="preload"][as="font"]')].map((l) => l.href))),
+    ]
+    expect(
+      faces.some((f) => f.urls.some((u) => preloads.includes(u))),
+      `Inter's woff2 is preloaded (preloads: ${preloads.join(', ') || 'none'})`,
+    ).toBe(true)
+    await page.evaluate(() => document.fonts.ready)
+    await frames(page)
+    // with `optional`, a face that missed the block period is never used afterwards: Inter now means Inter from the first paint
+    const rendered = await renderedFaces(page)
+    test.info().annotations.push({ type: 'rendered face', description: describeFaces(rendered) })
+    expect(rendered[0]?.family, 'the letter is set in Inter').toBe('Inter')
+    const value = await cls(page)
+    test.info().annotations.push({ type: 'load CLS', description: value.toFixed(4) })
+    await context.close()
+    expect(value, 'layout shift during the load').toBeLessThanOrEqual(MAX_CLS)
+  })
+
+  test(`Inter arriving late leaves the letter in the matched fallback, with no shift, at ${size.width}×${size.height}`, async ({ browser }) => {
+    test.setTimeout(60_000)
+    const { context, page } = await recordingPage(browser, size)
+    // the web fonts are held well past the block period, until the page has laid out and hydrated in the fallback
     let release!: () => void
     const released = new Promise<void>((resolve) => (release = resolve))
     await page.route('**/*.woff2', async (route) => {
       await released
       await route.continue()
     })
-    await page.addInitScript(() => {
-      const w = window as unknown as { __shifts: Shift[] }
-      w.__shifts = []
-      new PerformanceObserver((list) => {
-        for (const e of list.getEntries() as unknown as Array<PerformanceEntry & { value: number; hadRecentInput: boolean }>) {
-          w.__shifts.push({ t: e.startTime, value: e.value, hadRecentInput: e.hadRecentInput })
-        }
-      }).observe({ type: 'layout-shift', buffered: true })
-    })
     // the load event waits for the preloaded fonts, which are held
     await openPortfolio(page, '/', 'domcontentloaded')
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+    await frames(page)
     await page.waitForTimeout(500)
-    const faces = await renderedFaces(page)
-    test.info().annotations.push({ type: 'fallback face', description: describeFaces(faces) })
-    // otherwise there is no swap to measure and the bound would pass for the wrong reason
+    const before = await renderedFaces(page)
+    const fallback = before[0]?.family ?? 'nothing'
+    test.info().annotations.push({ type: 'fallback face', description: describeFaces(before) })
+    // otherwise Inter could not arrive late and the test would pass for the wrong reason
     expect(await page.evaluate(() => document.fonts.status), 'the web fonts are still on their way').toBe('loading')
-    const t0 = await page.evaluate(() => performance.now())
+    // the rare view without Inter is the tuned one, not an untuned system face
+    expect(TUNED.has(fallback), `the fallback resolved to ${fallback}, a face styles/font-fallbacks.css has a tuning for`).toBe(true)
     release()
     await page.evaluate(() => document.fonts.ready)
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
-    expect((await renderedFaces(page))[0]?.family, 'Inter took over').toBe('Inter')
+    await frames(page)
     await page.waitForTimeout(500)
-    const shifts = await page.evaluate(() => (window as unknown as { __shifts: Shift[] }).__shifts)
-    const cls = shifts.filter((s) => s.t >= t0 && !s.hadRecentInput).reduce((sum, s) => sum + s.value, 0)
-    test.info().annotations.push({ type: 'swap CLS', description: cls.toFixed(4) })
+    expect((await renderedFaces(page))[0]?.family, 'the letter keeps the face it was first shown in').toBe(fallback)
+    const value = await cls(page)
+    test.info().annotations.push({ type: 'load CLS', description: value.toFixed(4) })
     await context.close()
-    expect(cls, `layout shift from the font swap (fallback: ${faces[0]?.family})`).toBeLessThanOrEqual(MAX_CLS)
+    expect(value, `layout shift during the load (fallback: ${fallback})`).toBeLessThanOrEqual(MAX_CLS)
   })
 }
