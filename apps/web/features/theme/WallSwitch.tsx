@@ -1,5 +1,7 @@
 'use client'
 import { forwardRef, useEffect, useRef } from 'react'
+import { ASSETS, type ImageAsset } from '@/lib/assets/manifest'
+import { fallbackSrc, srcset } from '@/lib/assets/srcset'
 import { playClick } from '@/lib/audio/click'
 import { useReducedMotion } from '@/lib/dom/use-reduced-motion'
 import { applyTheme, currentTheme, stampThemeTransition } from './theme-dom'
@@ -9,6 +11,20 @@ import styles from './WallSwitch.module.css'
 import { track } from '@/lib/analytics/events'
 
 const RAPID_MS = 300
+/** The switch's layout width (`.switcher` in WallSwitch.module.css): the density pick for the fallback frames. */
+const SIZES = '2.8rem'
+
+/** A no-canvas fallback frame: AVIF, else the WebP candidates; sized by CSS. */
+function Frame({ asset, className }: { asset: ImageAsset; className: string }) {
+  const avif = srcset(asset, 'avif')
+  return (
+    <picture>
+      {avif && <source type="image/avif" srcSet={avif} sizes={SIZES} />}
+      {/* eslint-disable-next-line @next/next/no-img-element -- no-canvas fallback frames, sized by CSS */}
+      <img className={className} src={fallbackSrc(asset)} srcSet={srcset(asset, 'fallback')} sizes={SIZES} alt="" width={asset.width} height={asset.height} decoding="async" />
+    </picture>
+  )
+}
 
 interface Props {
   /** true while the blowout owns the switch */
@@ -57,10 +73,8 @@ export const WallSwitch = forwardRef<HTMLDivElement, Props>(function WallSwitch(
         aria-label={dark ? 'Turn the lights on' : 'Turn the lights off'}
       >
         <span className={styles.stage} data-motion-ready={ready} aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element -- no-canvas fallback frames, sized by CSS */}
-          <img className={`${styles.image} ${styles.state} ${styles.light}`} src="/theme-switch/rocker-on.webp" alt="" width={530} height={700} decoding="async" />
-          {/* eslint-disable-next-line @next/next/no-img-element -- no-canvas fallback frames, sized by CSS */}
-          <img className={`${styles.image} ${styles.state} ${styles.dark}`} src="/theme-switch/rocker-off.webp" alt="" width={530} height={700} decoding="async" />
+          <Frame asset={ASSETS.theme.rockerOn} className={`${styles.image} ${styles.state} ${styles.light}`} />
+          <Frame asset={ASSETS.theme.rockerOff} className={`${styles.image} ${styles.state} ${styles.dark}`} />
           <canvas ref={canvasRef} className={`${styles.image} ${styles.motion}`} width={212} height={280} />
         </span>
       </button>

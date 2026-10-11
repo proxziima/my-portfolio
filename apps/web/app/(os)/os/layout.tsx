@@ -8,8 +8,8 @@ import '@/features/os/os.css'
 /** The reference Showcase's text face (Millennium, regular and bold). */
 const serif = localFont({
   src: [
-    { path: '../fonts/Millennium.ttf', weight: '400', style: 'normal' },
-    { path: '../fonts/Millennium-Bold.ttf', weight: '700', style: 'normal' },
+    { path: '../fonts/Millennium.woff2', weight: '400', style: 'normal' },
+    { path: '../fonts/Millennium-Bold.woff2', weight: '700', style: 'normal' },
   ],
   variable: '--os-serif',
   display: 'swap',

@@ -15,6 +15,11 @@
   opacity: 1;
 }
 
+/* the still layers come as <picture> (AVIF, else WebP): the wrapper makes no box, the img stays absolutely placed */
+.screen-fx picture {
+  display: contents;
+}
+
 .screen-shadow,
 .screen-static,
 .screen-smudges {

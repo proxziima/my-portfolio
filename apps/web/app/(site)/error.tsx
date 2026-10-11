@@ -1,12 +1,12 @@
 'use client'
 
-import posthog from 'posthog-js'
 import { useEffect } from 'react'
+import { captureException } from '@/lib/analytics/events'
 
 /** The CMS could not be reached: a quiet, letter-styled note with a retry that re-fetches. */
 export default function Error({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
-    posthog.captureException(error)
+    captureException(error)
   }, [error])
   return (
     <main>

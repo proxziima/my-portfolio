@@ -69,8 +69,8 @@ New env vars follow the `apps/agents/CLAUDE.md` rule: `agentsEnvSchema`, the `.e
 | `twin_refusal` | use-twin (`refuse` helper, every refusal) | reason |
 | `twin_session_renewed` | use-twin, when the chat auto-renews a dead session | none |
 | `booking_opened` / `booking_completed` | BookingDialog | none |
-| `experience_ready` | Figure/DeskScene, Desktop, DosPlayer, use-twin | experience (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), ms, app (DOS only) |
-| `experience_failed` | the same | experience, reason (`webgl_unavailable`, `load_error`, `run_error`, `timeout` or the refusal kind), app (DOS only) |
+| `experience_ready` | Figure/DeskScene, Desktop, DosPlayer, use-twin | experience (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), ms, app (DOS only), host (`desk_scene` only: `worker` or `main`) |
+| `experience_failed` | the same, plus the OS window boundary (AppBoundary) | experience (the above, plus `os_app`), reason (`webgl_unavailable`, `load_error`, `context_lost`, `run_error`, `timeout`, the refusal kind, or for `os_app` `chunk_load_error` / `render_error`), app (DOS and OS apps), host (`desk_scene` only) |
 | `$ai_generation`, `$ai_span`, `$ai_trace` | agents (OTel), Payload MCP | PostHog LLM schema |
 | `mcp_request` | Payload MCP, methods other than `tools/call`, `initialize` and `notifications/*` | method, status |
 
@@ -98,11 +98,66 @@ Create these PostHog actions:
 - Funnel: `$pageview`, `section_viewed` where section is work, `outbound_click`
 - Conversions trend
 - Web vitals p75 LCP, INP and CLS by `$pathname` and `$device_type`
-- Experience load time: p50 and p95 of `experience_ready.ms` by `experience` (and by `app` for `dos_app`), broken down by `$device_type` and `$browser`
+- Experience load time: p50 and p95 of `experience_ready.ms` by `experience` (and by `app` for `dos_app`), broken down by `$device_type` and `$browser`; for `desk_scene`, by `host` (see "Performance alerts")
 - Experience failure rate: `experience_failed` / (`experience_ready` + `experience_failed`) by `experience`, with `experience_failed` broken down by `reason`
 - Error tracking issues
 - LLM analytics: cost per day, p95 latency, error rate, generations by `gen_ai.agent.name`
 - `$ai_span` count by `mcp_tool`
+
+## Performance alerts
+
+The owner creates these in PostHog; nothing in the repo configures PostHog. posthog-js sends one `$web_vitals` event per page (`capture_performance.web_vitals`), with one property per metric: `$web_vitals_LCP_value`, `$web_vitals_INP_value`, `$web_vitals_CLS_value` and `$web_vitals_FCP_value` (the names posthog-js 1.438 builds as `$web_vitals_<METRIC>_value`; check them in Data management, Properties, before saving an insight).
+
+**Insights** (Product analytics, Trends, daily interval, last 30 days):
+
+| Insight | Series | Breakdown |
+|---|---|---|
+| LCP p75 | `$web_vitals`, aggregated by property value, p75 of `$web_vitals_LCP_value` | `$device_type` |
+| INP p75 | same, p75 of `$web_vitals_INP_value` | `$device_type` |
+| CLS p75 | same, p75 of `$web_vitals_CLS_value` | `$device_type` |
+| Desk scene load p95 | `experience_ready` where `experience = desk_scene`, p95 of `ms` | `host` (`worker` or `main`) |
+
+Filter `embedded` is not set on the vitals insights: the `/os` iframe reports its own `$web_vitals` with `embedded: true`, and they are not the letter's.
+
+**Alerts** (on each insight: Alerts, New alert; notify the owner by email):
+
+| Insight | Condition | Why |
+|---|---|---|
+| LCP p75 | above 2500 ms, 2 consecutive days | Google's "good" threshold |
+| INP p75 | above 200 ms, 2 consecutive days | same |
+| CLS p75 | above 0.1, 2 consecutive days | same; the budget in CI is the stricter 0.05 |
+| Desk scene load p95 | above 4000 ms | the desk taking that long reads as broken; a jump on `main` only points at the worker path failing over |
+
+Two consecutive days keeps a single bad day (one slow network, a crawler burst) from paging; a low-traffic day can still miss the threshold, so read the counts before acting.
+
+**Reading a regression.** Find the first day over the threshold, then the deploy before it and the PR it shipped. Download that PR's `lighthouse` artifact from its CI run (see "Performance budgets") and compare `summary.json` with the previous PR's: the metric that moved, the main-thread breakdown, the top scripts by evaluation time and the heaviest requests point at the change. A regression that only shows on one `$device_type`, or only on `host = main`, narrows it down before any of that.
+
+## Performance budgets
+
+The `lighthouse` job in `.github/workflows/ci.yml` runs on every PR and push, after `checks`. It needs no secret: it builds and seeds a throwaway CMS in the runner (SQLite under `apps/payload/.tmp`, never `payload.db`), builds the web app, and starts the standalone server the Docker image runs. Then:
+
+1. `scripts/perf/chunks.ts` asserts what the letter and the OS load up front (no posthog, three, eve or zod; initial JS within budget), then brings the desk on screen in Chromium and fails if the main thread loaded three's renderer or the glTF loader while the desk drew in its worker.
+2. `scripts/perf/lighthouse.ts --runs 5 --calibrate --lhci` measures the letter five times per form factor with Lighthouse 13.5.0, the version every phase checkpoint used. `--calibrate` scales the CPU slowdown by the runner's benchmark index (`environment.benchmarkIndex`) over PageSpeed's (about 1250), so a fast or slow runner type is measured as PageSpeed's hardware class; without it, TBT moved with whichever machine GitHub assigned.
+3. `lhci assert` checks `apps/web/lighthouserc.mobile.json` and `lighthouserc.desktop.json` against the **median** of the five runs, each assertion on its own (`aggregationMethod: median`), so one noisy run cannot fail the job.
+4. The `lighthouse` artifact holds every report (`<form>-<n>.json`, open them in the [Lighthouse viewer](https://googlechrome.github.io/lighthouse/viewer/)), `summary.json` and `<form>/.lighthouseci/assertion-results.json`.
+
+| Budget | Mobile | Desktop | Measured, mobile / desktop |
+|---|---|---|---|
+| Performance score | ≥ 0.75 | ≥ 0.9 | 82 / 100 |
+| Accessibility, best practices, SEO | 1 | 1 | 100 / 100 / 100 |
+| CLS | ≤ 0.05 | ≤ 0.05 | 0.000 / 0.000 (the real-throttling recorder: 0.0000 at 412 and 1350 px; Inter is `display: optional`, so the font adds no shift and 0.05 is a ceiling) |
+| TBT | ≤ 650 ms | ≤ 150 ms | 520 ms / 43 ms |
+| Total bytes | ≤ 1.6 MB | ≤ 1.6 MB | 1.03 MB |
+| Script transfer | ≤ 460 KB | ≤ 460 KB | 342 KB |
+
+Measured: the job's exact procedure run locally at the end of Phase 3 (five calibrated runs each, against the seeded throwaway CMS; mobile runs 82 to 84, TBT 469 to 528 ms). Every assertion is an error: a budget that only warns gets ignored. The score floors sit under the measured medians by more than a run's spread; PageSpeed's ≥ 90 target is checked on production at each checkpoint, not here. TBT is median + 25 % (mobile) and the Phase 3 target (desktop). CLS (owner's decision: 0.05) and the byte budgets are never relaxed. These numbers come from a workstation calibrated to PageSpeed's class, not from a GitHub runner: after the job's first three runs, re-derive the TBT budget from their medians as below.
+
+**Updating a budget.** A budget changes in the PR that changes what it measures, with the numbers in the PR description:
+
+- Tighter, after an improvement: take the medians of three CI runs of the PR (re-run the job), set the new budget at median + 25 % for TBT, at the median minus five points (rounded down to 0.05) for a score floor, and with about 10 % headroom for bytes. Tightening is always fine.
+- Looser, for a real feature cost: same evidence, plus a line in the PR saying what the visitor gets for it. Never for CLS or the bytes without the owner's sign-off.
+- After bumping Lighthouse (`LIGHTHOUSE` in `scripts/perf/lighthouse.ts`) or `PSI_BENCHMARK`, re-measure the baseline and every budget in the same PR: scores move between Lighthouse versions.
+- Reproduce a CI run locally: production build plus CMS (see `scripts/perf/lighthouse.ts`), then `node scripts/perf/lighthouse.ts --serve --runs 5 --calibrate --lhci --out .perf/ci`, then from `apps/web/.perf/ci/mobile`: `bunx @lhci/cli@0.15.1 assert --config=../../../lighthouserc.mobile.json` (and the same for desktop).
 
 ## Reading a twin trace
 

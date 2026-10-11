@@ -63,6 +63,7 @@ export function Desktop({ data }: { data: OsData }) {
         return (
           <Window
             key={app.id}
+            app={app.id}
             title={app.title}
             status={app.status ?? status}
             icon={app.icon}

@@ -27,7 +27,10 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 # next/font/google downloads the fonts here, so the build needs network access.
-RUN bunx turbo run build --filter=web
+# Source maps go to PostHog when the build is given the secret (BuildKit), then are deleted either way.
+RUN --mount=type=secret,id=posthog_cli_token,env=POSTHOG_CLI_TOKEN \
+    --mount=type=secret,id=posthog_cli_env_id,env=POSTHOG_CLI_ENV_ID \
+    bunx turbo run build --filter=web
 
 # Standalone output mirrors the monorepo layout: the server is apps/web/server.js. Static assets and
 # public/ are not part of it and are copied next to it.

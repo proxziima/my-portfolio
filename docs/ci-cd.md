@@ -15,7 +15,7 @@ pull-request checkout. A change to `bun.lock`, the root `package.json`, `turbo.j
 | Job          | Runs when                    | Gate                                                                                                                                                             |
 | ------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `repo`       | always                       | actionlint (with shellcheck) on the workflows; both compose files resolve with `.env.deploy.example`                                                             |
-| `verify`     | always                       | `check-types`, `lint` and `test` (with coverage, one suite at a time) for the affected workspaces; `bun test scripts`                                            |
+| `verify`     | always                       | `check-types`, `lint` and `test` (with coverage, one suite at a time) for the affected workspaces; `bun test ./scripts`                                          |
 | `drift`      | cms or twin                  | Payload migrations, `payload-types.ts`, the admin import map and the twin's drizzle migrations match their sources                                               |
 | `agents`     | agents                       | `eve info` + build; offline acceptance evals                                                                                                                     |
 | `bundle`     | web                          | the client bundle carries no secret names, values or prompt fragments                                                                                            |
@@ -101,11 +101,14 @@ PR. Without it, the job falls back to `github.token`, and you merge the release 
 ```bash
 bunx turbo run check-types lint
 bunx turbo run test --concurrency=1 -- --coverage
-bun test scripts
+bun test ./scripts
 ```
 
 Tests run one suite at a time because wall-clock assertions in the cms favicon tests need an unshared CPU. The root
 `bun run test` script sets the same flag, but it can't take `--coverage`: turbo would receive it.
+
+`./scripts` is a path, so only the root `scripts/` tests run under Bun. A bare `bun test scripts` is a substring filter
+on every test path and also picks up the web app's Vitest files whose names contain it (`initial-scripts.test.ts`).
 
 ## One-time setup (repository owner)
 

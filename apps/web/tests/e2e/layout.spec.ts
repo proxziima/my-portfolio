@@ -23,8 +23,10 @@ test.describe('without javascript', () => {
     await expect(page.getByText('backend plumber')).toBeVisible()
     const images = page.locator('[data-anchor="switch"] img')
     await expect(images).toHaveCount(2)
-    await expect(images.first()).toHaveAttribute('src', /rocker-on\.webp/)
-    await expect(images.nth(1)).toHaveAttribute('src', /rocker-off\.webp/)
+    // the img's src is the WebP fallback; AVIF comes from the picture's source
+    await expect(images.first()).toHaveAttribute('src', /rocker-on\.\d+w\.[0-9a-f]{10}\.webp/)
+    await expect(images.nth(1)).toHaveAttribute('src', /rocker-off\.\d+w\.[0-9a-f]{10}\.webp/)
+    await expect(page.locator('[data-anchor="switch"] picture source[type="image/avif"]')).toHaveCount(2)
     // the light frame is the one showing
     await expect(images.first()).toBeVisible()
   })

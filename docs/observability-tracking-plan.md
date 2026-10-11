@@ -56,7 +56,7 @@ PostHog  generation joins the visitor's person timeline and replay
 
 ## 2. Automatic PostHog web signals
 
-Initialised once per document by [initPostHog](../apps/web/lib/analytics/init.ts#L15), called from [Analytics.tsx:31](../apps/web/features/analytics/Analytics.tsx#L31), which both layouts mount with their `surface` ([(site)/layout.tsx:35](../apps/web/app/(site)/layout.tsx#L35), [(os)/os/layout.tsx:31](../apps/web/app/(os)/os/layout.tsx#L31)). Options, from [init.ts:18-27](../apps/web/lib/analytics/init.ts#L18):
+Initialised once per document by [initPostHog](../apps/web/lib/analytics/init.ts#L18), called from [Analytics.tsx:32](../apps/web/features/analytics/Analytics.tsx#L32), which both layouts mount with their `surface` ([(site)/layout.tsx:44](../apps/web/app/(site)/layout.tsx#L44), [(os)/os/layout.tsx:31](../apps/web/app/(os)/os/layout.tsx#L31)). Options, from [init.ts:29-38](../apps/web/lib/analytics/init.ts#L29):
 
 | Option | Value | Effect |
 | --- | --- | --- |
@@ -82,13 +82,13 @@ Web vitals, exception autocapture and replay also need the matching switches in 
 
 **Session replay.** The code sets no recording options, so masking is the project setting: "Mask all inputs" on (`maskAllInputs`), which hides every typed value. Two extras are in code: the twin chat transcript ([History.tsx:54](../apps/web/features/os/apps/messenger/History.tsx#L54)) and the message box ([Conversation.tsx:97](../apps/web/features/os/apps/messenger/Conversation.tsx#L97)) carry `ph-no-capture`, which excludes them from replay and autocapture. That matters because the parent page's recorder also captures the same-origin `/os` iframe on the desk monitor.
 
-**Embedded `/os` iframe.** `Analytics` computes `embedded = window.self !== window.top` once ([Analytics.tsx:30](../apps/web/features/analytics/Analytics.tsx#L30)) and passes it to `initPostHog` and to the OS engagement tracker. When embedded: `capture_pageview: false`, `capture_pageleave: false`, `disable_session_recording: true` ([init.ts:26](../apps/web/lib/analytics/init.ts#L26)) and `posthog.register({ embedded: true })` ([init.ts:29](../apps/web/lib/analytics/init.ts#L29)), so every event the frame sends (custom, `$autocapture`, `$web_vitals`, `$exception`) carries `embedded: true`. Everything else stays on, and the frame shares the parent's cookie, so it is the same visitor and session. Opening `/os` directly in a tab is not embedded: full pageviews and replay. The property is only registered in the iframe, so "`embedded` is not set" selects the standalone case.
+**Embedded `/os` iframe.** `Analytics` computes `embedded = window.self !== window.top` once ([Analytics.tsx:30](../apps/web/features/analytics/Analytics.tsx#L30)) and passes it to `initPostHog` and to the OS engagement tracker. When embedded: `capture_pageview: false`, `capture_pageleave: false`, `disable_session_recording: true` ([init.ts:37](../apps/web/lib/analytics/init.ts#L37)) and `posthog.register({ embedded: true })` ([init.ts:40](../apps/web/lib/analytics/init.ts#L40)), so every event the frame sends (custom, `$autocapture`, `$web_vitals`, `$exception`) carries `embedded: true`. Everything else stays on, and the frame shares the parent's cookie, so it is the same visitor and session. Opening `/os` directly in a tab is not embedded: full pageviews and replay. The property is only registered in the iframe, so "`embedded` is not set" selects the standalone case.
 
 **Do Not Track.** `respect_dnt` stops all browser capture. The BFF then finds no cookie, so the agent's traces for that visitor still flow, but under `web:<uuid>` with no `ph_did` or `$session_id` ([observability.md, Privacy](observability.md#privacy)).
 
 ## 3. Custom web events
 
-All fourteen use the typed catalog in [events.ts:10-25](../apps/web/lib/analytics/events.ts#L10). Twelve go through [`track()`](../apps/web/lib/analytics/events.ts#L33); the two engaged-time events go through [`trackOnExit()`](../apps/web/lib/analytics/events.ts#L41), which sends at once over `sendBeacon` (`{ transport: 'sendBeacon', send_instantly: true }`: with request batching on, `transport` alone would only queue the event). Both are no-ops until `posthog.__loaded` (no token, tests, SSR). Wiring: [`Analytics`](../apps/web/features/analytics/Analytics.tsx) installs the delegated click listener on both surfaces, then per `surface` ([Analytics.tsx:14-17](../apps/web/features/analytics/Analytics.tsx#L14)): `site` adds the section observer and section engagement, `os` adds OS engagement. The other events are called from components.
+All fourteen use the typed catalog in [events.ts:19-38](../apps/web/lib/analytics/events.ts#L19). Twelve go through [`track()`](../apps/web/lib/analytics/events.ts#L82); the two engaged-time events go through [`trackOnExit()`](../apps/web/lib/analytics/events.ts#L92), which sends over `sendBeacon` (`{ transport: 'sendBeacon', send_instantly: true }`: with request batching on, `transport` alone would only queue the event). posthog-js loads in its own chunk after hydration, so until it has loaded **both queue** their events in memory (at most 100, oldest dropped first; [send](../apps/web/lib/analytics/events.ts#L55)) and the queue flushes in order once [`attach()`](../apps/web/lib/analytics/events.ts#L64) hands the client over; a queued exit event still leaves as a beacon, and one whose page truly unloads first is lost. With no token, or if the posthog-js chunk fails to load, [`disable()`](../apps/web/lib/analytics/events.ts#L73) drops the queue and every later event at once. Nothing is sent during SSR. Wiring: [`Analytics`](../apps/web/features/analytics/Analytics.tsx) installs the delegated click listener on both surfaces, then per `surface` ([Analytics.tsx:14-17](../apps/web/features/analytics/Analytics.tsx#L14)): `site` adds the section observer and section engagement, `os` adds OS engagement. The other events are called from components.
 
 ### 3.1 `outbound_click`
 
@@ -114,9 +114,9 @@ All fourteen use the typed catalog in [events.ts:10-25](../apps/web/lib/analytic
 
 | `cta` | Element | Line |
 | --- | --- | --- |
-| `desk_mute` | Mute / Unmute button on the desk video | [Figure.tsx:68](../apps/web/features/figure/Figure.tsx#L68) |
-| `desk_fullscreen` | Full screen button | [Figure.tsx:73](../apps/web/features/figure/Figure.tsx#L73) |
-| `open_desktop` | "Open the desktop" link to `/os` | [Figure.tsx:77](../apps/web/features/figure/Figure.tsx#L77) |
+| `desk_mute` | Mute / Unmute button on the desk video | [Figure.tsx:78](../apps/web/features/figure/Figure.tsx#L78) |
+| `desk_fullscreen` | Full screen button | [Figure.tsx:83](../apps/web/features/figure/Figure.tsx#L83) |
+| `open_desktop` | "Open the desktop" link to `/os` | [Figure.tsx:87](../apps/web/features/figure/Figure.tsx#L87) |
 
 These are the only `data-track` attributes in the repo. A new CTA needs only the attribute; add it to this table.
 
@@ -248,8 +248,8 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 
 | | |
 | --- | --- |
-| Properties, ready | `experience` (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), `ms` (integer milliseconds since the start, `1463`), `app` (string, DOS only: `resume`, `doom`, `autocad`) |
-| Properties, failed | `experience`, `reason` (short machine label, never error text or user data; per experience below), `app` (DOS only) |
+| Properties, ready | `experience` (`desk_scene`, `os_boot`, `dos_app`, `twin_first_reply`), `ms` (integer milliseconds since the start, `1463`), `app` (string, DOS only: `resume`, `doom`, `autocad`), `host` (`desk_scene` only: `worker` or `main`, see below) |
+| Properties, failed | `experience` (the above, plus `os_app`, which only fails), `reason` (short machine label, never error text or user data; per experience below), `app` (`dos_app`: the DOS app id; `os_app`: any OS app id, `messenger`, `credits`, `doom`…), `host` (`desk_scene` only) |
 | Notes | Inside the desk-monitor iframe the `embedded: true` super property rides along (the embedded `os_boot` is the iframe's own boot) |
 | Suggested insight | p50 and p95 of `ms` per `experience` (SQL: `quantile(0.95)(properties.ms)` grouped by `properties.experience`); failure rate = `experience_failed` / (`experience_ready` + `experience_failed`) per `experience`; both broken down by `$device_type` and `$browser`; for `dos_app`, by `app`; `experience_failed` by `reason` |
 
@@ -257,10 +257,10 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 
 | | |
 | --- | --- |
-| Start | The figure box comes within 200 px of the viewport and the lazy `DeskScene` (three.js, `next/dynamic`, `ssr: false`) is mounted, so the chunk download is included ([Figure.tsx:32](../apps/web/features/figure/Figure.tsx#L32)) |
-| Ready | The first frame drawn with the models in place (`onFirstFrame`, the same moment as `data-loaded="true"`; [DeskScene.tsx:46](../apps/web/features/desk/DeskScene.tsx#L46)) |
-| Failed | `webgl_unavailable` when the engine cannot be created ([DeskScene.tsx:52](../apps/web/features/desk/DeskScene.tsx#L52)); `load_error` when the models fail to load ([DeskScene.tsx:96](../apps/web/features/desk/DeskScene.tsx#L96)). Both are where the figure already collapses to its caption ([Figure.tsx:35](../apps/web/features/figure/Figure.tsx#L35)) |
-| Notes | Frames render only while the box is on screen, so a visitor who stops inside the 200 px margin without scrolling the box into view adds that wait to `ms`. A failure to download the scene's code chunk goes to the error boundary (`$exception`), not here |
+| Start | The figure box comes within 200 px of the viewport and the lazy `DeskScene` (three.js, `next/dynamic`, `ssr: false`) is mounted, so the chunk download is included ([Figure.tsx:39](../apps/web/features/figure/Figure.tsx#L39)) |
+| Ready | The first frame with the models in place on the canvas (`onFirstFrame`, the same moment as `data-loaded="true"`; [DeskScene.tsx:72](../apps/web/features/desk/DeskScene.tsx#L72)). `host` is the thread that drew it: `worker` where the browser renders WebGL in a worker (OffscreenCanvas: Chromium, Safari 17+, Firefox), else `main`. A worker frame is on the canvas only once the GPU has finished it, so on the same device `worker` timings include the first frame's GPU work (texture uploads) that a `main` frame hands to the GPU after it is committed |
+| Failed | `webgl_unavailable` when nothing can draw: the main thread has no WebGL (a worker without it is not a failure, the main thread takes over; [DeskScene.tsx:78](../apps/web/features/desk/DeskScene.tsx#L78)); `load_error` when the models fail to load ([DeskScene.tsx:135](../apps/web/features/desk/DeskScene.tsx#L135)); `context_lost` when the main thread's WebGL context is lost (a worker's lost context is not a failure either: the main thread takes over, [DeskScene.tsx:83](../apps/web/features/desk/DeskScene.tsx#L83)). All three collapse the figure to its caption ([Figure.tsx:39](../apps/web/features/figure/Figure.tsx#L39)). `host` is the thread that failed, so `main` in practice |
+| Notes | Frames render only while the box is on screen, so a visitor who stops inside the 200 px margin without scrolling the box into view adds that wait to `ms`. A failure to download the scene's code chunk goes to the error boundary (`$exception`), not here. Suggested insight: p50 and p95 of `ms` by `properties.host`, and the share of `host = main` by `$browser` (where the worker is not available) |
 
 #### `os_boot`
 
@@ -269,7 +269,7 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 | Start | `Desktop` first renders ([Desktop.tsx:22](../apps/web/features/os/Desktop.tsx#L22)), on `/os` or in the desk-monitor iframe |
 | Ready | The boot screen hands over to the desktop (`boot`, [Desktop.tsx:35](../apps/web/features/os/Desktop.tsx#L35)): the BIOS typewriter finishing, or the visitor skipping it with a click or key |
 | Failed | None: a crash here is an error-boundary `$exception` |
-| Notes | First boot only: the timer settles once per mount, so a reboot after Shutdown is not timed. Mostly hydration plus the typewriter (about 1.5 s locally), so a rising p95 points at slow hydration |
+| Notes | First boot only: the timer settles once per mount, so a reboot after Shutdown is not timed. Mostly hydration plus the typewriter (about 1.5 s locally), so a rising p95 points at slow hydration. Inside the desk monitor the iframe mounts on approach (a mouse entering the figure, keyboard focus on the screen, on touch the monitor scrolling half into view, or full screen; [DeskScene.tsx](../apps/web/features/desk/DeskScene.tsx), [intent.ts](../apps/web/features/desk/intent.ts)), so the embedded `os_boot` starts then, not necessarily during the page load. Until then the screen is a powered-off tube and no OS document exists, so a visitor who never approaches the desk sends no embedded `os_boot`, `os_engaged` or `os_app_opened` at all |
 
 #### `dos_app`
 
@@ -278,7 +278,16 @@ One measurement per heavy experience, through one helper: `startExperience(exper
 | Start | A DOS window mounts its player ([DosPlayer.tsx:18](../apps/web/features/os/apps/dos/DosPlayer.tsx#L18)); `app` is the OS app id passed through `dosApp(id, bundle, name)` ([apps.ts:81](../apps/web/features/os/apps.ts#L81)) |
 | Ready | js-dos's `run(bundle)` resolves: the emulator is running the bundle ([DosPlayer.tsx:41](../apps/web/features/os/apps/dos/DosPlayer.tsx#L41)). The first DOS window also pays for the js-dos runtime script |
 | Failed | `load_error` when the js-dos script fails to load or defines no `Dos` ([DosPlayer.tsx:30](../apps/web/features/os/apps/dos/DosPlayer.tsx#L30)); `run_error` when the emulator rejects the bundle ([DosPlayer.tsx:48](../apps/web/features/os/apps/dos/DosPlayer.tsx#L48)), where the window shows "DOS could not start" |
-| Notes | Every window opening is timed (reopening Doom times it again, usually faster with the runtime cached) |
+| Notes | Every window opening is timed (reopening Doom times it again, usually faster with the runtime cached). A failure to download the player's own code chunk is an `os_app` failure, not a `dos_app` one |
+
+#### `os_app`
+
+| | |
+| --- | --- |
+| Start | None: only failures are reported. Every app but the boot Showcase loads its code with its first window (`lazyApp`, [lazy-app.tsx](../apps/web/features/os/lazy-app.tsx); the DOS player likewise, [dos-app.tsx:9](../apps/web/features/os/apps/dos-app.tsx#L9)) |
+| Ready | None |
+| Failed | Each window has its own error boundary ([AppBoundary.tsx:40](../apps/web/features/os/AppBoundary.tsx#L40), mounted in [Window.tsx:60](../apps/web/features/os/Window.tsx#L60)): `chunk_load_error` when the app's code chunk fails to download (offline, or a tab older than the deploy whose chunks are gone); `render_error` when the app throws while rendering. The window shows a notice with Retry, which imports the chunk again; the desktop and the other windows keep working. `app` is the window's app id. A `$exception` with the original error goes with it ([AppBoundary.tsx:42](../apps/web/features/os/AppBoundary.tsx#L42)) |
+| Notes | Failure rate per app = `experience_failed` with `experience = os_app` / `os_app_opened`, by `app`. Each failure is reported, so a visitor pressing Retry while still offline sends one per press. Reopening the window after a failure also imports again |
 
 #### `twin_first_reply`
 
@@ -413,9 +422,10 @@ All capture sites, each producing a PostHog `$exception`. Server sites use [`cap
 
 | Site | Distinct id | Properties | Code |
 | --- | --- | --- | --- |
-| Browser, uncaught errors and rejections | browser id | SDK exception properties | `capture_exceptions` [init.ts:23](../apps/web/lib/analytics/init.ts#L23) |
+| Browser, uncaught errors and rejections | browser id | SDK exception properties | `capture_exceptions` [init.ts:34](../apps/web/lib/analytics/init.ts#L34) |
 | Browser, `(site)` route boundary | browser id | the error | [(site)/error.tsx:9](../apps/web/app/(site)/error.tsx#L9) |
 | Browser, `/os` boundary | browser id | the error | [(os)/os/error.tsx:9](../apps/web/app/(os)/os/error.tsx#L9) |
+| Browser, OS window boundary (an app's chunk failed to load, or the app crashed) | browser id | the original error (the import's own, not the wrapper) | [AppBoundary.tsx:42](../apps/web/features/os/AppBoundary.tsx#L42) |
 | Browser, blog preview boundary (draft mode only) | browser id | the error | [blog/error.tsx:10](../apps/web/app/(site)/blog/error.tsx#L10) |
 | Browser, root layout failed | browser id, only if posthog-js had already loaded | the error | [global-error.tsx:9](../apps/web/app/global-error.tsx#L9) |
 | Web server `onRequestError` | PostHog id from the request cookie, or none | `path` (query string stripped), `method`, `routePath`, `routeType` | [instrumentation.ts:20-27](../apps/web/instrumentation.ts#L20) |
@@ -437,7 +447,7 @@ Notes:
 
 ## 8. Infrastructure
 
-**`/relay` proxy.** posthog-js sends to `/relay` on the site's own origin ([init.ts:19](../apps/web/lib/analytics/init.ts#L19)), which avoids ad-blocker word lists. [`proxy.ts`](../apps/web/proxy.ts) (matcher `/relay/:path*`, [proxy.ts:19](../apps/web/proxy.ts#L19)) resolves the target per request, so the region is runtime config:
+**`/relay` proxy.** posthog-js sends to `/relay` on the site's own origin ([init.ts:30](../apps/web/lib/analytics/init.ts#L30)), which avoids ad-blocker word lists. [`proxy.ts`](../apps/web/proxy.ts) (matcher `/relay/:path*`, [proxy.ts:19](../apps/web/proxy.ts#L19)) resolves the target per request, so the region is runtime config:
 
 | Request path | Forwarded to |
 | --- | --- |
@@ -457,7 +467,7 @@ Routing is in [relay.ts:10-14](../apps/web/lib/analytics/relay.ts#L10). The prox
 | `SITE_URL` | web | Validated at boot together with the region ([instrumentation.ts:8-18](../apps/web/instrumentation.ts#L8)) |
 | `CMS_URL`, `TWIN_REDACT_SECRET`, `TWIN_PROMPT_CANARY` | agents | Feed the redactor ([processor.ts:127-131](../apps/agents/agent/lib/observability/processor.ts#L127)) |
 
-**Without a token.** `posthogConfig()` returns `null`: `clientAnalyticsConfig()` is `null` so [`Analytics`](../apps/web/features/analytics/Analytics.tsx#L24) does nothing and `track()` is a no-op; the server SDK is a no-op client ([server.ts:11](../packages/observability/src/server.ts#L11)); the agent's span processor is never built and the redaction rules are never fetched; the MCP capture and error calls reach the no-op client; `/relay` answers 404. Dev, tests and CI run this way. A bad region throws at web boot; per request the web helpers instead switch analytics off for that request and log once ([request.ts:19](../apps/web/lib/analytics/request.ts#L19)).
+**Without a token.** `posthogConfig()` returns `null`: `clientAnalyticsConfig()` is `null` so [`Analytics`](../apps/web/features/analytics/Analytics.tsx#L28) disables analytics (`disable()`: nothing queued, nothing sent) and loads no posthog-js; the server SDK is a no-op client ([server.ts:11](../packages/observability/src/server.ts#L11)); the agent's span processor is never built and the redaction rules are never fetched; the MCP capture and error calls reach the no-op client; `/relay` answers 404. Dev, tests and CI run this way. A bad region throws at web boot; per request the web helpers instead switch analytics off for that request and log once ([request.ts:19](../apps/web/lib/analytics/request.ts#L19)).
 
 ## 9. Quick verification checklist
 
@@ -482,8 +492,8 @@ Open PostHog, Activity, Live events, with a token set in a dev project ([observa
 | `twin_refusal` | Exceed a limit, or stop the agent | `reason` = `throttled`, `too_long`, `ended`, `offline` |
 | `twin_session_renewed` | Clear the server session, then send | Fires once |
 | `booking_opened`, `booking_completed` | Ask the twin to schedule, book in the booker | One each, no properties |
-| `experience_ready` | Scroll to the desk; open `/os`; open Doom; send the twin a message | One each: `desk_scene`, `os_boot` (and an embedded one from the monitor), `dos_app` with `app` = `doom`, `twin_first_reply`; `ms` an integer |
-| `experience_failed` | Block `*.glb` or `/js-dos/js-dos.js` in the Network tab, then load the desk or open a DOS app | `reason` = `load_error` (desk, or DOS with `app`); a refused twin message gives its refusal kind |
+| `experience_ready` | Scroll to the desk; open `/os`; open Doom; send the twin a message | One each: `desk_scene` (with `host` = `worker` in Chrome, `main` with `?deskHost=main`), `os_boot` (and an embedded one after hovering the desk), `dos_app` with `app` = `doom`, `twin_first_reply`; `ms` an integer |
+| `experience_failed` | Block `*.glb` or `/js-dos/js-dos.js` in the Network tab, then load the desk or open a DOS app; on `/os`, go offline in DevTools before opening Credits for the first time | `reason` = `load_error` (desk, or DOS with `app`); a refused twin message gives its refusal kind; Credits: `experience` = `os_app`, `reason` = `chunk_load_error`, `app` = `credits`, the window shows Retry and the rest of the desktop works |
 | `$ai_generation` | After a twin reply, LLM analytics, Traces | `chat <model>` generations plus `twin.gate` and `twin.intent`; `distinctId` equals the visitor's; no prompt text, no canary |
 | MCP `$ai_span` | A twin turn that searches | `$ai_span` with `mcp_tool` `twinSearch`, `$ai_trace_id` equal to the turn's trace, `$ai_parent_id` set, `mcp_input_keys` names only |
 | `mcp_request` | Call `tools/list` from an MCP client | `method`, `status`; none for `initialize` or `notifications/*` |

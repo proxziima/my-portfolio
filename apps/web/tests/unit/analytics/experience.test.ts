@@ -38,6 +38,14 @@ describe('startExperience', () => {
     expect(send).toHaveBeenNthCalledWith(2, 'experience_failed', { experience: 'dos_app', reason: 'load_error', app: 'resume' })
   })
 
+  it("adds what the outcome learned: the desk's host on ready or failed", () => {
+    const send = vi.fn()
+    startExperience('desk_scene', {}, { send, now: clock(0, 700) }).ready({ host: 'worker' })
+    startExperience('desk_scene', {}, { send, now: clock(0) }).failed('context_lost', { host: 'main' })
+    expect(send).toHaveBeenNthCalledWith(1, 'experience_ready', { experience: 'desk_scene', ms: 700, host: 'worker' })
+    expect(send).toHaveBeenNthCalledWith(2, 'experience_failed', { experience: 'desk_scene', reason: 'context_lost', host: 'main' })
+  })
+
   it('defaults to the page clock and the catalog track (a no-op until PostHog loads)', () => {
     expect(() => startExperience('os_boot').ready()).not.toThrow()
   })

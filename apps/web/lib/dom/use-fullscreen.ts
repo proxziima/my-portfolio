@@ -12,10 +12,11 @@ export interface Fullscreen {
  * Full-screen state for one element. `on` drives the CSS (the element is styled to cover the
  * viewport by its owner); where the browser has the Fullscreen API the element also goes truly
  * full screen, so the browser chrome leaves too. Leaving native full screen by any route (Esc, a
- * tab switch) turns `on` off, and Escape exits in both modes. While on, `<html data-fullscreen>`
- * lets the stylesheet lock page scroll.
+ * tab switch) turns `on` off, and Escape exits in both modes, also from a same-origin iframe inside
+ * the element. An iframe that appears or reloads later (the desk monitor powering on) is reached
+ * when `rebind` changes. While on, `<html data-fullscreen>` lets the stylesheet lock page scroll.
  */
-export function useFullscreen(ref: RefObject<HTMLElement | null>): Fullscreen {
+export function useFullscreen(ref: RefObject<HTMLElement | null>, rebind?: unknown): Fullscreen {
   const [on, setOn] = useState(false)
 
   const enter = useCallback(() => {
@@ -67,7 +68,7 @@ export function useFullscreen(ref: RefObject<HTMLElement | null>): Fullscreen {
         }
       }
     }
-  }, [on, exit, ref])
+  }, [on, exit, ref, rebind])
 
   return { on, enter, exit, toggle }
 }

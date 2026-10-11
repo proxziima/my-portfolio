@@ -10,6 +10,8 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "env": ["CMS_URL", "REVALIDATE_SECRET"],
       "passThroughEnv": [
+        "POSTHOG_CLI_TOKEN",
+        "POSTHOG_CLI_ENV_ID",
         "PREVIEW_SECRET",
         "TWIN_JWT_SECRET",
         "TWIN_COOKIE_SECRET",

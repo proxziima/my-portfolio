@@ -1,7 +1,9 @@
+import { ASSETS } from '@/lib/assets/manifest'
 import { audioContext, safely } from './context'
 import { thump } from './thump'
 
-const BULB_URL = '/sound/bulb-explode.mp3'
+/** Hashed and served immutable by the asset pipeline (assets-src/blowout). */
+const BULB_URL = ASSETS.blowout.bulb
 
 let buffer: AudioBuffer | null = null
 let loading: Promise<void> | null = null

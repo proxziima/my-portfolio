@@ -2,12 +2,10 @@ import type { ComponentType } from 'react'
 import type { Messenger as MessengerData, Portfolio } from '@/lib/cms/types'
 import type { IconName } from './icons'
 import type { Size } from './window-geometry'
-import { Credits } from './apps/Credits'
 import { dosApp } from './apps/dos-app'
-import { Conversation } from './apps/messenger/Conversation'
 import { withName } from './apps/messenger/labels'
-import { Messenger } from './apps/messenger/Messenger'
 import { Showcase } from './apps/Showcase'
+import { lazyApp } from './lazy-app'
 
 /** What the OS apps read: the portfolio plus the content only the desktop shows. */
 export interface OsData extends Portfolio {
@@ -68,6 +66,11 @@ export const withChildren = (apps: readonly Family[], id: string): string[] => [
 
 /** The chrome every DOS program shares, as the reference's Doom window. */
 const DOS_CHROME = { status: 'Powered by JSDOS & DOSBox', barColor: '#1c1c1c' } as const
+
+// opened by a double-click, so their code waits for it; Showcase is the boot app and stays eager
+const Credits = lazyApp(() => import('./apps/Credits').then((m) => ({ default: m.Credits })), 'Credits')
+const Messenger = lazyApp(() => import('./apps/messenger/Messenger').then((m) => ({ default: m.Messenger })), 'Messenger')
+const Conversation = lazyApp(() => import('./apps/messenger/Conversation').then((m) => ({ default: m.Conversation })), 'Conversation')
 
 export const APPS: readonly OsApp[] = [
   // the reference's "Henry Heffernan - Showcase 2022", with our owner and this year

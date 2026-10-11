@@ -9,7 +9,8 @@ declare global {
 }
 
 const m = vi.hoisted(() => ({
-  initPostHog: vi.fn(),
+  initPostHog: vi.fn(() => Promise.resolve()),
+  disable: vi.fn(),
   uninstall: vi.fn(),
   stop: vi.fn(),
   observeSections: vi.fn(),
@@ -23,7 +24,7 @@ vi.mock('@/lib/analytics/delegated', () => ({ installDelegatedTracking: () => m.
 vi.mock('@/lib/analytics/sections', () => ({ observeSections: m.observeSections }))
 vi.mock('@/lib/analytics/section-engagement', () => ({ trackSectionEngagement: m.trackSectionEngagement }))
 vi.mock('@/lib/analytics/os-engagement', () => ({ trackOsEngagement: m.trackOsEngagement }))
-vi.mock('@/lib/analytics/events', () => ({ track: vi.fn(), trackOnExit: m.trackOnExit }))
+vi.mock('@/lib/analytics/events', () => ({ track: vi.fn(), trackOnExit: m.trackOnExit, disable: m.disable }))
 
 const { Analytics } = await import('@/features/analytics/Analytics')
 
@@ -61,6 +62,8 @@ describe('Analytics', () => {
   it('sets up again when the token changes, and not at all without a config', () => {
     render(null)
     expect(m.initPostHog).not.toHaveBeenCalled()
+    // events tracked before this point would otherwise wait for a client that never comes
+    expect(m.disable).toHaveBeenCalledTimes(1)
     render({ token: 'phc_x', uiHost: 'https://us.posthog.com' })
     render({ token: 'phc_y', uiHost: 'https://us.posthog.com' })
     expect(m.initPostHog).toHaveBeenCalledTimes(2)

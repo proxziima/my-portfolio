@@ -44,6 +44,11 @@
     drop-shadow(0.025rem 0.24rem 0.22rem var(--wall-cast));
 }
 
+/* the fallback frames come as <picture> (AVIF, else WebP): the wrapper makes no box */
+.stage :global(picture) {
+  display: contents;
+}
+
 .image {
   object-fit: contain;
   pointer-events: none;

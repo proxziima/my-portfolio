@@ -18,6 +18,15 @@ function Harness() {
   return createElement('div', { ref, id: 'box' }, createElement('iframe'))
 }
 
+let late: Api | undefined
+
+/** The desk's case: the iframe appears later (the monitor powering on), and `rebind` says so. */
+function LateFrame({ rebind, frame = false }: { rebind: string; frame?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
+  late = useFullscreen(ref, rebind)
+  return createElement('div', { ref }, frame ? createElement('iframe') : null)
+}
+
 let host: HTMLElement
 let root: Root
 
@@ -75,6 +84,18 @@ describe('useFullscreen', () => {
       win.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
     expect(latest?.on).toBe(false)
+  })
+
+  it('Escape inside an iframe added after entering exits, once the rebind key changes', () => {
+    act(() => root.render(createElement(LateFrame, { rebind: 'off' })))
+    act(() => late?.enter())
+    act(() => root.render(createElement(LateFrame, { rebind: 'on', frame: true })))
+    const win = host.querySelector('iframe')?.contentWindow
+    if (!win) throw new Error('no iframe window')
+    act(() => {
+      win.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(late?.on).toBe(false)
   })
 
   it('unmounting while on releases the page lock', () => {

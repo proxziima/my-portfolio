@@ -13,7 +13,7 @@
 
 /* The scene appears as one piece once the first frame with the models is drawn: desk, screen and
    its effects together. Fading the canvas alone left the monitor's screen floating in the box while
-   the models streamed. The OS keeps booting underneath, so it is ready when the scene shows. */
+   the models streamed. The screen shows as a powered-off tube until the visitor approaches it. */
 .host > * {
   opacity: 0;
   transition: opacity 0.4s ease;
@@ -23,8 +23,9 @@
   opacity: 1;
 }
 
-/* a tilted, scaled iframe is not usable by touch: the screen stays a picture, the link below opens the OS */
-@media (hover: none) {
+/* a tilted, scaled iframe is not usable by touch: the screen stays a picture, the link below opens the OS.
+   The query is intent.ts's TOUCH_QUERY: `(hover: none)` alone also matches a device with no pointer at all. */
+@media (hover: none) and (pointer: coarse) {
   .host iframe {
     pointer-events: none;
   }

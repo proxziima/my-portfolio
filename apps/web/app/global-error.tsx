@@ -1,12 +1,12 @@
 'use client'
 
-import posthog from 'posthog-js'
 import { useEffect } from 'react'
+import { captureException } from '@/lib/analytics/events'
 
 /** Last-resort boundary (the root layout itself failed): report it and render a bare page. */
 export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
-    posthog.captureException(error)
+    captureException(error)
   }, [error])
   return (
     <html lang="en">

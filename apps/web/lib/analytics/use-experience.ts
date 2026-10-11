@@ -13,8 +13,8 @@ export function useExperience(experience: Experience, { active = true, app }: { 
   // parent's, and the child is what settles it (a scene that fails as it mounts)
   if (active && timer.current === null) timer.current = startExperience(experience, app === undefined ? {} : { app })
   const [stable] = useState<ExperienceTimer>(() => ({
-    ready: () => timer.current?.ready(),
-    failed: (reason) => timer.current?.failed(reason),
+    ready: (extra) => timer.current?.ready(extra),
+    failed: (reason, extra) => timer.current?.failed(reason, extra),
   }))
   return stable
 }

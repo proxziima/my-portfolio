@@ -7,8 +7,8 @@ export const drum = (page: Page) => page.getByRole('button', { name: /Open the r
  * `goto` resolves on the document, before React hydrates; a click or key press before that is lost.
  * React tags the DOM nodes it has claimed with a `__reactProps$…` key, so wait for that on the drum.
  */
-export async function openPortfolio(page: Page, path = '/'): Promise<void> {
-  await page.goto(path)
+export async function openPortfolio(page: Page, path = '/', waitUntil: 'load' | 'domcontentloaded' = 'load'): Promise<void> {
+  await page.goto(path, { waitUntil })
   await expect(drum(page)).toBeVisible()
   await page.waitForFunction(() => {
     const button = document.querySelector('button[aria-haspopup="listbox"]')
