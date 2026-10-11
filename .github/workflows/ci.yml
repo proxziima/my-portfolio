@@ -94,8 +94,9 @@ jobs:
       # One suite at a time: wall-clock assertions in the cms favicon tests need an unshared CPU.
       - name: tests with coverage
         run: bunx turbo run test ${AFFECTED:+"$AFFECTED"} --concurrency=1 -- --coverage
+      # a path, not a filter: bun matches a bare argument against every test path (initial-scripts.test.ts too)
       - name: repo scripts
-        run: bun test scripts
+        run: bun test ./scripts
       - name: upload coverage
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
