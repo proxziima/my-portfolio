@@ -1,7 +1,7 @@
-import { existsSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { sha256 } from './hash.ts'
+import { contentHash, sha256 } from './hash.ts'
 import { SOURCE_DIR, type Recipe } from './recipes.ts'
 
 export type ManifestValue = string | number | boolean | readonly ManifestValue[] | { readonly [key: string]: ManifestValue }
@@ -27,8 +27,21 @@ export interface LockEntry {
 export type Lock = Record<string, LockEntry>
 
 export interface LockProblem {
+  /** The recipe id; for `manifest stale` the manifest file, for `orphan` the file's `/assets/…` path. */
   id: string
-  problem: 'not built' | 'source changed' | 'recipe changed' | 'output missing'
+  problem: 'not built' | 'source changed' | 'recipe changed' | 'output missing' | 'output changed' | 'manifest stale' | 'orphan'
+  /** The output concerned, for `output missing` and `output changed`. */
+  detail?: string
+}
+
+/** What `assets:check` reads from disk, injectable for tests. */
+export interface CheckIo {
+  exists(output: string): boolean
+  readOutput(output: string): Uint8Array
+  /** The committed `lib/assets/manifest.ts`. */
+  manifest(): string
+  /** Every file under `public/assets`, as `/assets/…` paths. */
+  publicAssets(): string[]
 }
 
 export const WEB_ROOT = fileURLToPath(new URL('../../', import.meta.url))
@@ -112,29 +125,58 @@ export function writeManifest(recipes: readonly Recipe[], lock: Lock): void {
   writeFileSync(LOCK_FILE, `${JSON.stringify(ordered, null, 2)}\n`)
 }
 
+const ASSETS_DIR = join(PUBLIC_DIR, 'assets')
+
+const walk = (dir: string): string[] =>
+  existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)])) : []
+
+/** The real disk. */
+export const diskIo: CheckIo = {
+  exists: (output) => existsSync(outputFile(output)),
+  readOutput: (output) => readFileSync(outputFile(output)),
+  manifest: () => readFileSync(MANIFEST_FILE, 'utf8'),
+  publicAssets: () => walk(ASSETS_DIR).map((file) => `/${relative(PUBLIC_DIR, file).split(sep).join('/')}`),
+}
+
+/** The content hash `hashedName` put in a file name (`name.<10 hex>.<ext>`), or null for an unhashed output. */
+const NAME_HASH = /\.([0-9a-f]{10})\.[^./]+$/
+
 /**
- * What `assets:check` reports: per recipe, the first reason its committed outputs may not match its
- * source and recipe. Needs no encoders, so CI can run it.
+ * What `assets:check` reports per recipe: the first reason its committed outputs may not match its
+ * source and recipe, or bytes that no longer match the hash in their file name (an output edited or
+ * replaced by hand keeps its immutable URL, so every cache would keep the old bytes). Needs no
+ * encoders, so CI can run it.
  */
-export function checkLock(
-  recipes: readonly Recipe[],
-  lock: Lock,
-  readSource: (source: string) => Uint8Array,
-  exists: (output: string) => boolean = (output) => existsSync(outputFile(output)),
-): LockProblem[] {
+export function checkLock(recipes: readonly Recipe[], lock: Lock, readSource: (source: string) => Uint8Array, io: CheckIo = diskIo): LockProblem[] {
   const problems: LockProblem[] = []
   for (const recipe of recipes) {
     const entry = lock[recipe.id]
-    const problem: LockProblem['problem'] | null = !entry
-      ? 'not built'
-      : sha256(readSource(recipe.source)) !== entry.source
-        ? 'source changed'
-        : recipeHash(recipe) !== entry.recipe
-          ? 'recipe changed'
-          : entry.outputs.some((o) => !exists(o))
-            ? 'output missing'
-            : null
-    if (problem) problems.push({ id: recipe.id, problem })
+    const problem = (p: LockProblem['problem'], detail?: string) => problems.push({ id: recipe.id, problem: p, ...(detail ? { detail } : {}) })
+    if (!entry) problem('not built')
+    else if (sha256(readSource(recipe.source)) !== entry.source) problem('source changed')
+    else if (recipeHash(recipe) !== entry.recipe) problem('recipe changed')
+    else {
+      const missing = entry.outputs.find((o) => !io.exists(o))
+      const changed = missing ? undefined : entry.outputs.find((o) => {
+        const named = NAME_HASH.exec(o)?.[1]
+        return named !== undefined && contentHash(io.readOutput(o)) !== named
+      })
+      if (missing) problem('output missing', missing)
+      else if (changed) problem('output changed', changed)
+    }
   }
+  return problems
+}
+
+/**
+ * The checks over the whole tree (only meaningful with every recipe): the committed manifest is
+ * exactly what the lock generates, and `public/assets` holds nothing the lock did not produce.
+ */
+export function checkTree(recipes: readonly Recipe[], lock: Lock, io: CheckIo = diskIo): LockProblem[] {
+  const problems: LockProblem[] = []
+  // git may check the file out with CRLF on Windows; the content is what counts
+  if (io.manifest().replace(/\r\n/g, '\n') !== manifestSource(recipes, lock)) problems.push({ id: relative(WEB_ROOT, MANIFEST_FILE).split(sep).join('/'), problem: 'manifest stale' })
+  const locked = new Set(Object.values(lock).flatMap((e) => e.outputs))
+  for (const file of io.publicAssets().sort()) if (!locked.has(file)) problems.push({ id: file, problem: 'orphan' })
   return problems
 }

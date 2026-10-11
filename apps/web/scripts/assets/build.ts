@@ -6,13 +6,15 @@
  *   bun scripts/assets/build.ts [--only <id-prefix>]… [--force]
  *   bun scripts/assets/build.ts --check
  *
- * A recipe whose source, recipe and outputs are unchanged is skipped unless `--force`.
+ * A recipe whose source, recipe and outputs are unchanged is skipped unless `--force`. `--check` also
+ * verifies each hashed output against the hash in its name, the generated manifest against the lock,
+ * and that `public/assets` holds no file the lock does not list.
  */
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { sha256 } from './hash.ts'
-import { checkLock, LOCK_FILE, outputFile, recipeHash, writeManifest, type Lock } from './manifest.ts'
+import { checkLock, checkTree, LOCK_FILE, outputFile, recipeHash, writeManifest, type Lock } from './manifest.ts'
 import { RECIPES, SOURCE_DIR, type Recipe } from './recipes.ts'
 import { copyStage } from './stages/copy.ts'
 import { fontStage } from './stages/font.ts'
@@ -47,8 +49,9 @@ const selected = RECIPES.filter((r) => !values.only?.length || values.only.some(
 if (!selected.length) throw new Error(`no recipe matches --only ${values.only?.join(', ')}`)
 
 if (values.check) {
-  const problems = checkLock(selected, lock, readSource)
-  for (const p of problems) console.error(`${p.id}: ${p.problem}`)
+  // the manifest and orphan checks need every recipe: an --only check covers its recipes alone
+  const problems = [...checkLock(selected, lock, readSource), ...(values.only?.length ? [] : checkTree(RECIPES, lock))]
+  for (const p of problems) console.error(`${p.id}: ${p.problem}${p.detail ? ` (${p.detail})` : ''}`)
   console.log(problems.length ? `assets:check: ${problems.length} problem(s); run bun run assets:build` : `assets:check: ${selected.length} recipe(s) up to date`)
   process.exit(problems.length ? 1 : 0)
 }
@@ -92,4 +95,13 @@ for (const recipe of selected) {
 }
 
 writeManifest(RECIPES, lock)
+
+// public/assets belongs to the pipeline: a full build leaves nothing there the lock does not list
+if (!values.only?.length) {
+  for (const p of checkTree(RECIPES, lock)) {
+    if (p.problem !== 'orphan') continue
+    unlinkSync(outputFile(p.id))
+    rows.push(`${p.id}: orphan removed`)
+  }
+}
 console.log(rows.join('\n'))
