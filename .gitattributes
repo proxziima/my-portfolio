@@ -4,3 +4,5 @@ Dockerfile text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.ndjson text eol=lf
+# verbatim build output: the bytes are the test (no newline conversion)
+apps/web/tests/unit/fixtures/turbopack/** -text

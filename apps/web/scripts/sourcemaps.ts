@@ -7,7 +7,12 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const MAP_COMMENT = /\n?\/[/*][#@] sourceMappingURL=\S+?\.map(?: \*\/)?\s*$/
+/**
+ * The trailing map comment in either form: `//# sourceMappingURL=a.js.map` (JS) or
+ * `/*# sourceMappingURL=a.css.map*\/` (CSS; Turbopack writes no space before the `*\/`), with the
+ * blank lines before it. CSS keeps it otherwise, and `inlineCss` copies it into every HTML response.
+ */
+const MAP_COMMENT = /\s*\/[/*][#@] sourceMappingURL=\S+?\.map\s*(?:\*\/)?\s*$/
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
@@ -43,7 +48,9 @@ const SOURCE_COPY = /\.(?:ts|tsx|mts|cts)$/
  * The asset's module sits unrequired in the client chunk; nothing ever fetches the file. No call shape,
  * magic comment or config option avoids the second reference (all checked in a minimal app), so the copy
  * goes here, beside the maps, before anything serves `.next/static`. Drop this once Turbopack stops
- * emitting it (`removed 0 source copies` in the build log).
+ * emitting it (`removed 0 source copies` in the build log). Upstream: no vercel/next.js issue covers it
+ * as of 2026-10-10 (searched "turbopack worker", "worker.ts static/media", "new URL import.meta.url
+ * media"); the closest worker reports (#99442, #82520) are about resolution, not this copy.
  */
 export function removeSourceCopies(dir: string): string[] {
   const media = join(dir, 'media')
