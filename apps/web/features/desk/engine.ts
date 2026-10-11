@@ -78,6 +78,8 @@ export function createDeskEngine({
   const cameraPosition = new Vector3()
 
   let size = { width: 1, height: 1 }
+  /** The size the CSS3D layer was last given: the one of the last frame committed. */
+  let cssSize: typeof size | null = null
   let pixelRatio = 1
   let raf = 0
   let last = 0
@@ -90,7 +92,13 @@ export function createDeskEngine({
   const draw = () => {
     camera.updateMatrixWorld()
     const frame: GlFrameCamera = { view: Float64Array.from(camera.matrixWorld.elements), projection: Float64Array.from(camera.projectionMatrix.elements) }
+    const at = size
     return host.render(frame, (models) => {
+      // the CSS3D layer takes the box size with the frame drawn at it: a host that draws later keeps the two together
+      if (at !== cssSize) {
+        cssSize = at
+        css.setSize(at.width, at.height)
+      }
       cssCamera.matrixWorld.fromArray(frame.view)
       cssCamera.matrixWorldInverse.copy(cssCamera.matrixWorld).invert()
       cssCamera.projectionMatrix.fromArray(frame.projection)
@@ -124,7 +132,7 @@ export function createDeskEngine({
   }
 
   /**
-   * Resizing the canvas clears it: repaint now so the next paint is not blank. `dirty` stays set and
+   * Resizing a main-thread canvas clears it: repaint now so the next paint is not blank. `dirty` stays set and
    * the loop wakes, so the next frame draws again once the rig has caught up with the new aspect.
    */
   const redraw = () => {
@@ -167,8 +175,7 @@ export function createDeskEngine({
     resize(width, height) {
       if (width === size.width && height === size.height) return
       size = { width, height }
-      host.resize(width, height, pixelRatio) // the canvas is sized by CSS
-      css.setSize(width, height)
+      host.resize(width, height, pixelRatio) // the canvas is sized by CSS; the CSS3D layer follows on commit
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       rig.setAspect(height / width)

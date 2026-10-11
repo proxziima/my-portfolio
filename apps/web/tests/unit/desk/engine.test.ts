@@ -38,6 +38,7 @@ function fakeHost(accept = true) {
       pending.push({ camera, commit })
       return true
     }),
+    onFail: vi.fn(),
     dispose: vi.fn(),
   } satisfies GlHost
   return {
@@ -122,6 +123,23 @@ describe('createDeskEngine', () => {
     expect(drawn.view).toEqual([...view])
     expect(drawn.projection).toEqual([...projection])
     expect(drawn.inverse).toEqual(new Matrix4().fromArray(view).invert().elements)
+    engine.dispose()
+  })
+
+  it('sizes the CSS3D layer with the frame drawn at that size, not before', () => {
+    const fake = fakeHost()
+    const engine = createDeskEngine({ container, host: fake.host, screenSrc: '/os' })
+    engine.resize(600, 400)
+    engine.start()
+    tick()
+    fake.land(false)
+    const layer = container.children[0] as HTMLElement
+    expect([layer.style.width, layer.style.height]).toEqual(['600px', '400px'])
+    // the resize draws at once; until that frame lands the CSS3D layer stays with the frame on the canvas
+    engine.resize(800, 500)
+    expect([layer.style.width, layer.style.height]).toEqual(['600px', '400px'])
+    fake.land(false)
+    expect([layer.style.width, layer.style.height]).toEqual(['800px', '500px'])
     engine.dispose()
   })
 

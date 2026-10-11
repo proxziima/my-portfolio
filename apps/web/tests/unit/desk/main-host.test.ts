@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const desk = vi.hoisted(() => ({
-  created: [] as Array<{ canvas: unknown; assets: unknown }>,
+  created: [] as Array<{ canvas: unknown }>,
   models: false,
   fail: false,
   log: [] as string[],
@@ -10,9 +10,9 @@ const desk = vi.hoisted(() => ({
 }))
 
 vi.mock('@/features/desk/gl/desk-gl', () => ({
-  createDeskGl: (canvas: unknown, assets: unknown) => {
+  createDeskGl: (canvas: unknown) => {
     if (desk.fail) throw new Error('Error creating WebGL context.')
-    desk.created.push({ canvas, assets })
+    desk.created.push({ canvas })
     desk.instance = {
       load: vi.fn(async () => {}),
       resize: vi.fn(),
@@ -28,7 +28,8 @@ vi.mock('@/features/desk/gl/desk-gl', () => ({
 
 const { createMainHost } = await import('@/features/desk/gl/main-host')
 
-const URLS = Promise.resolve([{ model: '/m.glb', texture: '/t.webp' }])
+const LIST = [{ model: '/m.glb', texture: '/t.webp' }]
+const URLS = Promise.resolve(LIST)
 const camera = { view: new Float64Array(16), projection: new Float64Array(16) }
 
 beforeEach(() => {
@@ -44,7 +45,7 @@ describe('createMainHost', () => {
     expect(host.kind).toBe('main')
     expect(host.canvas).toBeInstanceOf(HTMLCanvasElement)
     expect(host.canvas.style.display).toBe('block')
-    expect(desk.created).toEqual([{ canvas: host.canvas, assets: URLS }])
+    expect(desk.created).toEqual([{ canvas: host.canvas }])
   })
 
   it('throws when there is no WebGL, so the scene can report it', () => {
@@ -68,7 +69,20 @@ describe('createMainHost', () => {
     host.resize(600, 400, 2)
     host.dispose()
     expect(desk.instance.load).toHaveBeenCalledTimes(1)
+    expect(desk.instance.load).toHaveBeenCalledWith(LIST)
     expect(desk.instance.resize).toHaveBeenCalledWith(600, 400, 2)
     expect(desk.instance.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a lost context, but not the one its own dispose causes', () => {
+    const host = createMainHost(URLS)
+    const onFail = vi.fn()
+    host.onFail(onFail)
+    host.canvas.dispatchEvent(new Event('webglcontextlost'))
+    expect(onFail).toHaveBeenCalledWith('context_lost')
+    onFail.mockClear()
+    host.dispose()
+    host.canvas.dispatchEvent(new Event('webglcontextlost'))
+    expect(onFail).not.toHaveBeenCalled()
   })
 })

@@ -76,8 +76,8 @@ export function createScreenGl(screen: ScreenSpec = SCREEN): { group: Group; dis
 /** The desk's WebGL side, wherever it runs. */
 export interface DeskGl {
   readonly canvas: HTMLCanvasElement | OffscreenCanvas
-  /** Fetches the models into the scene; rejects on any failure. */
-  load(): Promise<void>
+  /** Fetches these models into the scene; rejects on any failure. */
+  load(assets: DeskAssetUrls): Promise<void>
   /** CSS size and pixel ratio; the canvas's own CSS size is left to its owner. */
   resize(width: number, height: number, pixelRatio: number): void
   /** Draws one frame with exactly this camera. Returns whether the models are in it. */
@@ -91,7 +91,7 @@ export interface DeskGl {
  * OffscreenCanvas in a worker (its globals are `fetch`, `createImageBitmap` and `WebAssembly`).
  * Throws if the canvas gives no WebGL context.
  */
-export function createDeskGl(canvas: HTMLCanvasElement | OffscreenCanvas, assets: DeskAssetUrls | Promise<DeskAssetUrls>): DeskGl {
+export function createDeskGl(canvas: HTMLCanvasElement | OffscreenCanvas): DeskGl {
   const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' })
   renderer.setClearColor(0x000000, 0)
   const scene = new Scene()
@@ -107,8 +107,8 @@ export function createDeskGl(canvas: HTMLCanvasElement | OffscreenCanvas, assets
 
   return {
     canvas,
-    async load() {
-      const loaded = await loadDesk(await assets)
+    async load(assets) {
+      const loaded = await loadDesk(assets)
       if (disposed) {
         loaded.dispose()
         return

@@ -139,14 +139,14 @@ describe('createDeskGl', () => {
 
   it('draws into the canvas it is given, transparent and antialiased', () => {
     const c = canvas()
-    const desk = createDeskGl(c, URLS)
+    const desk = createDeskGl(c)
     expect(desk.canvas).toBe(c)
     expect(gl.renderers[0]!.options).toEqual({ canvas: c, alpha: true, antialias: true, powerPreference: 'high-performance' })
     expect(gl.renderers[0]!.clear).toEqual([0x000000, 0])
   })
 
   it('renders with a camera that is exactly the frame camera: same view, its inverse, same projection', () => {
-    const desk = createDeskGl(canvas(), URLS)
+    const desk = createDeskGl(canvas())
     const { view, projection, camera } = frameCamera()
     desk.render({ view, projection })
     const drawn = gl.renderers[0]!.renders[0]!
@@ -162,10 +162,10 @@ describe('createDeskGl', () => {
   it('says the models are in the frame only once they have loaded', async () => {
     const loaded = fakeDesk()
     gl.load = async () => loaded
-    const desk = createDeskGl(canvas(), URLS)
+    const desk = createDeskGl(canvas())
     const { view, projection } = frameCamera()
     expect(desk.render({ view, projection })).toBe(false)
-    await desk.load()
+    await desk.load(URLS)
     expect(desk.render({ view, projection })).toBe(true)
     const scene = gl.renderers[0]!.renders[1]!.scene
     // the screen first, then the models, as the scene was always built
@@ -173,13 +173,13 @@ describe('createDeskGl', () => {
     expect(scene.children[1]).toBe(loaded.objects[0])
   })
 
-  it('loads the URLs it was given, also when they are still being resolved', async () => {
+  it('loads the URLs it is given', async () => {
     const seen: unknown[] = []
     gl.load = async (assets) => {
       seen.push(assets)
       return fakeDesk()
     }
-    await createDeskGl(canvas(), Promise.resolve(URLS)).load()
+    await createDeskGl(canvas()).load(URLS)
     expect(seen).toEqual([URLS])
   })
 
@@ -187,11 +187,11 @@ describe('createDeskGl', () => {
     gl.load = async () => {
       throw new Error('404')
     }
-    await expect(createDeskGl(canvas(), URLS).load()).rejects.toThrow('404')
+    await expect(createDeskGl(canvas()).load(URLS)).rejects.toThrow('404')
   })
 
   it('sizes the drawing buffer by the pixel ratio and leaves the CSS size alone', () => {
-    const desk = createDeskGl(canvas(), URLS)
+    const desk = createDeskGl(canvas())
     desk.resize(600, 400, 2)
     expect(gl.renderers[0]!.pixelRatio).toBe(2)
     expect(gl.renderers[0]!.sizes.at(-1)).toEqual([600, 400, false])
@@ -200,8 +200,8 @@ describe('createDeskGl', () => {
   it('frees the models and the context on dispose', async () => {
     const loaded = fakeDesk()
     gl.load = async () => loaded
-    const desk = createDeskGl(canvas(), URLS)
-    await desk.load()
+    const desk = createDeskGl(canvas())
+    await desk.load(URLS)
     desk.dispose()
     expect(loaded.dispose).toHaveBeenCalledTimes(1)
     expect(gl.renderers[0]!.disposed).toBe(1)
@@ -212,8 +212,8 @@ describe('createDeskGl', () => {
     const loaded = fakeDesk()
     let arrive: ((d: typeof loaded) => void) | null = null
     gl.load = () => new Promise((r) => (arrive = r))
-    const desk = createDeskGl(canvas(), URLS)
-    const loading = desk.load()
+    const desk = createDeskGl(canvas())
+    const loading = desk.load(URLS)
     await vi.waitFor(() => expect(arrive).not.toBeNull())
     desk.dispose()
     arrive!(loaded)
