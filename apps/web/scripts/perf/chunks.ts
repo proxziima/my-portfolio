@@ -19,6 +19,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { gzipSync } from 'node:zlib'
+import { chromium, type Browser } from '@playwright/test'
+import { initialScripts } from './initial-scripts.ts'
 import { start, stop, waitFor } from './server.ts'
 
 const { values } = parseArgs({ options: { port: { type: 'string', default: '3100' }, url: { type: 'string' } } })
@@ -61,11 +63,9 @@ const MAIN_THREAD_WITH_WORKER: Marker[] = ['three', 'gltf']
  * then lists the scripts the page's own thread fetched (the window's resource timeline holds no
  * worker request). Returns which host drew and those script paths, relative to `.next/static`.
  */
-async function deskMainThreadScripts(): Promise<{ host: 'worker' | 'main'; scripts: string[] }> {
-  const { chromium } = await import('@playwright/test')
-  const browser = await chromium.launch()
+async function deskMainThreadScripts(browser: Browser): Promise<{ host: 'worker' | 'main'; scripts: string[] }> {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     await page.goto(`${origin}/`)
     await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
     const scene = page.locator('[data-anchor="desk-scene"]')
@@ -77,7 +77,7 @@ async function deskMainThreadScripts(): Promise<{ host: 'worker' | 'main'; scrip
     const scripts = urls.filter((u) => u.includes('/_next/static/') && u.endsWith('.js')).map((u) => decodeURIComponent(new URL(u).pathname.split('/_next/static/')[1]!))
     return { host, scripts }
   } finally {
-    await browser.close()
+    await page.close()
   }
 }
 
@@ -100,28 +100,19 @@ function allChunks(dir = staticDir, base = ''): string[] {
   )
 }
 
-/** The script URLs a document loads at load: `<script src>` and `<link rel="preload" as="script">`. */
-function initialScripts(html: string): string[] {
-  const urls = new Set<string>()
-  for (const tag of html.match(/<(?:script|link)\b[^>]*>/g) ?? []) {
-    const isScript = tag.startsWith('<script') && /\ssrc=/.test(tag)
-    const isPreload = tag.startsWith('<link') && /\sas="script"/.test(tag)
-    if (!isScript && !isPreload) continue
-    const src = /\s(?:src|href)="([^"]+)"/.exec(tag)?.[1]
-    if (src?.includes('/_next/static/')) urls.add(decodeURIComponent(src.split('?')[0]!.split('/_next/static/')[1]!))
-  }
-  return [...urls]
-}
-
 const kib = (n: number) => `${(n / 1024).toFixed(1)} KiB`
 const failures: string[] = []
 
 let server: ChildProcess | null = null
+let browser: Browser | null = null
 try {
   if (!values.url) {
     server = start(port)
   }
   await waitFor(`${origin}/`, 60_000)
+  browser = await chromium.launch()
+  // the documents are parsed by Chromium's own HTML parser (initial-scripts.ts)
+  const parser = await browser.newPage()
 
   const files = new Map(allChunks().map((f) => [f, readFileSync(join(staticDir, f), 'utf8')]))
   for (const marker of Object.keys(MARKERS) as Marker[]) {
@@ -132,7 +123,7 @@ try {
 
   for (const path of Object.keys(FORBIDDEN)) {
     const html = await fetch(`${origin}${path}`).then((r) => r.text())
-    const scripts = initialScripts(html)
+    const scripts = await parser.evaluate(initialScripts, html)
     if (scripts.length === 0) failures.push(`${path}: no initial scripts found in the document`)
     let raw = 0
     let gzip = 0
@@ -154,7 +145,7 @@ try {
     if (gzip > budget.gzip) failures.push(`${path}: initial JS ${kib(gzip)} gzip is over the ${kib(budget.gzip)} budget`)
   }
 
-  const desk = await deskMainThreadScripts()
+  const desk = await deskMainThreadScripts(browser)
   let deskRaw = 0
   for (const script of desk.scripts) {
     const text = files.get(script)
@@ -168,6 +159,7 @@ try {
   // Chromium draws in the worker; the main host here would make the assertion above vacuous
   if (desk.host !== 'worker') failures.push(`/: the desk drew on the ${desk.host} thread in Chromium, expected its worker`)
 } finally {
+  await browser?.close()
   if (server) stop(server)
 }
 
