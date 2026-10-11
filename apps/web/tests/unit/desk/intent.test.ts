@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { VISIBLE_RATIO, watchApproach } from '@/features/desk/intent'
+import { isTouchDevice, VISIBLE_RATIO, watchApproach } from '@/features/desk/intent'
 import type { IntentSource } from '@/features/desk/power'
 
 /** Records its options and target, and lets the test report an intersection ratio. */
@@ -125,6 +125,36 @@ describe('watchApproach on touch', () => {
     watchApproach(box, screen, true, onApproach)
     screen.dispatchEvent(focusIn())
     expect(onApproach).toHaveBeenCalledWith('focus')
+  })
+})
+
+/** A matchMedia for a device with these primary-input features, evaluating `(feature: value) and …` queries. */
+function device(features: { hover: 'hover' | 'none'; pointer: 'fine' | 'coarse' | 'none' }) {
+  return (query: string) => {
+    const tests = [...query.matchAll(/\(\s*([a-z-]+)\s*:\s*([a-z-]+)\s*\)/g)]
+    if (tests.length === 0 || query.replace(/\([^)]*\)/g, '').replace(/\band\b/g, '').trim() !== '') throw new Error(`unsupported query ${query}`)
+    const matches = tests.every(([, name, value]) => features[name as keyof typeof features] === value)
+    return { matches, media: query } as MediaQueryList
+  }
+}
+
+describe('isTouchDevice', () => {
+  it('a phone or tablet (coarse pointer, no hover) is touch', () => {
+    expect(isTouchDevice(device({ hover: 'none', pointer: 'coarse' }))).toBe(true)
+  })
+
+  it('a desktop or laptop with a mouse or trackpad is not', () => {
+    expect(isTouchDevice(device({ hover: 'hover', pointer: 'fine' }))).toBe(false)
+  })
+
+  // headless Chromium on Linux (PageSpeed Insights, CI's Lighthouse), a kiosk, a keyboard-only setup:
+  // no hover because there is no pointer at all, and nobody approaching the monitor at load
+  it('a device with no pointing device is not, although it has no hover either', () => {
+    expect(isTouchDevice(device({ hover: 'none', pointer: 'none' }))).toBe(false)
+  })
+
+  it('a pen-only screen (fine pointer, no hover) is not: a pen entering the box counts as approach', () => {
+    expect(isTouchDevice(device({ hover: 'none', pointer: 'fine' }))).toBe(false)
   })
 })
 

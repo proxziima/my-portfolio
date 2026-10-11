@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { TOUCH_QUERY } from '../../features/desk/intent'
 import { ASSETS } from '../../lib/assets/manifest'
 import { openPortfolio, test } from './support'
 
@@ -130,6 +131,45 @@ test('the mute toggle flips and persists', async ({ page }) => {
   await expect(page.locator('[data-anchor="figure"]').getByRole('button', { name: 'Unmute' })).toBeVisible()
 })
 
+// Headless Chromium on Linux, which PageSpeed Insights and CI's Lighthouse run, has no pointing device:
+// `(hover: none)` and `(pointer: none)` match. CDP cannot emulate input media features, so the page's
+// matchMedia answers for them as that host does; every other query goes to the real one.
+test.describe('with no pointing device', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const real = window.matchMedia.bind(window)
+      const input: Record<string, string> = { hover: 'none', 'any-hover': 'none', pointer: 'none', 'any-pointer': 'none' }
+      window.matchMedia = (query: string) => {
+        const tests = [...query.matchAll(/\(\s*([a-z-]+)\s*:\s*([^)]+?)\s*\)/g)]
+        if (!tests.some(([, name]) => name! in input)) return real(query)
+        const matches = tests.every(([, name, value]) => (name! in input ? input[name!] === value : real(`(${name}: ${value})`).matches))
+        return { matches, media: query, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false } as MediaQueryList
+      }
+    })
+  })
+
+  test('the monitor stays off in view until approached, and the OS is never fetched at load', async ({ page }) => {
+    const osRequests: string[] = []
+    page.on('request', (r) => {
+      if (new URL(r.url()).pathname === '/os') osRequests.push(r.url())
+    })
+    await page.route('**/*.glb', (route) => route.continue())
+    await openPortfolio(page)
+    expect(await page.evaluate(() => matchMedia('(hover: none)').matches && matchMedia('(pointer: none)').matches), 'the host has no pointer').toBe(true)
+    const scene = page.locator('[data-anchor="desk-scene"]')
+    await page.locator('[data-anchor="figure-box"]').evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    await expect(scene).toHaveAttribute('data-loaded', 'true', { timeout: 30_000 })
+    // a touch device would have booted within the observer's delivery delay
+    await page.waitForTimeout(1500)
+    await expect(scene.getByRole('img', { name: 'Desktop (powered off)' })).toBeAttached()
+    await expect(scene.locator('iframe')).toHaveCount(0)
+    expect(osRequests).toEqual([])
+    // keyboard still boots it: focus on the powered-off screen is an approach
+    await scene.getByRole('img', { name: 'Desktop (powered off)' }).focus()
+    await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached({ timeout: 5_000 })
+  })
+})
+
 test.describe('on touch', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
 
@@ -144,7 +184,9 @@ test.describe('on touch', () => {
   test('the monitor boots as it scrolls into view', async ({ page }) => {
     await page.route('**/*.glb', (route) => route.continue())
     await openPortfolio(page)
-    expect(await page.evaluate(() => matchMedia('(hover: none)').matches), 'the emulated phone has no hover').toBe(true)
+    // what `isTouchDevice` reads: the emulated phone's primary pointer is coarse, cannot hover, and it reports touch points
+    expect(await page.evaluate((query) => matchMedia(query).matches, TOUCH_QUERY), 'the emulated phone is a touch device').toBe(true)
+    expect(await page.evaluate(() => navigator.maxTouchPoints)).toBeGreaterThan(0)
     const scene = page.locator('[data-anchor="desk-scene"]')
     const box = page.locator('[data-anchor="figure-box"]')
     // the scene mounts 200 px before the box is in view: it stays powered off while under half visible

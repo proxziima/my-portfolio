@@ -459,7 +459,20 @@ There is no transition back to `off`: once powered, the OS stays, as today.
 
 ### 7.2 Approach triggers (`features/desk/intent.ts`, `watchApproach(box, screen, touch, onApproach)` → cleanup; fires once)
 
-`touch` is `matchMedia('(hover: none)').matches`, read once when the scene mounts.
+`touch` is `isTouchDevice()`: `matchMedia('(hover: none) and (pointer: coarse)').matches`
+(`TOUCH_QUERY`), read once when the scene mounts. That is Media Queries 4's touchscreen: a coarse
+primary pointer that cannot hover (phones, tablets). It was `(hover: none)` alone, which a device
+with no pointing device at all matches too (`pointer: none`): headless Chromium on Linux, which is
+what PageSpeed Insights and CI's Lighthouse run, plus kiosks and keyboard-only setups. Taken for
+touch, those booted the OS at load whenever the figure was half in view, and CI's desktop run
+(1350×940, figure in view) fetched `/os`, the two static videos (2.07 MB H.264 + 0.91 MB AV1) and
+the smudges: 4,074,161 B against the 1,600,000 B budget, with no input at all. They now take the
+pointer path, where keyboard focus or full screen boots the OS. `navigator.maxTouchPoints` is not
+used: touchscreen laptops report touch points (the dev machine reports 2) but have a fine primary
+pointer that hovers, so they belong to the pointer path, and CSS (§7.4) cannot read it. An e2e
+test stubs the no-pointer host's media features (CDP cannot emulate them) and asserts the monitor
+stays off in view with `/os` never requested; the touch tests assert the emulated phone matches
+`TOUCH_QUERY` and reports touch points.
 
 | Source | Mode | Signal | Why |
 |---|---|---|---|
@@ -493,7 +506,7 @@ call `iframe.focus()`**, so a keyboard visitor lands in the OS at the same tab p
   `power` through `onPower`, so `Figure` can pass it as the rebind key to
   `useFullscreen(box, power)`. The Escape listener inside the iframe is then installed when the
   iframe exists, whichever came first.
-- Touch: the iframe keeps `pointer-events: none` under `(hover: none)`. The screen remains a
+- Touch: the iframe keeps `pointer-events: none` under `(hover: none) and (pointer: coarse)` (the same `TOUCH_QUERY`). The screen remains a
   picture, and it boots as the monitor scrolls half into view.
 
 ### 7.5 Analytics semantics

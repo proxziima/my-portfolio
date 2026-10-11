@@ -7,7 +7,7 @@ import { DESK_ASSETS, OS_PATH } from './config'
 import { createDeskEngine, type DeskEngine } from './engine'
 import { GlHostError, type GlFailure, type GlHost, type HostKind } from './gl/host'
 import { selectHost } from './gl/select-host'
-import { watchApproach } from './intent'
+import { isTouchDevice, watchApproach } from './intent'
 import { cappedPixelRatio } from './pixel-ratio'
 import { reducePower, type Power } from './power'
 import { watchScreen } from './screen-events'
@@ -104,8 +104,7 @@ export function DeskScene({ onFail, onReady, muted, fullscreen, onPower }: DeskS
     }
     watchDpr()
     const unlock = () => audio.unlock()
-    // read once: a device does not grow or lose hover while the page is open
-    const touch = window.matchMedia('(hover: none)').matches
+    const touch = isTouchDevice()
     // the figure box: the host fills it, and the pointer enters it well before it reaches the screen
     const box = host.parentElement ?? host
     const stopApproach = watchApproach(box, engine.screen.element, touch, (source) => dispatchPower({ type: 'intent', source }))

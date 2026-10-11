@@ -23,8 +23,9 @@
   opacity: 1;
 }
 
-/* a tilted, scaled iframe is not usable by touch: the screen stays a picture, the link below opens the OS */
-@media (hover: none) {
+/* a tilted, scaled iframe is not usable by touch: the screen stays a picture, the link below opens the OS.
+   The query is intent.ts's TOUCH_QUERY: `(hover: none)` alone also matches a device with no pointer at all. */
+@media (hover: none) and (pointer: coarse) {
   .host iframe {
     pointer-events: none;
   }
