@@ -864,6 +864,15 @@
     ],
     "value": "/assets/desk/audio/office.fffe9677c5.mp3"
   },
+  "blowout.bulb": {
+    "source": "cc89cf948346d71ce475e05a55b39a5f8d6c5085288e74087b96dce51f0af2cc",
+    "recipe": "de698e3eecc23756879d37436d601cf9bdcb4544e122520dd5a4a1fe090ff7aa",
+    "tools": {},
+    "outputs": [
+      "/assets/blowout/bulb-explode.cc89cf9483.mp3"
+    ],
+    "value": "/assets/blowout/bulb-explode.cc89cf9483.mp3"
+  },
   "theme.rockerOn": {
     "source": "5c8e20dfd15bfba6f01f01034ef3a7a58512adec31b02e87af9a5ad6c8ceafaf",
     "recipe": "0ff910f001338b2b445d20113a9e5a20d2603e5fe358ace4e1a0f60ff04e735b",

@@ -1,6 +1,7 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { PUBLIC_DIR } from '@/scripts/assets/manifest'
 import { RECIPES, SOURCE_DIR } from '@/scripts/assets/recipes'
 
 describe('recipes', () => {
@@ -21,5 +22,12 @@ describe('recipes', () => {
       const ranks = r.codecs.map((c) => order.indexOf(c))
       expect(ranks, r.id).toEqual([...ranks].sort((a, b) => a - b))
     }
+  })
+
+  it('own every sound and video the site serves: none sits unhashed in public/ outside assets/', () => {
+    const media = (readdirSync(PUBLIC_DIR, { recursive: true }) as string[])
+      .map((f) => f.replaceAll('\\', '/'))
+      .filter((f) => !f.startsWith('assets/') && /\.(?:mp3|ogg|wav|m4a|mp4|webm)$/i.test(f))
+    expect(media).toEqual([])
   })
 })

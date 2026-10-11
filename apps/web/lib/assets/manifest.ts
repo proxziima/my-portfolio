@@ -104,6 +104,9 @@ export const ASSETS = {
       office: '/assets/desk/audio/office.fffe9677c5.mp3',
     },
   },
+  blowout: {
+    bulb: '/assets/blowout/bulb-explode.cc89cf9483.mp3',
+  },
   theme: {
     rockerOn: {
       width: 530,

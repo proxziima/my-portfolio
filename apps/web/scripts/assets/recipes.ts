@@ -37,6 +37,8 @@ export const RECIPES: readonly Recipe[] = [
   { id: 'desk.screen.staticBase', kind: 'video', source: 'desk/screen/static-base.mp4', codecs: ['av1', 'vp9', 'h264'], layer: { opacity: 0.5 } },
   { id: 'desk.screen.staticLayer', kind: 'video', source: 'desk/screen/static-layer.mp4', codecs: ['av1', 'vp9', 'h264'], layer: { opacity: 0.1 } },
   ...AUDIO.map((n): Recipe => ({ id: `desk.audio.${camel(n)}`, kind: 'copy', source: `desk/audio/${n}.mp3` })),
+  // the light bulb bursting (features/blowout): fetched on the second rapid click, decoded once
+  { id: 'blowout.bulb', kind: 'copy', source: 'blowout/bulb-explode.mp3' },
   // shown at 2.8rem (44.8 px): 64 for 1×, 128 for 2×, 192 so a 3× phone never upscales
   { id: 'theme.rockerOn', kind: 'image', source: 'theme-switch/rocker-on.webp', widths: [64, 128, 192], formats: ['avif', 'webp'], parity: { ssim: 0.99 } },
   { id: 'theme.rockerOff', kind: 'image', source: 'theme-switch/rocker-off.webp', widths: [64, 128, 192], formats: ['avif', 'webp'], parity: { ssim: 0.99 } },
