@@ -33,3 +33,6 @@ apps/payload/public/favicons
 
 # Claude Code state, including worktree checkouts of this repo
 .claude
+
+# Design docs and reference sites: never part of an image
+docs

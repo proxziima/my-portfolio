@@ -731,29 +731,16 @@ How it works:
 
 This command has not been run against the deployed stack yet; see [Status](#status).
 
-**CI** (`.github/workflows/ci.yml`) has two jobs.
+**CI** (`.github/workflows/ci.yml`; the whole pipeline is in [docs/ci-cd.md](../../docs/ci-cd.md)) covers the agent in two places.
 
-The `checks` job runs on every push to `main`/`develop` and on every PR:
+The `agents` job runs when the agent is affected: `eve info` and `eve build`, then twin migrations, world setup and the offline acceptance evals (scripted model, local stubs) against a `postgres:17` service on 5433 (`twin_eval`). If it fails, the `agents-evals` artifact has the offline JUnit report.
 
-- `turbo run check-types lint`;
-- the twin and agents unit tests;
-- Payload integration tests on a throwaway SQLite database (`file:./.tmp/ci.db`, never `payload.db`);
-- the web tests;
-- the client-bundle scanner's own test;
-- `eve info` and `eve build`;
-- twin migrations, world setup and the offline evals against a `postgres:17` service on 5433 (`twin_eval`);
-- a web build scanned for secrets and prompt fragments (`scripts/scan-client-bundle.ts`).
+`live-evals` runs on pushes to `main` and on manual `workflow_dispatch`, after `ci-ok`, and only when the `OPENROUTER_API_KEY` repository secret is set: the `changes` job exports that as a boolean output, because a job-level `if` can't read secrets. It never touches production. Everything runs inside the runner:
 
-`live-evals` runs on manual `workflow_dispatch` and on every push to `main`. It runs only when the `OPENROUTER_API_KEY` repository secret is set; `checks` exports that as a boolean output, because a job-level `if` can't read secrets. It never touches production. Everything runs inside the runner:
-
-1. **Secrets.** Random values are generated and masked for `PAYLOAD_SECRET`, `TWIN_REDACT_SECRET`, `TWIN_JWT_SECRET`, `TWIN_PROMPT_CANARY`, `CAL_WEBHOOK_SECRET` and the other agent secrets. Only `OPENROUTER_API_KEY` and `EXA_API_KEY` come from repository secrets. Without `EXA_API_KEY`, a placeholder keeps the env valid, since no live eval asserts on web search.
-2. **A throwaway Payload CMS** on SQLite (`file:./.tmp/live.db`) is built, then seeded with `NODE_ENV=production`. The first start applies the committed migrations (`prodMigrations`). The seed runs `src/seed/run.ts` (portfolio content) and then `src/seed/twin-ci.ts`.
-   - `twin-ci.ts` adds one public `availability` fact and one `voice` sample.
-   - It creates a CI user and an MCP API key with only `twinIdentity`, `twinSearch` and `twinDisclose` enabled. The key uses Payload's `useAPIKey` auth: the Local API sets `enableAPIKey` and `apiKey`, and Payload's field hooks store the key encrypted plus an HMAC index that the MCP endpoint looks up.
-   - The key is masked and written to `$GITHUB_ENV` as `PAYLOAD_MCP_API_KEY`.
-   - Then `next start` serves the CMS on `:3001`.
-3. **The agent** is built and runs `world:setup` and `db:migrate` against a `postgres:17` service (`twin_eval` on 5433), then starts on `:4100`. `CMS_URL` and `PAYLOAD_MCP_URL` point at the local CMS. Google gets harmless placeholders; iMessage is left unconfigured, so nothing restricted is offered and no approval runs. The live suite has no free/busy eval either. If the model calls `check_availability` during the booking acceptance, that call fails, and the model has to go on without it.
-4. **The evals.** Once `/eve/v1/health` answers, the job mints the eval token and runs `bunx eve eval --url http://127.0.0.1:4100 --strict --junit .eve/junit.xml` from `apps/agents`.
+1. **Secrets.** Random values are generated and masked (`.github/actions/secrets`). Only `OPENROUTER_API_KEY` and `EXA_API_KEY` come from repository secrets. Without `EXA_API_KEY`, a placeholder keeps the env valid, since no live eval asserts on web search.
+2. **A throwaway Payload CMS** (`.github/actions/cms`, on an empty SQLite file under `.tmp/`, never `payload.db`) is built and seeded with `NODE_ENV=production`, so the first start applies the committed migrations (`prodMigrations`). `src/seed/twin-ci.ts` then adds one public `availability` fact, one `voice` sample, and a CI user with an MCP API key that has only `twinIdentity`, `twinSearch` and `twinDisclose` enabled (Payload's `useAPIKey` auth). The key is masked and exported as `PAYLOAD_MCP_API_KEY`.
+3. **The agent** is built and runs `world:setup` and `db:migrate` against the same kind of `postgres:17` service, then starts on `:4100`. `CMS_URL` and `PAYLOAD_MCP_URL` point at the local CMS. Google is stubbed with harmless placeholders; iMessage is left unconfigured, so nothing restricted is offered and no approval runs. The live suite has no free/busy eval either. If the model calls `check_availability` during the booking acceptance, that call fails, and the model has to go on without it.
+4. **The evals.** Once `/eve/v1/health` answers, the job mints the eval token (`scripts/mint-eval-token.ts`) and runs `bunx eve eval --url http://127.0.0.1:4100 --strict --junit .eve/junit.xml` from `apps/agents`. The `live-evals` artifact has the JUnit report plus the CMS and agent logs from `ci-logs/`.
 
 ## Where the code differs from the spec
 
@@ -773,7 +760,7 @@ The `checks` job runs on every push to `main`/`develop` and on every PR:
 - **Three MCP tools, not two:** `twinIdentity` (owner identity and voice samples for the `identity` skill) joins `twinSearch` and `twinDisclose`.
 - **`check_availability({ startDate, days })`**, not `check_availability({ from, to })`: `startDate` is `YYYY-MM-DD` (default today in the owner's time zone, up to 90 days ahead) and `days` is 1 to 14 (default 7).
 - **Hook and instrumentation files.** The spec's `hooks/intent.ts`, `hooks/transcript.ts` and `hooks/usage.ts` are `agent/hooks/conversation.ts` (turn bookkeeping, transcript and the post-reply intent evaluation) and `agent/instrumentation/spend.ts` (the spend ledger).
-- **No CI migration-drift check.** CI applies the committed twin migrations (`db:migrate`), and the `live-evals` job's throwaway CMS applies Payload's committed ones, but nothing fails when the Drizzle schema or the Payload config has changes without a generated migration.
+- **CI migration drift is checked.** The `drift` job fails when the Drizzle schema or the Payload config changes without a generated migration (see [docs/ci-cd.md](../../docs/ci-cd.md)).
 - **Classifier calls are not in the spend ledger.** The abuse gate and the intent label call `generateText` directly, outside eve's instrumentation, so their cost never reaches `twin.spend_ledger` and the daily cap undercounts by that much. The OpenRouter key's credit limit still covers them.
 - **The abuse gate adds latency.** It runs before dispatch, so every message waits up to `TWIN_ABUSE_TIMEOUT_MS` (2.5 s by default) before the model call starts: time-to-first-token grows by the classifier's latency.
 - **`request_disclosure` takes `{ sourceId, reason }`.** The spec's model-supplied topic is gone: the topic shown to the owner and stored on the approval comes from the CMS stub this session's search listed, and a `sourceId` the session was never offered as restricted is denied.

@@ -16,14 +16,12 @@ WORKDIR /app
 FROM base AS build
 COPY package.json bun.lock .npmrc ./
 COPY apps/agents/package.json apps/agents/
-COPY apps/docs/package.json apps/docs/
 COPY apps/payload/package.json apps/payload/
 COPY apps/web/package.json apps/web/
 COPY packages/cms-types/package.json packages/cms-types/
 COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/twin/package.json packages/twin/
 COPY packages/typescript-config/package.json packages/typescript-config/
-COPY packages/ui/package.json packages/ui/
 RUN bun install --frozen-lockfile
 
 COPY . .
@@ -38,6 +36,9 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=node:node /app/apps/web/public ./apps/web/public
+# The release (e.g. 0.0.1) CI built this image for (`/api/health` reports it). Last, so a new value reuses every layer above.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 USER node
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]

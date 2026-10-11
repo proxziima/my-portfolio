@@ -19,6 +19,12 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } }],
-  // needs the CMS on :3001 with the seed data; an already-running dev server on `port` is reused
-  webServer: { command: 'bun run dev', url: baseURL, reuseExistingServer: true, timeout: 120_000 },
+  // needs the CMS on :3001 with the seed data. Locally an already-running dev server on `port` is reused;
+  // CI (CI=true) builds the site first and serves the production build.
+  webServer: {
+    command: process.env.CI ? 'bun run start' : 'bun run dev',
+    url: baseURL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
 })

@@ -1,11 +1,32 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "futureFlags": {
+    "githubActionsRemoteBaseRefFallback": true
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "env": ["CMS_URL", "REVALIDATE_SECRET"],
+      "passThroughEnv": [
+        "PREVIEW_SECRET",
+        "TWIN_JWT_SECRET",
+        "TWIN_COOKIE_SECRET",
+        "TWIN_REDACT_SECRET",
+        "TWIN_STABLE_KEY_SECRET",
+        "TWIN_BOOKING_REF_SECRET",
+        "TWIN_PROMPT_CANARY",
+        "TWIN_DATABASE_URL",
+        "WORKFLOW_POSTGRES_URL",
+        "OPENROUTER_API_KEY",
+        "PAYLOAD_MCP_API_KEY",
+        "IMESSAGE_PROJECT_SECRET",
+        "IMESSAGE_WEBHOOK_SECRET",
+        "CAL_WEBHOOK_SECRET",
+        "GOOGLE_SERVICE_ACCOUNT_JSON",
+        "EXA_API_KEY"
+      ],
       "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
     "lint": {
@@ -16,7 +37,8 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "passThroughEnv": ["DATABASE_URL", "PAYLOAD_SECRET", "TWIN_DATABASE_URL", "WORKFLOW_POSTGRES_URL"],
+      "outputs": ["coverage/**"]
     },
     "dev": {
       "cache": false,
