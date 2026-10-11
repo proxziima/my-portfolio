@@ -13,6 +13,16 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-10-pagespeed-design.md` (read §1.2 and §2 first: the measured causes and where this plan departs from the first draft).
 
+**As built (where the code departs from the steps below; the spec describes the built state):**
+- **Analytics queue (Task 2.5).** `trackOnExit` before posthog-js loads is queued like `track` and flushed as a beacon (a hidden tab often comes back); it is not dropped. The no-token path is `disable()`, not `discardQueue()`: it empties the queue and sets a disabled state that `send` checks, so later events are dropped at once instead of queueing again.
+- **Worker protocol (Tasks 3.2 to 3.4).** Matrices are `Float64Array` (three's precision), not `Float64Array`. `init` carries only the canvas; the models go in a separate `load` message. There is no `dispose` message: disposing terminates the worker. `load` carries the `DeskAsset`s with both texture encodes and the **drawing context probes the format** (`textureFormat()` in the worker, or on the main thread when the main host draws); `loaded` reports `{ format }` and every host's `load()` resolves with it. The main thread does not resolve the format.
+- **Main host.** `createMainHost(assets)` creates its canvas and the WebGL2 context at once (with `GL_CONTEXT_ATTRIBUTES`, so it still throws without WebGL) and imports `desk-gl` dynamically, so the main thread never parses three's renderer or the loaders while the worker draws; frames are skipped until the code is in. `deskAssetUrls` lives in the loader-free `desk-assets.ts`. `perf:chunks` asserts it in Chromium.
+- **CI budgets (Task 3.6).** Five calibrated runs per form factor, medians, all errors: performance ≥ 0.75 mobile / ≥ 0.9 desktop, TBT ≤ 650 ms mobile / ≤ 150 ms desktop, CLS ≤ 0.05, bytes ≤ 1.6 MB, script ≤ 460 KB (`lighthouserc.*.json`, `docs/observability.md`).
+- **Smudges (Task 1.6).** The 1280 w variants were dropped by the pipeline's own rules (AVIF 1280 w not smaller than AVIF 2048 w at the gate; no WebP passing below the source): shipped AVIF 2048 w plus the source JPEG. The still layers get their candidates on power-on, and the CRT fade-in waits for them to decode.
+- **Assets.** `assets:check` also verifies hashed outputs against their file names, the generated manifest against the lock, and orphans in `public/assets`. The OS fonts have no `ASSETS` entry (next/font needs a literal path). The bulb sample is a copy recipe (`blowout.bulb`), no longer in `public/sound/`.
+- **Source maps.** The post-build script also matches Turbopack's CSS map comment (`/*# …css.map*/`, no space) and strips it from the client reference manifests that `inlineCss` renders from.
+- **Rocker atlas.** Decoded with `createImageBitmap(blob)` off the main thread; `new Image()` only where the API is missing.
+
 **Repo rules for every task:**
 - Run commands from the worktree root `D:/Second Brain/01.PROJETOS/applications/my-portfolio/.claude/worktrees/perf-pagespeed` unless a step says otherwise. Web commands run from `apps/web`.
 - Git: one git command per Bash call. No compound commands mentioning git (`&&`, `;`, `|`).
@@ -779,7 +789,7 @@ export const ASSETS = {
   desk: {
     computer: { model: '/assets/desk/computer.3f9a1c2b7e.glb', texture: { avif: '…', webp: '…', width: 2048, height: 2048 } },
     // …
-    screen: { smudges: { width: 2048, height: 1638, variants: [/* avif 1280, avif 2048, webp 1280, webp 2048 */] }, staticBase: { width: 640, height: 480, sources: [/* av1, vp9, h264 in that order */] } },
+    screen: { smudges: { width: 2048, height: 1638, variants: [/* as built: avif 2048, jpg 2048 (the 1280 w variants and WebP were dropped by the parity rules) */] }, staticBase: { width: 640, height: 480, sources: [/* av1, vp9, h264 in that order */] } },
     audio: { key1: '/assets/desk/audio/key-1.ab12cd34ef.mp3' /* … */ },
   },
   theme: { /* … */ },
@@ -1449,7 +1459,7 @@ git commit -m "docs: embedded os_boot starts on approach"
 - [ ] **Step 1: Failing tests, `events.test.ts`:**
   - before `attach(client)`, `track('role_selected', { role: 'x' })` does not throw and nothing is captured. After `attach(fake)`, the queued event is captured in order with its properties.
   - the queue keeps at most 100 events (the oldest are dropped).
-  - `trackOnExit` before attach captures nothing and queues nothing. After attach it calls `capture(…, { transport: 'sendBeacon', send_instantly: true })`.
+  - (as built: `trackOnExit` before attach is queued and flushed as a beacon; see "As built") ~~`trackOnExit` before attach captures nothing and queues nothing.~~ After attach it calls `capture(…, { transport: 'sendBeacon', send_instantly: true })`.
   - `init.test.ts`: `initPostHog(config, embedded)` returns a promise. It `import()`s posthog-js once (mock the module with `vi.mock('posthog-js', …)` and count factory calls), calls `init` with today's options, `register({ embedded: true })` when embedded, then `attach`. A second call returns the same promise.
 
 - [ ] **Step 2: Implement.** `events.ts` no longer imports posthog-js at runtime:
@@ -1486,7 +1496,7 @@ export const trackOnExit: Track = (event, properties) => {
 }
 ```
 
-**No token means no `attach`, so the queue is never flushed and nothing is sent, as today.** Clear the queue when `Analytics` decides there is no token (export `discardQueue()` and call it in the effect's no-token branch), so memory does not hold events forever.
+**No token means no `attach`, so the queue is never flushed and nothing is sent, as today.** As built: `Analytics`'s no-token branch (and a failed posthog-js import) calls `disable()`, which empties the queue and sets a disabled state that `send` checks, so nothing queues afterwards either.
 
 `init.ts`:
 
@@ -1679,9 +1689,9 @@ export type HostKind = 'worker' | 'main'
 
 export interface GlFrameCamera {
   /** camera.matrixWorld.elements */
-  view: Float32Array
+  view: Float64Array
   /** camera.projectionMatrix.elements */
-  projection: Float32Array
+  projection: Float64Array
 }
 
 /** Where the desk's WebGL lives. The engine drives it the same way whichever it is. */
@@ -1724,7 +1734,7 @@ function applyCamera({ view, projection }: GlFrameCamera) {
 ```ts
   const draw = () => {
     camera.updateMatrixWorld()
-    const frame = { view: Float32Array.from(camera.matrixWorld.elements), projection: Float32Array.from(camera.projectionMatrix.elements) }
+    const frame = { view: Float64Array.from(camera.matrixWorld.elements), projection: Float64Array.from(camera.projectionMatrix.elements) }
     host.render(frame, (models) => {
       cssCamera.matrixWorld.fromArray(frame.view)
       cssCamera.projectionMatrix.fromArray(frame.projection)
@@ -1915,16 +1925,17 @@ export function createWorkerHost(assets: DeskAssetUrls, timeoutMs = 3000): Promi
         return true
       },
       dispose() {
-        send({ type: 'dispose' })
+        // as built: no dispose message, terminating the worker frees its context
         worker.terminate()
       },
     }
-    send({ type: 'init', canvas: offscreen, assets }, [offscreen])
+    // as built: init carries only the canvas; the assets follow in a 'load' message when the engine asks
+    send({ type: 'init', canvas: offscreen }, [offscreen])
   })
 }
 ```
 
-The main thread resolves the texture format (`textureFormat()`) and passes plain URLs, so `init` carries no format. Remove `textureFormat` from the spec's `ToWorker.init` type when writing `protocol.ts`. `GlHost.render` returns `boolean`: true when the frame was sent or drawn (the main host always returns true), false when skipped. In `engine.ts`'s `frame()`, a false result keeps `dirty = true`, so the loop asks again on the next rAF.
+(Superseded, see "As built": the drawing context probes the format and `loaded` reports it.) The main thread resolves the texture format (`textureFormat()`) and passes plain URLs, so `init` carries no format. Remove `textureFormat` from the spec's `ToWorker.init` type when writing `protocol.ts`. `GlHost.render` returns `boolean`: true when the frame was sent or drawn (the main host always returns true), false when skipped. In `engine.ts`'s `frame()`, a false result keeps `dirty = true`, so the loop asks again on the next rAF.
 
 - [ ] **Step 5: `worker-host.test.ts`** (jsdom; stub `Worker`, `OffscreenCanvas` and `HTMLCanvasElement.prototype.getContext('bitmaprenderer')`):
   - `ready` resolves the host; `unsupported`, a worker `error` and the 3 s timeout (fake timers) each reject and terminate the worker.
@@ -1983,6 +1994,8 @@ git commit -m "perf(web): the desk renders in a worker where supported, main thr
 **Files:** Create `apps/web/lighthouserc.json`. Modify `.github/workflows/ci.yml`.
 
 - [ ] **Step 1: `lighthouserc.json`**
+
+As built, per form factor (`lighthouserc.mobile.json` / `lighthouserc.desktop.json`, every assertion with `aggregationMethod: median`): performance ≥ 0.75 / ≥ 0.9; accessibility, best practices, SEO = 1; CLS ≤ 0.05; TBT ≤ 650 / ≤ 150 ms; total bytes ≤ 1,600,000; script ≤ 460,000. The first draft below had one file with performance ≥ 0.8 and TBT ≤ 300 ms.
 
 ```json
 {

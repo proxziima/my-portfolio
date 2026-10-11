@@ -56,7 +56,7 @@ PostHog  generation joins the visitor's person timeline and replay
 
 ## 2. Automatic PostHog web signals
 
-Initialised once per document by [initPostHog](../apps/web/lib/analytics/init.ts#L15), called from [Analytics.tsx:31](../apps/web/features/analytics/Analytics.tsx#L31), which both layouts mount with their `surface` ([(site)/layout.tsx:35](../apps/web/app/(site)/layout.tsx#L35), [(os)/os/layout.tsx:31](../apps/web/app/(os)/os/layout.tsx#L31)). Options, from [init.ts:18-27](../apps/web/lib/analytics/init.ts#L18):
+Initialised once per document by [initPostHog](../apps/web/lib/analytics/init.ts#L18), called from [Analytics.tsx:32](../apps/web/features/analytics/Analytics.tsx#L32), which both layouts mount with their `surface` ([(site)/layout.tsx:44](../apps/web/app/(site)/layout.tsx#L44), [(os)/os/layout.tsx:31](../apps/web/app/(os)/os/layout.tsx#L31)). Options, from [init.ts:29-38](../apps/web/lib/analytics/init.ts#L29):
 
 | Option | Value | Effect |
 | --- | --- | --- |
@@ -82,13 +82,13 @@ Web vitals, exception autocapture and replay also need the matching switches in 
 
 **Session replay.** The code sets no recording options, so masking is the project setting: "Mask all inputs" on (`maskAllInputs`), which hides every typed value. Two extras are in code: the twin chat transcript ([History.tsx:54](../apps/web/features/os/apps/messenger/History.tsx#L54)) and the message box ([Conversation.tsx:97](../apps/web/features/os/apps/messenger/Conversation.tsx#L97)) carry `ph-no-capture`, which excludes them from replay and autocapture. That matters because the parent page's recorder also captures the same-origin `/os` iframe on the desk monitor.
 
-**Embedded `/os` iframe.** `Analytics` computes `embedded = window.self !== window.top` once ([Analytics.tsx:30](../apps/web/features/analytics/Analytics.tsx#L30)) and passes it to `initPostHog` and to the OS engagement tracker. When embedded: `capture_pageview: false`, `capture_pageleave: false`, `disable_session_recording: true` ([init.ts:26](../apps/web/lib/analytics/init.ts#L26)) and `posthog.register({ embedded: true })` ([init.ts:29](../apps/web/lib/analytics/init.ts#L29)), so every event the frame sends (custom, `$autocapture`, `$web_vitals`, `$exception`) carries `embedded: true`. Everything else stays on, and the frame shares the parent's cookie, so it is the same visitor and session. Opening `/os` directly in a tab is not embedded: full pageviews and replay. The property is only registered in the iframe, so "`embedded` is not set" selects the standalone case.
+**Embedded `/os` iframe.** `Analytics` computes `embedded = window.self !== window.top` once ([Analytics.tsx:30](../apps/web/features/analytics/Analytics.tsx#L30)) and passes it to `initPostHog` and to the OS engagement tracker. When embedded: `capture_pageview: false`, `capture_pageleave: false`, `disable_session_recording: true` ([init.ts:37](../apps/web/lib/analytics/init.ts#L37)) and `posthog.register({ embedded: true })` ([init.ts:40](../apps/web/lib/analytics/init.ts#L40)), so every event the frame sends (custom, `$autocapture`, `$web_vitals`, `$exception`) carries `embedded: true`. Everything else stays on, and the frame shares the parent's cookie, so it is the same visitor and session. Opening `/os` directly in a tab is not embedded: full pageviews and replay. The property is only registered in the iframe, so "`embedded` is not set" selects the standalone case.
 
 **Do Not Track.** `respect_dnt` stops all browser capture. The BFF then finds no cookie, so the agent's traces for that visitor still flow, but under `web:<uuid>` with no `ph_did` or `$session_id` ([observability.md, Privacy](observability.md#privacy)).
 
 ## 3. Custom web events
 
-All fourteen use the typed catalog in [events.ts:10-25](../apps/web/lib/analytics/events.ts#L10). Twelve go through [`track()`](../apps/web/lib/analytics/events.ts#L33); the two engaged-time events go through [`trackOnExit()`](../apps/web/lib/analytics/events.ts#L41), which sends at once over `sendBeacon` (`{ transport: 'sendBeacon', send_instantly: true }`: with request batching on, `transport` alone would only queue the event). Both are no-ops until `posthog.__loaded` (no token, tests, SSR). Wiring: [`Analytics`](../apps/web/features/analytics/Analytics.tsx) installs the delegated click listener on both surfaces, then per `surface` ([Analytics.tsx:14-17](../apps/web/features/analytics/Analytics.tsx#L14)): `site` adds the section observer and section engagement, `os` adds OS engagement. The other events are called from components.
+All fourteen use the typed catalog in [events.ts:19-38](../apps/web/lib/analytics/events.ts#L19). Twelve go through [`track()`](../apps/web/lib/analytics/events.ts#L82); the two engaged-time events go through [`trackOnExit()`](../apps/web/lib/analytics/events.ts#L92), which sends over `sendBeacon` (`{ transport: 'sendBeacon', send_instantly: true }`: with request batching on, `transport` alone would only queue the event). posthog-js loads in its own chunk after hydration, so until it has loaded **both queue** their events in memory (at most 100, oldest dropped first; [send](../apps/web/lib/analytics/events.ts#L55)) and the queue flushes in order once [`attach()`](../apps/web/lib/analytics/events.ts#L64) hands the client over; a queued exit event still leaves as a beacon, and one whose page truly unloads first is lost. With no token, or if the posthog-js chunk fails to load, [`disable()`](../apps/web/lib/analytics/events.ts#L73) drops the queue and every later event at once. Nothing is sent during SSR. Wiring: [`Analytics`](../apps/web/features/analytics/Analytics.tsx) installs the delegated click listener on both surfaces, then per `surface` ([Analytics.tsx:14-17](../apps/web/features/analytics/Analytics.tsx#L14)): `site` adds the section observer and section engagement, `os` adds OS engagement. The other events are called from components.
 
 ### 3.1 `outbound_click`
 
@@ -422,7 +422,7 @@ All capture sites, each producing a PostHog `$exception`. Server sites use [`cap
 
 | Site | Distinct id | Properties | Code |
 | --- | --- | --- | --- |
-| Browser, uncaught errors and rejections | browser id | SDK exception properties | `capture_exceptions` [init.ts:23](../apps/web/lib/analytics/init.ts#L23) |
+| Browser, uncaught errors and rejections | browser id | SDK exception properties | `capture_exceptions` [init.ts:34](../apps/web/lib/analytics/init.ts#L34) |
 | Browser, `(site)` route boundary | browser id | the error | [(site)/error.tsx:9](../apps/web/app/(site)/error.tsx#L9) |
 | Browser, `/os` boundary | browser id | the error | [(os)/os/error.tsx:9](../apps/web/app/(os)/os/error.tsx#L9) |
 | Browser, OS window boundary (an app's chunk failed to load, or the app crashed) | browser id | the original error (the import's own, not the wrapper) | [AppBoundary.tsx:42](../apps/web/features/os/AppBoundary.tsx#L42) |
@@ -447,7 +447,7 @@ Notes:
 
 ## 8. Infrastructure
 
-**`/relay` proxy.** posthog-js sends to `/relay` on the site's own origin ([init.ts:19](../apps/web/lib/analytics/init.ts#L19)), which avoids ad-blocker word lists. [`proxy.ts`](../apps/web/proxy.ts) (matcher `/relay/:path*`, [proxy.ts:19](../apps/web/proxy.ts#L19)) resolves the target per request, so the region is runtime config:
+**`/relay` proxy.** posthog-js sends to `/relay` on the site's own origin ([init.ts:30](../apps/web/lib/analytics/init.ts#L30)), which avoids ad-blocker word lists. [`proxy.ts`](../apps/web/proxy.ts) (matcher `/relay/:path*`, [proxy.ts:19](../apps/web/proxy.ts#L19)) resolves the target per request, so the region is runtime config:
 
 | Request path | Forwarded to |
 | --- | --- |
@@ -467,7 +467,7 @@ Routing is in [relay.ts:10-14](../apps/web/lib/analytics/relay.ts#L10). The prox
 | `SITE_URL` | web | Validated at boot together with the region ([instrumentation.ts:8-18](../apps/web/instrumentation.ts#L8)) |
 | `CMS_URL`, `TWIN_REDACT_SECRET`, `TWIN_PROMPT_CANARY` | agents | Feed the redactor ([processor.ts:127-131](../apps/agents/agent/lib/observability/processor.ts#L127)) |
 
-**Without a token.** `posthogConfig()` returns `null`: `clientAnalyticsConfig()` is `null` so [`Analytics`](../apps/web/features/analytics/Analytics.tsx#L24) does nothing and `track()` is a no-op; the server SDK is a no-op client ([server.ts:11](../packages/observability/src/server.ts#L11)); the agent's span processor is never built and the redaction rules are never fetched; the MCP capture and error calls reach the no-op client; `/relay` answers 404. Dev, tests and CI run this way. A bad region throws at web boot; per request the web helpers instead switch analytics off for that request and log once ([request.ts:19](../apps/web/lib/analytics/request.ts#L19)).
+**Without a token.** `posthogConfig()` returns `null`: `clientAnalyticsConfig()` is `null` so [`Analytics`](../apps/web/features/analytics/Analytics.tsx#L28) disables analytics (`disable()`: nothing queued, nothing sent) and loads no posthog-js; the server SDK is a no-op client ([server.ts:11](../packages/observability/src/server.ts#L11)); the agent's span processor is never built and the redaction rules are never fetched; the MCP capture and error calls reach the no-op client; `/relay` answers 404. Dev, tests and CI run this way. A bad region throws at web boot; per request the web helpers instead switch analytics off for that request and log once ([request.ts:19](../apps/web/lib/analytics/request.ts#L19)).
 
 ## 9. Quick verification checklist
 

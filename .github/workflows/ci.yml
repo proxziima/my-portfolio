@@ -137,7 +137,7 @@ jobs:
           done
           tail -n 100 "$RUNNER_TEMP/web.log"
           exit 1
-      - name: initial JS keeps posthog, three, eve and zod out, within budget
+      - name: initial JS keeps posthog, three, eve and zod out, within budget; with the desk in its worker, no renderer or loader on the main thread
         working-directory: apps/web
         run: node scripts/perf/chunks.ts --url http://127.0.0.1:3100
       # Five runs per form factor with Lighthouse 13.5.0 (the checkpoints' version), CPU calibrated to

@@ -136,7 +136,7 @@ Two consecutive days keeps a single bad day (one slow network, a crawler burst) 
 
 The `lighthouse` job in `.github/workflows/ci.yml` runs on every PR and push, after `checks`. It needs no secret: it builds and seeds a throwaway CMS in the runner (SQLite under `apps/payload/.tmp`, never `payload.db`), builds the web app, and starts the standalone server the Docker image runs. Then:
 
-1. `scripts/perf/chunks.ts` asserts what the letter and the OS load up front (no posthog, three, eve or zod; initial JS within budget).
+1. `scripts/perf/chunks.ts` asserts what the letter and the OS load up front (no posthog, three, eve or zod; initial JS within budget), then brings the desk on screen in Chromium and fails if the main thread loaded three's renderer or the glTF loader while the desk drew in its worker.
 2. `scripts/perf/lighthouse.ts --runs 5 --calibrate --lhci` measures the letter five times per form factor with Lighthouse 13.5.0, the version every phase checkpoint used. `--calibrate` scales the CPU slowdown by the runner's benchmark index (`environment.benchmarkIndex`) over PageSpeed's (about 1250), so a fast or slow runner type is measured as PageSpeed's hardware class; without it, TBT moved with whichever machine GitHub assigned.
 3. `lhci assert` checks `apps/web/lighthouserc.mobile.json` and `lighthouserc.desktop.json` against the **median** of the five runs, each assertion on its own (`aggregationMethod: median`), so one noisy run cannot fail the job.
 4. The `lighthouse` artifact holds every report (`<form>-<n>.json`, open them in the [Lighthouse viewer](https://googlechrome.github.io/lighthouse/viewer/)), `summary.json` and `<form>/.lighthouseci/assertion-results.json`.

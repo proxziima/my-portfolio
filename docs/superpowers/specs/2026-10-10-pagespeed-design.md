@@ -207,7 +207,21 @@ flag). A post-build script, `scripts/sourcemaps.ts`, runs after `next build`:
    `posthog-cli sourcemap inject --directory .next/static` and then `… upload`, which gives PostHog
    Error Tracking symbolicated stacks for `capture_exceptions`.
 2. **Always** delete `*.map` under `.next/static`, and the `//# sourceMappingURL` comments that
-   point at them, so no map is ever served.
+   point at them, so no map is ever served. Both comment forms are matched: JS's
+   `//# sourceMappingURL=a.js.map` and the CSS form Turbopack writes with no space before the
+   closing `*/` (`/*# sourceMappingURL=a.css.map*/`), with the blank lines before it; the unit test
+   uses verbatim tails of `next build` CSS as fixtures. `inlineCss` copies each stylesheet's text
+   into the client reference manifests during `next build`, before this script runs, and renders
+   `<style>` from there, so the same comment is also stripped from every
+   `*_client-reference-manifest.js` under `.next/server` and its `.next/standalone` copy (traced
+   `node_modules` skipped). Verified on a build: no `.next/static` CSS or JS contains
+   `sourceMappingURL`, nor does the HTML of `/` or `/os`. Known residual: the prerendered
+   not-found page (`_not-found.html`/`.rsc`) keeps one comment, because there the CSS sits in a
+   length-prefixed RSC text row that the script must not rewrite; it disappears if Turbopack stops
+   appending map comments to inlined CSS (no upstream issue exists yet).
+3. Delete the TypeScript source copy Turbopack 16.3 emits for `new Worker(new URL('./desk.worker.ts',
+   import.meta.url))` into `.next/static/media`. No vercel/next.js issue covers it (searched
+   2026-10-10); the exit condition is `removed 0 source copies` in the build log.
 
 In the Dockerfile, the build step mounts the token as a BuildKit secret
 (`RUN --mount=type=secret,id=posthog_cli_token,env=POSTHOG_CLI_TOKEN …`). With no secret the
@@ -270,6 +284,8 @@ apps/web/assets-src/                 committed sources, never served
   desk/{computer,decor,environment}.webp      (the textures' only sources: 2048² WebP)
   desk/screen/{static-base,static-layer}.mp4, smudges.jpg, shadow.png
   desk/audio/*.mp3
+  blowout/bulb-explode.mp3                    (was public/sound/: now hashed and immutable too)
+  fonts/Millennium{,-Bold}.ttf                (→ app/(os)/fonts/*.woff2, no ASSETS entry)
   theme-switch/{rocker-on,rocker-off,rocker-atlas}.webp
 apps/web/scripts/assets/
   build.ts            entry: runs every recipe; --only <id>, --check
@@ -292,18 +308,28 @@ apps/web/scripts/assets/
   the immutable cache is always correct.
 - **Reproducibility.** `manifest.lock.json` records each output's source sha256, recipe hash and
   tool versions. `bun run assets:check` recomputes the source and recipe hashes, needs no encoders,
-  and runs in CI: it fails if a source or recipe changed without a rebuild, or if an output file is
-  missing. Encoders: sharp (npm prebuilt), gltf-transform and meshoptimizer (npm, WASM), ffmpeg
+  and runs in CI: it fails if a source or recipe changed without a rebuild, if an output file is
+  missing, if a hashed output's bytes no longer match the hash in its file name (a hand-edited file
+  would keep its immutable URL), if `lib/assets/manifest.ts` differs from what the lock generates
+  (line endings aside), or if `public/assets` holds a file no lock entry lists (an orphan; a full
+  `assets:build` removes them). A stage may produce no manifest value: the OS fonts are built and
+  checked like any output but have no `ASSETS` entry, because `next/font/local` only takes a
+  literal path; a unit test holds the layout's paths to the font stage's recorded outputs. Encoders: sharp (npm prebuilt), gltf-transform and meshoptimizer (npm, WASM), ffmpeg
   (system). **ffmpeg decision:** a system ffmpeg ≥ 7 is required only to *rebuild* videos (one-time
   install: `winget install Gyan.FFmpeg`, `brew install ffmpeg` or `apt install ffmpeg`). This machine
   has 8.1.1 (gyan.dev full build) with libsvtav1, libaom-av1, libvpx-vp9, libx264 and libvmaf.
   `ffmpeg-static` was rejected: its `postinstall` downloads a ~70 MB binary on every install
   (CI, Docker) for a step only the owner runs, and its builds lag behind (6.x).
 - **Images.**
-  - `smudges.jpg` (2048×1638, 293 KB): AVIF and WebP at 1280 and 2048 w.
-    `<img srcset sizes="1280px">` inside the screen element picks 1280 at 1× and 2048 at 2×. The
-    layout width is the fixed 1280 CSS px screen; CSS3D only transforms it. Probe: AVIF at
-    1280 w is 152 KB.
+  - `smudges.jpg` (2048×1638, 293 KB): recipe AVIF and WebP at 1280 and 2048 w, under
+    `<img srcset sizes="1280px">` inside the screen element (the layout width is the fixed 1280 CSS
+    px screen; CSS3D only transforms it). **As built, the 1280 w variants were dropped by the
+    pipeline's own rules**: AVIF 1280 w passed the composited gate only at 248,637 bytes, not less
+    than the 2048 w AVIF (237,633 bytes at q54, SSIM 0.99812), and no WebP ≥ q80 passed SSIM ≥ 0.998
+    below the source's 292,727 bytes, so the source JPEG passes through as the fallback. Shipped:
+    AVIF 2048 w, JPEG 2048 w.
+  - The still layers (shadow, smudges) get their candidates only when the screen powers on
+    (§5), so nothing downloads while they are invisible.
   - `shadow.png` (845×676 RGBA, 67 KB): AVIF and WebP at source size (probe: AVIF 1.7 KB, WebP
     34 KB).
   - Rocker fallbacks (530×700 shown at 2.8 rem): AVIF and WebP at 64 and 128 w,
@@ -316,8 +342,10 @@ apps/web/scripts/assets/
   SSIM ≥ 0.995 against the source WebP, since the source is already lossy and generation loss is
   the risk. If AVIF cannot pass at a smaller size than the source WebP, the recipe keeps the source
   WebP bytes, hashed. Loaded with `ImageBitmapLoader` (`imageOrientation: 'none'`,
-  `premultiplyAlpha: 'none'`); `flipY = false` as today. The AVIF/WebP choice is made once per
-  session by decoding a 1×1 AVIF with `createImageBitmap`, which works in workers too.
+  `premultiplyAlpha: 'none'`); `flipY = false` as today. The AVIF/WebP choice is made by decoding
+  a 1×1 AVIF with `createImageBitmap` **in the context that decodes the textures**: the worker
+  probes before it fetches (or the main thread, when it draws), since a window and a worker need
+  not agree. It is cached per context, and the worker reports the format it used (§8.2).
 - **Models.** Meshopt as measured (§2), quantization `position: 16, texcoord: 16` (12-bit UVs
   would be a quarter texel on 2048² textures). `MeshoptDecoder` from
   `three/addons/libs/meshopt_decoder.module.js` is set on the `GLTFLoader`. Gate: the model parity
@@ -328,11 +356,21 @@ apps/web/scripts/assets/
 ## 5. Videos, textures, models: runtime wiring
 
 - `monitor-screen.ts` builds `<video>` elements with three `<source>` children from
-  `ASSETS.desk.screen.staticBase` / `staticLayer` once fx turns ready (§4.4), and `<img>` with
-  `srcset` for the smudges and the shadow.
+  `ASSETS.desk.screen.staticBase` / `staticLayer` once fx turns ready (§4.4). The smudges and the
+  shadow are `<picture>`s built empty at mount; `powerOn()` gives them their candidates (the AVIF
+  `<source>` first, then the `<img>`'s `srcset`/`src`) alongside the iframe, so they download
+  during the OS's boot console. The CRT layers' fade-in (`data-ready`) waits until both are
+  decoded (`img.decode()`; a failed decode never holds them back), so no frame shows the layers
+  with a still missing. Verified in Chromium frame by frame, with the stills throttled to arrive
+  well after the desktop: 0 frames with the layer visible and a still not loaded.
 - `assets.ts` (`loadDesk`): `GLTFLoader().setMeshoptDecoder(MeshoptDecoder)` plus
   `ImageBitmapLoader` for textures (`new Texture(bitmap)`, `needsUpdate`), the same `drop`
-  handling and the same unlit material. On dispose, `bitmap.close()`.
+  handling and the same unlit material. On dispose, `bitmap.close()`. The texture choice
+  (`deskAssetUrls`) lives in the loader-free `desk-assets.ts` and runs in the drawing thread.
+- The light switch's rocker atlas (1060×1120 WebP) is fetched and decoded with
+  `createImageBitmap(blob)` (default options: the same pixels `drawImage` takes from an `<img>`,
+  verified identical in Chromium), off the main thread; the `<img>` path stays where the API is
+  missing.
 
 ## 6. Phase 2b: smaller client tree and bundles (6)
 
@@ -376,14 +414,22 @@ to a bounded in-memory queue (100 events), which is flushed in order once `initP
 The `Analytics` effect calls it exactly where it does today, after hydration. With no token there is
 no import at all. Web vitals stay correct: posthog's web-vitals capture uses buffered
 `PerformanceObserver` entries, so FCP, LCP and CLS that happened before load are still reported.
-`trackOnExit` before load sends nothing (as today with no init) and is never queued, because a
-queued exit event could never be delivered. Tests cover the queue, the order and the no-token path.
+`trackOnExit` before load is **queued like any event** (as built): a hidden tab often comes back,
+and the flush still goes out as a beacon; a page that truly unloads first loses it, as no code is
+left to send it. With no token (or if the posthog-js chunk fails to load), `disable()` empties the
+queue and sets a disabled state that `send` checks, so later `track`/`trackOnExit` calls are dropped
+at once instead of piling up for a client that never comes. Tests cover the queue, the order, the
+exit events and the disabled path.
 
 Bundle analysis: `ANALYZE=true bunx next build` with `@next/bundle-analyzer@16.4.0` is not needed;
 Turbopack writes `.next/diagnostics`. Instead, the plan's checkpoint lists chunk sizes with
 `scripts/perf/chunks.ts`, which maps chunks to modules from the Turbopack chunk source, and asserts
 that the letter's initial JS contains neither `posthog-js` nor `three`, and that the `/os` boot chunk
-does not contain `eve/react`.
+does not contain `eve/react`. It also loads `/` in Chromium, brings the desk on screen, waits for
+its first frame with the models and reads the window's resource timeline (which holds no worker
+request): with the worker drawing, no main-thread chunk may contain `THREE.WebGLRenderer` or
+`THREE.GLTFLoader`, and the desk must have drawn in its worker (otherwise the check would be
+vacuous). `?deskHost=main` loads them, as it should.
 
 ## 7. Phase 2a: the monitor boots on approach (2)
 
@@ -469,37 +515,58 @@ features/desk/
                        GLTFLoader, ImageBitmapLoader, MeshoptDecoder.
   gl/protocol.ts       message types (below); shared by both sides
   gl/desk.worker.ts    worker entry: owns a DeskGl on an OffscreenCanvas, answers messages
-  gl/host.ts           interface GlHost + selectHost()
+  gl/host.ts           interface GlHost, GL_CONTEXT_ATTRIBUTES; gl/select-host.ts: selectHost()
   gl/worker-host.ts    GlHost via Worker + <canvas> 'bitmaprenderer'
-  gl/main-host.ts      GlHost via DeskGl on an <canvas> 'webgl2' (fallback)
+  gl/main-host.ts      GlHost via DeskGl on an <canvas> 'webgl2' (fallback); imports desk-gl lazily
+  desk-assets.ts       loader-free: DeskAssetUrls + deskAssetUrls(assets, format)
   engine.ts            main thread: CameraRig, CSS3DRenderer, MonitorScreen (CSS3D side), GlHost
 ```
+
+**What the main thread parses.** With the worker drawing, the main thread loads three's core (the
+camera rig and CSS3D need it) but never `WebGLRenderer`, `GLTFLoader` or the meshopt decoder:
+`main-host.ts` reaches `desk-gl.ts` only through `import('./desk-gl')`, run when a main host is
+created (`?deskHost=main`, no worker support, or failover), and `DeskScene` imports neither the
+loaders nor the URL table's texture logic. The main host still knows at once whether WebGL exists:
+it creates the context on its canvas with `GL_CONTEXT_ATTRIBUTES` (three's own attributes for the
+desk's options) and throws without one; `createDeskGl` asks for the same context and passes it to
+`WebGLRenderer({ context })`. Until the scene's code is in, the main host skips frames (the engine
+stays dirty and keeps what is on screen) and `load()` waits for it. `perf:chunks` asserts this in
+Chromium (§6.3).
 
 `screenPlanes()` (already pure) feeds the GL side. `createMonitorScreen` is split into its CSS3D
 DOM part (main thread) and its GL planes (`desk-gl.ts`), at the same transform from `SCREEN`.
 
 ### 8.2 Protocol
 
+As built (`gl/protocol.ts`):
+
 ```ts
 /** Main → worker. */
 export type ToWorker =
-  /** The main thread has already chosen AVIF or WebP (textureFormat()); the worker gets plain URLs. */
-  | { type: 'init'; canvas: OffscreenCanvas; assets: DeskAssetUrls }
+  /** The canvas the worker draws on; it answers `ready` (a WebGL context) or `unsupported`. */
+  | { type: 'init'; canvas: OffscreenCanvas }
+  /** The desk's files with both texture encodes: the worker probes which one it can decode. */
+  | { type: 'load'; assets: readonly DeskAsset[] }
   | { type: 'resize'; width: number; height: number; pixelRatio: number }
   /** Render one frame with this camera; `id` is echoed so the main thread pairs it with its CSS3D pose. */
-  | { type: 'render'; id: number; view: Float32Array /* matrixWorld, 16 */; projection: Float32Array /* 16 */ }
-  | { type: 'dispose' }
+  | { type: 'render'; id: number; view: Float64Array /* matrixWorld, 16 */; projection: Float64Array /* 16 */ }
 
 /** Worker → main. */
 export type FromWorker =
   | { type: 'ready' }                                 // context created
   | { type: 'unsupported' }                           // no WebGL in this worker → main host
   | { type: 'frame'; id: number; bitmap: ImageBitmap; models: boolean }
-  | { type: 'loaded' }                                // models and textures in the scene
+  | { type: 'loaded'; format: TextureFormat }         // models and textures in the scene, in this encode
   | { type: 'failed'; reason: 'load_error' | 'context_lost' }
 ```
 
-Matrices are transferred as copies (`Float32Array` of 16, which is cheap). The worker sets
+Differences from the first draft: `load` is its own message (the canvas goes at once, the models
+when the engine asks), it carries both encodes so the worker chooses the format in the context
+that decodes, and `loaded` reports that choice (every host's `load()` resolves with it). There is
+no `dispose` message: disposing terminates the worker, which frees its context with it. Matrices
+are `Float64Array`, three's own precision, so neither side rounds them.
+
+Matrices are transferred as copies (`Float64Array` of 16, which is cheap). The worker sets
 `camera.matrixWorld.fromArray(view)`, `matrixWorldInverse` (inverted), `projectionMatrix` and
 `projectionMatrixInverse`, with `matrixAutoUpdate = matrixWorldAutoUpdate = false`, so its camera is
 bit-identical to the one CSS3D used.
@@ -526,8 +593,12 @@ frame of extra latency, never misalignment. `models: true` on the first such fra
 `'transferToImageBitmap' in OffscreenCanvas.prototype` and `typeof Worker === 'function'`, start the
 worker and wait for `ready` or `unsupported`, with a 3 s timeout. `unsupported`, a timeout or a
 worker `error` falls back to the main host; this is not a failure. The main host failing to create
-a context is `webgl_unavailable`, as today. Safari 17+ supports WebGL in workers; older Safari and
-any browser without it get the main host with identical visuals.
+a context is `webgl_unavailable`, as today (still synchronous: the context is created before the
+scene's code is imported, §8.1). A failover keeps the worker's last frame, with the CSS3D layer at
+its pose, until the main host can draw a frame with as much in it (models included if they were
+shown), and swaps the canvases in that commit; the main host's lazy import only lengthens that
+wait. Safari 17+ supports WebGL in workers; older Safari and any browser without it get the main
+host with identical visuals.
 
 ### 8.5 What stays on the main thread, and why
 
@@ -570,10 +641,16 @@ load failure maps to the same `load_error`. A lost context (new: today it is not
   deploy a PSI run on production (pagespeed.web.dev; the PSI API without a key is quota-limited).
 - **Lighthouse CI** (Phase 3, Task 3.6): a `lighthouse` job in `.github/workflows/ci.yml` that
   builds the throwaway CMS (as `live-evals` does: build, migrate, seed on SQLite in `.tmp`) and the
-  web app, starts both, and runs `@lhci/cli@0.15.1` (3 runs, desktop and mobile). Budgets:
-  performance ≥ 0.9 (warn) and ≥ 0.8 (error), CLS ≤ 0.05 (error), TBT ≤ 300 ms (error, CI
-  hardware), total byte weight ≤ 1,600 KB (error), script ≤ 450 KB (error). Upload to `filesystem`
-  plus `actions/upload-artifact`, never to temporary public storage.
+  web app, starts both, runs `scripts/perf/lighthouse.ts --runs 5 --calibrate --lhci` (5 runs per
+  form factor, CPU calibrated from the runner's benchmark index) and asserts with
+  `@lhci/cli@0.15.1 assert` on the medians. Budgets as built (`lighthouserc.mobile.json`,
+  `lighthouserc.desktop.json`), all errors: performance ≥ 0.75 mobile and ≥ 0.9 desktop;
+  accessibility, best practices and SEO = 1; CLS ≤ 0.05; TBT ≤ 650 ms mobile and ≤ 150 ms desktop;
+  total byte weight ≤ 1,600,000 B; script ≤ 460,000 B. The score floors sit under the measured
+  calibrated medians by more than a run's spread, mobile TBT is the Phase 3 median + 25 % and
+  desktop TBT the Phase 3 target; production PSI stays the ground truth for the §3 goals
+  (`docs/observability.md`, "Performance budgets", has the derivation and the update rule). Reports
+  go to the job's artifacts, never to temporary public storage.
 - **PostHog alerting** (guidance, executed by the owner): insights on `$web_vitals` for p75 LCP,
   INP and CLS by `$device_type`, with alerts at LCP > 2.5 s, INP > 200 ms and CLS > 0.1, checked
   daily, plus p95 of `experience_ready.ms` for `desk_scene` by `host`.
