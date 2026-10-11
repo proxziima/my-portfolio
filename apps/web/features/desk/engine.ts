@@ -1,15 +1,16 @@
-import { PerspectiveCamera, Scene, WebGLRenderer } from 'three'
+import { PerspectiveCamera, Scene, Vector3 } from 'three'
 import { CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js'
-import { textureFormat } from '@/lib/assets/texture-format'
-import { loadDesk, type LoadedDesk } from './assets'
 import { CameraRig, type CameraKey } from './camera-rig'
-import { CAMERA, DESK_ASSETS } from './config'
+import { CAMERA } from './config'
+import type { GlFrameCamera, GlHost } from './gl/host'
 import type { Pointer } from './keyframes'
 import { createMonitorScreen } from './monitor-screen'
 
 export interface DeskEngineOptions {
   /** Positioned box the two renderer layers fill. */
-  host: HTMLElement
+  container: HTMLElement
+  /** Where the WebGL layer is drawn; the engine owns it from here and disposes it. */
+  host: GlHost
   /** The OS page the screen shows. */
   screenSrc: string
   reduceMotion?: boolean
@@ -45,36 +46,39 @@ export interface DeskEngine {
 const MAX_DT = 100
 
 /**
- * One WebGL and one CSS3D renderer sharing a camera. Render on demand: a frame is drawn only when
- * the rig moved or something flagged `dirty` (load, resize, pixel ratio), and once the rig has
- * settled the loop parks until an input wakes it. Throws if WebGL is unavailable, so the caller
- * can fall back.
+ * The GL layer (a `GlHost`) and one CSS3D renderer sharing a camera. The rig drives the camera; each
+ * frame its matrices go to the host, and the CSS3D layer takes the same matrices only when the host
+ * commits that frame, so the two layers always show the same pose. Render on demand: a frame is
+ * drawn only when the rig moved or something flagged `dirty` (load, resize, pixel ratio, a frame the
+ * host skipped), and once the rig has settled the loop parks until an input wakes it.
  */
 export function createDeskEngine({
+  container,
   host,
   screenSrc,
   reduceMotion = false,
   onFirstFrame,
   onFrame,
 }: DeskEngineOptions): DeskEngine {
-  const gl = new WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' })
-  gl.setClearColor(0x000000, 0)
   const css = new CSS3DRenderer()
   // the DOM screen sits below the canvas; the canvas lets the pointer through to it
   Object.assign(css.domElement.style, { position: 'absolute', inset: '0', zIndex: '0' })
-  Object.assign(gl.domElement.style, { position: 'absolute', inset: '0', zIndex: '1', pointerEvents: 'none' })
-  host.append(css.domElement, gl.domElement)
+  Object.assign(host.canvas.style, { position: 'absolute', inset: '0', zIndex: '1', pointerEvents: 'none' })
+  container.append(css.domElement, host.canvas)
 
   const camera = new PerspectiveCamera(CAMERA.fov, 1, CAMERA.near, CAMERA.far)
-  const scene = new Scene()
+  /** The camera CSS3D renders with: only ever the matrices of the frame the host committed. */
+  const cssCamera = new PerspectiveCamera()
+  cssCamera.matrixAutoUpdate = false
+  cssCamera.matrixWorldAutoUpdate = false
   const cssScene = new Scene()
   const screen = createMonitorScreen(screenSrc)
-  scene.add(screen.gl)
   cssScene.add(screen.css)
   const rig = new CameraRig(camera, reduceMotion)
+  const cameraPosition = new Vector3()
 
-  let desk: LoadedDesk | null = null
   let size = { width: 1, height: 1 }
+  let pixelRatio = 1
   let raf = 0
   let last = 0
   let dirty = true
@@ -82,14 +86,21 @@ export function createDeskEngine({
   let disposed = false
   let running = false
 
+  /** Asks the host for a frame of the camera as it is now; false if the host skipped it. */
   const draw = () => {
-    gl.render(scene, camera)
-    css.render(cssScene, camera)
-    if (!announced && desk) {
-      announced = true
-      onFirstFrame?.()
-    }
-    onFrame?.(camera.position.length())
+    camera.updateMatrixWorld()
+    const frame: GlFrameCamera = { view: Float64Array.from(camera.matrixWorld.elements), projection: Float64Array.from(camera.projectionMatrix.elements) }
+    return host.render(frame, (models) => {
+      cssCamera.matrixWorld.fromArray(frame.view)
+      cssCamera.matrixWorldInverse.copy(cssCamera.matrixWorld).invert()
+      cssCamera.projectionMatrix.fromArray(frame.projection)
+      css.render(cssScene, cssCamera)
+      if (!announced && models) {
+        announced = true
+        onFirstFrame?.()
+      }
+      onFrame?.(cameraPosition.setFromMatrixPosition(cssCamera.matrixWorld).length())
+    })
   }
 
   const frame = (now: number) => {
@@ -99,7 +110,7 @@ export function createDeskEngine({
     const moved = rig.update(dt)
     if (moved || dirty) {
       dirty = false
-      draw()
+      if (!draw()) dirty = true
     }
     // nothing left to animate: park until something changes (wake)
     if (moved || dirty || !rig.settled()) raf = requestAnimationFrame(frame)
@@ -140,13 +151,8 @@ export function createDeskEngine({
       onLoaded: (cb) => screen.onLoaded(cb),
     },
     async load() {
-      const loaded = await loadDesk(DESK_ASSETS, await textureFormat())
-      if (disposed) {
-        loaded.dispose()
-        return
-      }
-      desk = loaded
-      scene.add(...loaded.objects)
+      await host.load()
+      if (disposed) return
       dirty = true
       wake()
     },
@@ -161,7 +167,7 @@ export function createDeskEngine({
     resize(width, height) {
       if (width === size.width && height === size.height) return
       size = { width, height }
-      gl.setSize(width, height, false) // the canvas is sized by CSS
+      host.resize(width, height, pixelRatio) // the canvas is sized by CSS
       css.setSize(width, height)
       camera.aspect = width / height
       camera.updateProjectionMatrix()
@@ -169,8 +175,9 @@ export function createDeskEngine({
       redraw()
     },
     setPixelRatio(ratio) {
-      if (ratio === gl.getPixelRatio()) return
-      gl.setPixelRatio(ratio) // three re-applies the size itself
+      if (ratio === pixelRatio) return
+      pixelRatio = ratio
+      host.resize(size.width, size.height, ratio)
       redraw()
     },
     setPointer(pointer) {
@@ -191,12 +198,10 @@ export function createDeskEngine({
     dispose() {
       disposed = true
       stop()
-      desk?.dispose()
       screen.dispose()
-      gl.dispose()
-      gl.forceContextLoss() // free the context now, not at GC: StrictMode and HMR churn through them
+      host.dispose()
       css.domElement.remove()
-      gl.domElement.remove()
+      host.canvas.remove()
     },
   }
 }

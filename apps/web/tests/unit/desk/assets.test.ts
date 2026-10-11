@@ -53,7 +53,7 @@ vi.mock('three', async () => {
   return { ...three, ImageBitmapLoader }
 })
 
-const { loadDesk } = await import('@/features/desk/assets')
+const { deskAssetUrls, loadDesk } = await import('@/features/desk/assets')
 const { MODEL_SCALE } = await import('@/features/desk/config')
 
 const ASSETS = [
@@ -77,29 +77,40 @@ beforeEach(() => {
   loaders.bitmaps.length = 0
 })
 
+describe('deskAssetUrls', () => {
+  it('takes the AVIF when the context decodes it, else the WebP', () => {
+    // the environment has no AVIF (none passed parity at fewer bytes): its WebP either way
+    expect(deskAssetUrls(ASSETS, 'avif').map((a) => a.texture)).toEqual(['/t/computer.avif', '/t/environment.webp'])
+    expect(deskAssetUrls(ASSETS, 'webp').map((a) => a.texture)).toEqual(['/t/computer.webp', '/t/environment.webp'])
+  })
+
+  it('keeps the model and the drop list as they are', () => {
+    expect(deskAssetUrls(ASSETS, 'webp')).toEqual([
+      { model: '/m/computer.glb', texture: '/t/computer.webp' },
+      { model: '/m/environment.glb', texture: '/t/environment.webp', drop: ['Background'] },
+    ])
+  })
+})
+
 describe('loadDesk', () => {
   it('sets the meshopt decoder on the GLTF loader', async () => {
-    await loadDesk(ASSETS, 'webp')
+    await loadDesk(deskAssetUrls(ASSETS, 'webp'))
     expect(loaders.meshopt).toEqual([loaders.decoder])
     expect(loaders.models).toEqual(['/m/computer.glb', '/m/environment.glb'])
   })
 
   it('decodes with ImageBitmapLoader, unflipped and not premultiplied', async () => {
-    await loadDesk(ASSETS, 'webp')
+    await loadDesk(deskAssetUrls(ASSETS, 'webp'))
     expect(loaders.imageOptions).toEqual([{ imageOrientation: 'none', premultiplyAlpha: 'none' }])
   })
 
-  it('takes the AVIF when the context decodes it, else the WebP', async () => {
-    await loadDesk(ASSETS, 'avif')
-    // the environment has no AVIF (none passed parity at fewer bytes): its WebP either way
+  it('loads each texture from the URL it is given', async () => {
+    await loadDesk(deskAssetUrls(ASSETS, 'avif'))
     expect(loaders.images).toEqual(['/t/computer.avif', '/t/environment.webp'])
-    loaders.images.length = 0
-    await loadDesk(ASSETS, 'webp')
-    expect(loaders.images).toEqual(['/t/computer.webp', '/t/environment.webp'])
   })
 
   it('wraps each bitmap in an sRGB, unflipped texture marked for upload on one unlit material', async () => {
-    const desk = await loadDesk(ASSETS, 'webp')
+    const desk = await loadDesk(deskAssetUrls(ASSETS, 'webp'))
     desk.objects.forEach((root, i) => {
       for (const mesh of meshes(root)) {
         const material = mesh.material as MeshBasicMaterial
@@ -114,14 +125,14 @@ describe('loadDesk', () => {
   })
 
   it('removes the drop nodes by name', async () => {
-    const desk = await loadDesk(ASSETS, 'webp')
+    const desk = await loadDesk(deskAssetUrls(ASSETS, 'webp'))
     expect(desk.objects[0]!.getObjectByName('Background')).toBeDefined()
     expect(desk.objects[1]!.getObjectByName('Background')).toBeUndefined()
     expect(desk.objects[1]!.getObjectByName('/m/environment.glb')).toBeDefined()
   })
 
   it('scales the model root, keeping each node its own (dequantization) transform', async () => {
-    const desk = await loadDesk(ASSETS, 'webp')
+    const desk = await loadDesk(deskAssetUrls(ASSETS, 'webp'))
     const root = desk.objects[0]!
     expect(root.scale.toArray()).toEqual([MODEL_SCALE, MODEL_SCALE, MODEL_SCALE])
     const mesh = root.getObjectByName('/m/computer.glb')!
@@ -130,7 +141,7 @@ describe('loadDesk', () => {
   })
 
   it('closes every bitmap and frees the GPU side on dispose', async () => {
-    const desk = await loadDesk(ASSETS, 'webp')
+    const desk = await loadDesk(deskAssetUrls(ASSETS, 'webp'))
     const geometry = meshes(desk.objects[0]!)[0]!.geometry
     const freed = vi.fn()
     geometry.addEventListener('dispose', freed)

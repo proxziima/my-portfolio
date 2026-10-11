@@ -1,10 +1,13 @@
 'use client'
 import { useEffect, useReducer, useRef, useState } from 'react'
+import { textureFormat } from '@/lib/assets/texture-format'
 import { useInView } from '@/lib/dom/use-in-view'
 import { useReducedMotion } from '@/lib/dom/use-reduced-motion'
+import { deskAssetUrls } from './assets'
 import { createDeskAudio, type DeskAudio } from './audio'
-import { OS_PATH } from './config'
+import { DESK_ASSETS, OS_PATH } from './config'
 import { createDeskEngine, type DeskEngine } from './engine'
+import { createMainHost } from './gl/main-host'
 import { watchApproach } from './intent'
 import { cappedPixelRatio } from './pixel-ratio'
 import { reducePower, type Power } from './power'
@@ -54,7 +57,8 @@ export function DeskScene({ onFail, onReady, muted, fullscreen, onPower }: DeskS
     let created: DeskEngine
     try {
       created = createDeskEngine({
-        host,
+        container: host,
+        host: createMainHost(textureFormat().then((format) => deskAssetUrls(DESK_ASSETS, format))),
         screenSrc: OS_PATH,
         onFirstFrame: () => {
           if (!live) return

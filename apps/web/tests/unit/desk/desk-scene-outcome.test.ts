@@ -21,6 +21,9 @@ const engine = vi.hoisted(() => ({
 }))
 
 vi.mock('@/features/desk/engine', () => ({ createDeskEngine: (options: EngineOptions) => engine.create(options) }))
+// jsdom has no WebGL; the fake engine never draws, so the host it is handed is a bare stand-in
+vi.mock('@/features/desk/gl/main-host', () => ({ createMainHost: () => ({ kind: 'main' }) }))
+vi.mock('@/lib/assets/texture-format', () => ({ textureFormat: () => Promise.resolve('webp') }))
 vi.mock('@/features/desk/audio', () => ({
   createDeskAudio: () => ({ dispose: vi.fn(), setDistance: vi.fn(), setMuted: vi.fn(), unlock: vi.fn(), mouse: vi.fn(), key: vi.fn(), keyUp: vi.fn() }),
 }))

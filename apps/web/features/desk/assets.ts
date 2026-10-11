@@ -4,6 +4,13 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { TextureFormat } from '@/lib/assets/texture-format'
 import { MODEL_SCALE, type DeskAsset } from './config'
 
+/** The desk's files with the texture format already chosen: plain URLs a worker can take as they are. */
+export type DeskAssetUrls = ReadonlyArray<{ model: string; texture: string; drop?: readonly string[] }>
+
+/** Each asset's texture in `format`: the AVIF where there is one and the context decodes it, else the WebP. */
+export const deskAssetUrls = (assets: readonly DeskAsset[], format: TextureFormat): DeskAssetUrls =>
+  assets.map((asset) => ({ model: asset.model, texture: (format === 'avif' && asset.texture.avif) || asset.texture.webp, drop: asset.drop }))
+
 export interface LoadedDesk {
   objects: Group[]
   dispose(): void
@@ -18,13 +25,12 @@ const bitmaps = () => new ImageBitmapLoader().setOptions({ imageOrientation: 'no
  * Loads every (model, texture) pair in parallel and gives each model one unlit baked material,
  * the reference's trick for a lit-looking scene with no lights. Rejects if anything fails.
  */
-export async function loadDesk(assets: readonly DeskAsset[], format: TextureFormat): Promise<LoadedDesk> {
+export async function loadDesk(assets: DeskAssetUrls): Promise<LoadedDesk> {
   const gltf = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
   const images = bitmaps()
   const parts = await Promise.all(
     assets.map(async (asset) => {
-      const url = (format === 'avif' && asset.texture.avif) || asset.texture.webp
-      const [model, bitmap] = await Promise.all([gltf.loadAsync(asset.model), images.loadAsync(url) as Promise<ImageBitmap>])
+      const [model, bitmap] = await Promise.all([gltf.loadAsync(asset.model), images.loadAsync(asset.texture) as Promise<ImageBitmap>])
       return { asset, model, bitmap }
     }),
   )

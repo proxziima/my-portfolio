@@ -1,38 +1,10 @@
-import { DoubleSide, Group, MathUtils, Mesh, MeshBasicMaterial, NoBlending, PlaneGeometry, type Object3D } from 'three'
+import { MathUtils } from 'three'
 import { CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js'
 import { ASSETS, type ImageAsset, type VideoAsset } from '@/lib/assets/manifest'
 import { fallbackSrc, srcset } from '@/lib/assets/srcset'
-import { SCREEN, type Vec3 } from './config'
+import { SCREEN } from './config'
 
 type ScreenSpec = typeof SCREEN
-
-export interface PlaneSpec {
-  width: number
-  height: number
-  /** In the screen's local frame: origin at the screen centre, +z toward the viewer. */
-  position: Vec3
-  /** Euler radians. */
-  rotation: Vec3
-}
-
-const BEZEL_COLOR = 0x48493f
-
-/** The GL side of the screen, in its local frame: the occluder at the glass, four bezels around it. Pure. */
-export function screenPlanes(screen: ScreenSpec): { occluder: PlaneSpec; bezels: PlaneSpec[] } {
-  const { width, height, depth } = screen
-  const z = depth / 2
-  const sideRot = { x: 0, y: Math.PI / 2, z: 0 }
-  const capRot = { x: Math.PI / 2, y: 0, z: 0 }
-  return {
-    occluder: { width, height, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
-    bezels: [
-      { width: depth, height, position: { x: -width / 2, y: 0, z }, rotation: sideRot },
-      { width: depth, height, position: { x: width / 2, y: 0, z }, rotation: sideRot },
-      { width, height: depth, position: { x: 0, y: height / 2, z }, rotation: capRot },
-      { width, height: depth, position: { x: 0, y: -height / 2, z }, rotation: capRot },
-    ],
-  }
-}
 
 export interface MonitorScreen {
   /** The screen slab: powered off it is the dark tube and the tab stop; powered on it holds the OS. */
@@ -43,10 +15,8 @@ export interface MonitorScreen {
   powerOn(): HTMLIFrameElement
   /** `cb` runs once, when the OS's first document has loaded. Returns the unsubscribe. */
   onLoaded(cb: () => void): () => void
-  /** Add to the CSS scene. */
+  /** Add to the CSS scene. Its GL side (occluder and bezels) is `createScreenGl`, at the same transform. */
   css: CSS3DObject
-  /** Add to the GL scene. */
-  gl: Object3D
   /** Plays the static videos once they have sources; a no-op under reduced motion. */
   play(): void
   /** Pauses the static videos, so they decode only while the scene is on screen. */
@@ -234,16 +204,11 @@ function createOsFrame(src: string, screen: ScreenSpec): HTMLIFrameElement {
 const prefersReducedMotion = () =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
-const place = (object: Object3D, spec: PlaneSpec) => {
-  object.position.set(spec.position.x, spec.position.y, spec.position.z)
-  object.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z)
-}
-
 /**
- * The screen as the camera sees it: a CSS3D object holding the slab (and, once powered on, the OS's
- * iframe), and a GL group at the same transform whose occluder plane writes transparent pixels with
- * `NoBlending`, so the models in front of the glass cover the iframe and the glass itself shows the
- * DOM beneath the canvas. It starts powered off, a dark tube, and boots the OS on `powerOn`.
+ * The screen's DOM side: a CSS3D object holding the slab (and, once powered on, the OS's iframe).
+ * The GL scene holds its occluder at the same transform (`createScreenGl` in `gl/desk-gl.ts`), so the
+ * models in front of the glass cover the iframe and the glass itself shows this DOM beneath the
+ * canvas. It starts powered off, a dark tube, and boots the OS on `powerOn`.
  */
 export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): MonitorScreen {
   /** Whether the figure wants the static running (`play` since the last `pause`). */
@@ -285,25 +250,6 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
   css.position.set(screen.position.x, screen.position.y, screen.position.z)
   css.rotation.set(tilt, 0, 0)
 
-  const gl = new Group()
-  gl.position.copy(css.position)
-  gl.rotation.copy(css.rotation)
-
-  const { occluder, bezels } = screenPlanes(screen)
-  // black with alpha 0: the canvas is premultiplied, so any brighter colour at alpha 0 composites as light instead of a hole
-  const occluderMaterial = new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, blending: NoBlending, side: DoubleSide })
-  const bezelMaterial = new MeshBasicMaterial({ color: BEZEL_COLOR, side: DoubleSide })
-  const geometries: PlaneGeometry[] = []
-  const add = (spec: PlaneSpec, material: MeshBasicMaterial) => {
-    const geometry = new PlaneGeometry(spec.width, spec.height)
-    geometries.push(geometry)
-    const mesh = new Mesh(geometry, material)
-    place(mesh, spec)
-    gl.add(mesh)
-  }
-  add(occluder, occluderMaterial)
-  for (const bezel of bezels) add(bezel, bezelMaterial)
-
   return {
     element,
     get iframe() {
@@ -328,7 +274,6 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
       return () => loadedCallbacks.delete(cb)
     },
     css,
-    gl,
     play() {
       wantPlay = true
       start()
@@ -345,9 +290,6 @@ export function createMonitorScreen(src: string, screen: ScreenSpec = SCREEN): M
         v.replaceChildren()
         v.load()
       }
-      for (const g of geometries) g.dispose()
-      occluderMaterial.dispose()
-      bezelMaterial.dispose()
       stopGate()
       loadedCallbacks.clear()
       element.remove()
