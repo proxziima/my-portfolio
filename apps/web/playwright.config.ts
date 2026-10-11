@@ -6,6 +6,8 @@ const baseURL = `http://localhost:${port}`
 
 export default defineConfig({
   testDir: 'tests/e2e',
+  // the desk parity shots need WebGL and the real models: run on demand (`bun run test:parity`)
+  testIgnore: process.env.PARITY ? [] : ['visual/**'],
   // the tests share one dev server and one read-only CMS; a Next dev server compiles routes lazily,
   // so a handful of workers keeps the first hit from timing out
   fullyParallel: true,

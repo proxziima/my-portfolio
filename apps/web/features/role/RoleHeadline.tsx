@@ -1,8 +1,4 @@
-'use client'
-import { useRef, useState } from 'react'
-import { RoleDrum } from './RoleDrum'
-import { RolePicker } from './RolePicker'
-import { useRole } from './RoleProvider'
+import { RoleControl, RoleStatus } from './RoleControl'
 
 interface Props {
   name: string
@@ -10,25 +6,18 @@ interface Props {
   hint: string
 }
 
-/** Name over "<drum> tail", with a live status line for the role. */
+/** Name over "<drum> tail"; only the drum, its picker and the live status line are client code. */
 export function RoleHeadline({ name, tail, hint }: Props) {
-  const { current } = useRole()
-  const drumRef = useRef<HTMLButtonElement>(null)
-  const [open, setOpen] = useState(false)
   return (
     <>
       <h1>
         <span className="who" data-anchor="name">{name}</span>
         <span className="what">
-          <RolePicker drumRef={drumRef} open={open} onOpenChange={setOpen} hint={hint}>
-            <RoleDrum ref={drumRef} expanded={open} />
-          </RolePicker>
+          <RoleControl hint={hint} />
           <span className="tail">{tail}</span>
         </span>
       </h1>
-      <p className="sr-only" role="status">
-        {current.title} selected
-      </p>
+      <RoleStatus />
     </>
   )
 }

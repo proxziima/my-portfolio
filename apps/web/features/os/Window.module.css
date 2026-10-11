@@ -69,6 +69,44 @@
   -webkit-user-select: text;
 }
 
+/* the content while an app's code loads: an empty panel in the window's face colour */
+.loading {
+  width: 100%;
+  height: 100%;
+  background: var(--os-face);
+}
+
+/* an app that failed in this window: the message and a Retry on the face colour, like a Windows notice */
+.failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  background: var(--os-face);
+  color: var(--os-text);
+  text-align: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.failed p {
+  margin: 0;
+}
+
+.failed button {
+  min-width: 75px;
+  height: 23px;
+  padding: 0 12px;
+}
+
+.failed button:active {
+  border-color: var(--os-dark) var(--os-light) var(--os-light) var(--os-dark);
+}
+
 .status {
   display: flex;
   gap: 2px;

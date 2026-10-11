@@ -20,6 +20,9 @@
   gap: 12px;
   margin-top: 10px;
   font-size: 11.5px;
+  /* one line of height at least: a role with a shorter caption never moves the sections below */
+  line-height: 1.5;
+  min-height: calc(11.5px * 1.5);
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
   transition: var(--theme-transition);

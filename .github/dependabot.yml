@@ -10,6 +10,15 @@ updates:
     groups:
       bun-minor-and-patch:
         update-types: [minor, patch]
+    # Bun forces one version of a dependency across all workspaces, which is how a minor group
+    # carried these majors into cms. Bump them by hand once cms's plugins can take them.
+    ignore:
+      # @payloadcms/plugin-mcp 3.90 types custom tools against zod 3 (cms pins 3.25.76).
+      - dependency-name: zod
+        update-types: [version-update:semver-major]
+      # eslint-config-next bundles eslint-plugin-react 7.37, which doesn't support eslint 10 (cms stays on 9).
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directories: [/, /.github/actions/setup, /.github/actions/secrets, /.github/actions/cms]

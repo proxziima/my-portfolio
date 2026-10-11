@@ -8,6 +8,9 @@ import { Taskbar } from './Taskbar'
 import { Window } from './Window'
 import { activeWindow, EMPTY_WINDOWS, windowReducer } from './window-manager'
 import styles from './Desktop.module.css'
+import { track } from '@/lib/analytics/events'
+import { countAppOpen } from '@/lib/analytics/os-engagement'
+import { useExperience } from '@/lib/analytics/use-experience'
 
 type Phase = 'boot' | 'desktop' | 'shutdown'
 
@@ -15,6 +18,8 @@ type Phase = 'boot' | 'desktop' | 'shutdown'
 export function Desktop({ data }: { data: OsData }) {
   const [phase, setPhase] = useState<Phase>('boot')
   const [wm, dispatch] = useReducer(windowReducer, EMPTY_WINDOWS)
+  // mount to desktop, first boot only: the timer settles once, so a reboot after shutdown is not timed
+  const bootTiming = useExperience('os_boot')
   const deskRef = useRef<HTMLDivElement>(null)
   // the desk fills the viewport (html/body are 100%), so the viewport is the right answer before the
   // desk's ref is attached: a window in the desk's first commit lays out before the parent ref does
@@ -27,9 +32,14 @@ export function Desktop({ data }: { data: OsData }) {
     dispatch({ type: 'reset' })
     dispatch({ type: 'open', id: BOOT_APP })
     setPhase('desktop')
-  }, [])
+    bootTiming.ready()
+  }, [bootTiming])
   const reboot = useCallback(() => setPhase('boot'), [])
-  const open = useCallback((id: string) => dispatch({ type: 'open', id }), [])
+  const open = useCallback((id: string) => {
+    dispatch({ type: 'open', id })
+    track('os_app_opened', { app: id })
+    countAppOpen()
+  }, [])
 
   if (phase === 'boot') return <Boot name={data.profile.name} onDone={boot} />
   if (phase === 'shutdown') return <Shutdown onDone={reboot} />
@@ -53,6 +63,7 @@ export function Desktop({ data }: { data: OsData }) {
         return (
           <Window
             key={app.id}
+            app={app.id}
             title={app.title}
             status={app.status ?? status}
             icon={app.icon}

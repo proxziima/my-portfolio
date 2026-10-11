@@ -28,7 +28,11 @@ export function groupBySender(lines: readonly Line[]): Group[] {
   return groups
 }
 
-/** The conversation so far, kept scrolled to the newest line. A notice with no text is skipped. */
+/**
+ * The conversation so far, kept scrolled to the newest line. A notice with no text is skipped.
+ * `ph-no-capture` keeps the transcript out of PostHog session replay and autocapture: the parent
+ * page records the same-origin `/os` iframe too, and visitor chats must never reach a recording.
+ */
 export function History({
   lines,
   nameOf,
@@ -47,7 +51,7 @@ export function History({
   }, [lines])
   const shown = lines.filter((line) => line.kind !== 'notice' || noticeText(line.notice) !== '')
   return (
-    <div ref={ref} className={styles.history} role="log" aria-label="Conversation history">
+    <div ref={ref} className={`${styles.history} ph-no-capture`} role="log" aria-label="Conversation history">
       <ol className={styles.groups}>
         {groupBySender(shown).map((group) =>
           group.kind === 'notice' ? (

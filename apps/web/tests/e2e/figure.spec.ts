@@ -1,4 +1,6 @@
-import { expect } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { TOUCH_QUERY } from '../../features/desk/intent'
+import { ASSETS } from '../../lib/assets/manifest'
 import { openPortfolio, test } from './support'
 
 // the models are allowed through: software WebGL is slow in headless Chromium, but one frame is enough
@@ -7,9 +9,13 @@ test('the monitor shows the OS and the scene draws a first frame', async ({ page
   await openPortfolio(page)
   await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
   const scene = page.locator('[data-anchor="desk-scene"]')
-  await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached({ timeout: 20_000 })
   await expect(scene).toHaveAttribute('data-loaded', 'true', { timeout: 30_000 })
   await expect(scene.locator('canvas')).toHaveCount(1)
+  // the pointer has not come near: the monitor is a powered-off tube, the OS not even requested
+  await expect(scene.getByRole('img', { name: 'Desktop (powered off)' })).toBeAttached()
+  await expect(scene.locator('iframe')).toHaveCount(0)
+  await page.locator('[data-anchor="figure-box"]').hover()
+  await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached({ timeout: 20_000 })
   // the CRT layers sit over the iframe and must let the pointer through to it
   const fx = scene.locator('.screen-fx')
   await expect(fx).toBeAttached()
@@ -19,7 +25,73 @@ test('the monitor shows the OS and the scene draws a first frame', async ({ page
   await expect(fx.locator('img')).toHaveCount(2)
   // once the OS shows its desktop the static runs while the figure is on screen
   await expect(fx).toHaveAttribute('data-ready', 'true', { timeout: 20_000 })
+  // the encodes are attached only once the layers can show, in the pipeline's order (smallest passing codec first)
+  const expected = [ASSETS.desk.screen.staticBase, ASSETS.desk.screen.staticLayer].map((a) => a.sources.map((s) => [s.src, s.type]))
+  await expect
+    .poll(() => fx.locator('video').evaluateAll((vs) => vs.map((v) => [...v.querySelectorAll('source')].map((s) => [s.getAttribute('src'), s.type]))))
+    .toEqual(expected)
   await expect.poll(() => fx.locator('video').evaluateAll((vs) => (vs as HTMLVideoElement[]).some((v) => !v.paused)), { timeout: 10_000 }).toBe(true)
+  // each plays one of its own encodes
+  const playing = await fx.locator('video').evaluateAll((vs) => (vs as HTMLVideoElement[]).map((v) => new URL(v.currentSrc).pathname))
+  playing.forEach((src, i) => expect(expected[i]!.map(([s]) => s)).toContain(src))
+})
+
+test('the pointer entering the figure area boots the OS before it reaches the screen', async ({ page }) => {
+  await openPortfolio(page)
+  await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
+  const scene = page.locator('[data-anchor="desk-scene"]')
+  await expect(scene.getByRole('img', { name: 'Desktop (powered off)' })).toBeAttached({ timeout: 20_000 })
+  await expect(scene.locator('iframe')).toHaveCount(0)
+  // a corner of the box, nowhere near the screen
+  await page.locator('[data-anchor="figure-box"]').hover({ position: { x: 5, y: 5 } })
+  await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached({ timeout: 5_000 })
+  await expect(scene).toHaveAttribute('data-power', 'on', { timeout: 20_000 })
+})
+
+test('keyboard reaches the OS through the powered-off screen', async ({ page }) => {
+  await openPortfolio(page)
+  const scene = page.locator('[data-anchor="desk-scene"]')
+  const slab = scene.getByRole('img', { name: 'Desktop (powered off)' })
+  await page.locator('[data-anchor="figure"]').scrollIntoViewIfNeeded()
+  await expect(slab).toBeAttached({ timeout: 20_000 })
+  await expect(scene.locator('iframe')).toHaveCount(0)
+  // The slab holds the focus only until the OS it boots has loaded, then hands it to the iframe: on a
+  // fast load that is before the next check could see it there. So the page records the focus event
+  // itself, and the Tab loop stops on that record instead of polling the transient focus.
+  await slab.evaluate((el) => el.addEventListener('focus', () => (el.dataset.e2eFocused = 'true'), { once: true }))
+  const screen = scene.locator('[data-e2e-focused="true"]')
+  // Tab from the top of the page onto the screen
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  let reached = false
+  for (let i = 0; i < 80 && !reached; i++) {
+    await page.keyboard.press('Tab')
+    reached = (await screen.count()) > 0
+  }
+  expect(reached, 'Tab reaches the powered-off screen').toBe(true)
+  // the OS boots and, once loaded, takes the focus at the same tab position
+  await expect
+    .poll(() => page.evaluate(() => (document.activeElement as HTMLIFrameElement | null)?.title ?? ''), { timeout: 20_000 })
+    .toBe('Desktop')
+  await expect(scene.getByRole('img', { name: 'Desktop (powered off)' })).toHaveCount(0)
+})
+
+test('full screen boots the OS, and Escape inside the late iframe exits', async ({ page }) => {
+  await openPortfolio(page)
+  const figure = page.locator('[data-anchor="figure"]')
+  await figure.scrollIntoViewIfNeeded()
+  const scene = page.locator('[data-anchor="desk-scene"]')
+  await expect(scene.getByRole('img', { name: 'Desktop (powered off)' })).toBeAttached({ timeout: 20_000 })
+  await expect(scene.locator('iframe')).toHaveCount(0)
+  // keyboard activation: the pointer never enters the box, so only full screen can boot it
+  await figure.getByRole('button', { name: 'Full screen' }).focus()
+  await page.keyboard.press('Enter')
+  const box = page.locator('[data-anchor="figure-box"]')
+  await expect(box).toHaveAttribute('data-full', 'true')
+  await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached({ timeout: 5_000 })
+  await expect(scene).toHaveAttribute('data-power', 'on', { timeout: 20_000 })
+  // the iframe came after full screen began: Escape pressed inside it still exits
+  await page.frameLocator('iframe[title="Desktop"]').locator('body').press('Escape')
+  await expect(box).toHaveAttribute('data-full', 'false')
 })
 
 test('full screen covers the viewport and Escape restores the box', async ({ page }) => {
@@ -57,4 +129,119 @@ test('the mute toggle flips and persists', async ({ page }) => {
   expect(await page.evaluate(() => localStorage.getItem('desk-muted'))).toBe('1')
   await page.reload()
   await expect(page.locator('[data-anchor="figure"]').getByRole('button', { name: 'Unmute' })).toBeVisible()
+})
+
+// Headless Chromium on Linux, which PageSpeed Insights and CI's Lighthouse run, has no pointing device:
+// `(hover: none)` and `(pointer: none)` match. CDP cannot emulate input media features, so the page's
+// matchMedia answers for them as that host does; every other query goes to the real one.
+test.describe('with no pointing device', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const real = window.matchMedia.bind(window)
+      const input: Record<string, string> = { hover: 'none', 'any-hover': 'none', pointer: 'none', 'any-pointer': 'none' }
+      window.matchMedia = (query: string) => {
+        const tests = [...query.matchAll(/\(\s*([a-z-]+)\s*:\s*([^)]+?)\s*\)/g)]
+        if (!tests.some(([, name]) => name! in input)) return real(query)
+        const matches = tests.every(([, name, value]) => (name! in input ? input[name!] === value : real(`(${name}: ${value})`).matches))
+        return { matches, media: query, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false } as MediaQueryList
+      }
+    })
+  })
+
+  test('the monitor stays off in view until approached, and the OS is never fetched at load', async ({ page }) => {
+    const osRequests: string[] = []
+    page.on('request', (r) => {
+      if (new URL(r.url()).pathname === '/os') osRequests.push(r.url())
+    })
+    await page.route('**/*.glb', (route) => route.continue())
+    await openPortfolio(page)
+    expect(await page.evaluate(() => matchMedia('(hover: none)').matches && matchMedia('(pointer: none)').matches), 'the host has no pointer').toBe(true)
+    const scene = page.locator('[data-anchor="desk-scene"]')
+    await page.locator('[data-anchor="figure-box"]').evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    await expect(scene).toHaveAttribute('data-loaded', 'true', { timeout: 30_000 })
+    // a touch device would have booted within the observer's delivery delay
+    await page.waitForTimeout(1500)
+    await expect(scene.getByRole('img', { name: 'Desktop (powered off)' })).toBeAttached()
+    await expect(scene.locator('iframe')).toHaveCount(0)
+    expect(osRequests).toEqual([])
+    // keyboard still boots it: focus on the powered-off screen is an approach
+    await scene.getByRole('img', { name: 'Desktop (powered off)' }).focus()
+    await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached({ timeout: 5_000 })
+  })
+})
+
+test.describe('on touch', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
+
+  /** The share of the figure box inside the viewport, as the IntersectionObserver measures it. */
+  const visibleRatio = (page: Page) =>
+    page.locator('[data-anchor="figure-box"]').evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const seen = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0))
+      return r.height ? seen / r.height : 0
+    })
+
+  test('the monitor boots as it scrolls into view', async ({ page }) => {
+    await page.route('**/*.glb', (route) => route.continue())
+    await openPortfolio(page)
+    // what `isTouchDevice` reads: the emulated phone's primary pointer is coarse, cannot hover, and it reports touch points
+    expect(await page.evaluate((query) => matchMedia(query).matches, TOUCH_QUERY), 'the emulated phone is a touch device').toBe(true)
+    expect(await page.evaluate(() => navigator.maxTouchPoints)).toBeGreaterThan(0)
+    const scene = page.locator('[data-anchor="desk-scene"]')
+    const box = page.locator('[data-anchor="figure-box"]')
+    // the scene mounts 200 px before the box is in view: it stays powered off while under half visible
+    await box.evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - innerHeight + 60))
+    await expect(scene.getByRole('img', { name: 'Desktop (powered off)' })).toBeAttached({ timeout: 20_000 })
+    expect(await visibleRatio(page)).toBeLessThan(0.5)
+    await page.waitForTimeout(500)
+    await expect(scene.locator('iframe')).toHaveCount(0)
+    // no tap: scrolling it into view is enough
+    await box.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    await expect(scene.locator('iframe[title="Desktop"]')).toBeAttached({ timeout: 2_000 })
+    // the desktop and the static show while it is on screen
+    await expect(scene.locator('.screen-fx')).toHaveAttribute('data-ready', 'true', { timeout: 30_000 })
+  })
+
+  // a jump straight to the figure (an anchor, a reload part-way down): the worst case for the lazy scene
+  test('the screen is never dark while in view', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.route('**/*.glb', (route) => route.continue())
+    await openPortfolio(page)
+    const box = page.locator('[data-anchor="figure-box"]')
+    await box.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    // sampled in the page every 50 ms until a second after the scene shows. The scene is invisible
+    // until its first frame with the models (the host fades in on `data-loaded`), so the tube can
+    // only be seen dark from then on.
+    const samples = await page.evaluate(
+      () =>
+        new Promise<{ t: number; inView: boolean; shown: boolean; iframe: boolean }[]>((done) => {
+          const out: { t: number; inView: boolean; shown: boolean; iframe: boolean }[] = []
+          const t0 = performance.now()
+          let shownAt = 0
+          const id = setInterval(() => {
+            const t = performance.now() - t0
+            const boxEl = document.querySelector('[data-anchor="figure-box"]')!
+            const r = boxEl.getBoundingClientRect()
+            const seen = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0))
+            const scene = document.querySelector('[data-anchor="desk-scene"]')
+            const shown = scene?.getAttribute('data-loaded') === 'true'
+            if (shown && !shownAt) shownAt = t
+            out.push({ t, inView: r.height > 0 && seen / r.height >= 0.5, shown, iframe: !!scene?.querySelector('iframe') })
+            if ((shownAt && t - shownAt > 1000) || t > 60_000) {
+              clearInterval(id)
+              done(out)
+            }
+          }, 50)
+        }),
+    )
+    expect(samples.some((x) => x.shown), 'the scene showed').toBe(true)
+    const firstDark = samples.find((x) => x.inView && x.shown && !x.iframe)
+    if (firstDark) {
+      // at most the observer's delivery delay: an iframe follows within 300 ms
+      const lit = samples.find((x) => x.t > firstDark.t && x.iframe)
+      expect(lit, 'an iframe follows the first dark in-view sample').toBeDefined()
+      expect(lit!.t - firstDark.t).toBeLessThanOrEqual(300)
+    }
+    expect(samples.some((x) => x.inView && x.shown && x.iframe)).toBe(true)
+  })
 })

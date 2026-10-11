@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   // tsconfig keeps JSX for Next ("preserve"); tests that render components need the automatic runtime.
-  esbuild: { jsx: 'automatic' },
+  oxc: { jsx: { runtime: 'automatic' } },
   test: {
     include: ['tests/unit/**/*.test.ts'],
     environment: 'node',

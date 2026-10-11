@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest'
-import { desktopApps, resolveApp, withChildren, type OsApp, type OsData } from '@/features/os/apps'
+import { describe, expect, it, vi } from 'vitest'
+import { APPS, desktopApps, resolveApp, withChildren, type OsApp, type OsData } from '@/features/os/apps'
+
+// counts which app modules the registry pulls in when it is imported
+const loaded = vi.hoisted(() => new Set<string>())
+vi.mock('@/features/os/apps/messenger/Messenger', () => (loaded.add('messenger'), { Messenger: () => null }))
+vi.mock('@/features/os/apps/messenger/Conversation', () => (loaded.add('conversation'), { Conversation: () => null }))
+vi.mock('@/features/os/apps/Credits', () => (loaded.add('credits'), { Credits: () => null }))
+vi.mock('@/features/os/apps/dos/DosPlayer', () => (loaded.add('dos'), { DosPlayer: () => null }))
 
 const Noop = () => null
 const data = { profile: { name: 'Vinicius Queiroz' }, messenger: { shortcut: 'Messenger' } } as unknown as OsData
@@ -35,5 +42,12 @@ describe('withChildren', () => {
   })
   it('closes a child alone', () => {
     expect(withChildren(family, 'conversation')).toEqual(['conversation'])
+  })
+})
+
+describe('APPS', () => {
+  it('leaves every app but the boot one out of the boot chunk: their code loads with their first window', () => {
+    expect(APPS.map((app) => app.id)).toEqual(['showcase', 'resume', 'credits', 'doom', 'autocad', 'messenger', 'conversation'])
+    expect([...loaded]).toEqual([])
   })
 })

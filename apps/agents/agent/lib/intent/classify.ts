@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { IntentClass } from '@repo/twin/contract'
 import { isAbort } from '../abort'
 import { intentClassifierModel } from '../models'
+import { classifierTelemetry, type TraceIdentity } from '../observability/trace-context'
 
 /**
  * The intent label's instructions. The hard line is requesting_call: a visitor asking the owner to
@@ -56,9 +57,13 @@ export function intentPrompt(turns: ReadonlyArray<{ role: 'visitor' | 'twin'; te
 /**
  * One enum label for the recent turns, or null when the classifier is unavailable (spec §7).
  * Never throws: the evaluation is persisted from signals alone either way. Timeouts are expected
- * and silent; any other failure is logged.
+ * and silent; any other failure is logged. The call is a `twin.intent` generation, tied to the visitor when `trace` is given.
  */
-export async function classifyIntent(turns: ReadonlyArray<{ role: 'visitor' | 'twin'; text: string }>, timeoutMs: number): Promise<IntentClass | null> {
+export async function classifyIntent(
+  turns: ReadonlyArray<{ role: 'visitor' | 'twin'; text: string }>,
+  timeoutMs: number,
+  trace?: TraceIdentity,
+): Promise<IntentClass | null> {
   const signal = AbortSignal.timeout(timeoutMs)
   try {
     const { output } = await generateText({
@@ -68,6 +73,7 @@ export async function classifyIntent(turns: ReadonlyArray<{ role: 'visitor' | 't
       output: Output.choice({ options: [...IntentClass.options] }),
       abortSignal: signal,
       maxRetries: 0, // the timeout decides the fallback
+      ...classifierTelemetry('twin.intent', trace),
     })
     return IntentClass.parse(output)
   } catch (error) {

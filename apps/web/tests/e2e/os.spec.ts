@@ -53,6 +53,24 @@ test('a shortcut opens Credits on top, and close removes it', async ({ page }) =
   await expect(credits).toHaveCount(0)
 })
 
+test('an app whose code fails to load fails in its own window, and Retry loads it', async ({ page }) => {
+  await openDesktop(page)
+  // offline for the app chunks only, as a tab older than the deploy whose chunks are gone
+  const chunks = '**/_next/static/**/*.js'
+  await page.route(chunks, (route) => route.abort())
+  await page.getByRole('button', { name: 'Credits' }).first().dblclick()
+  const credits = page.getByRole('dialog', { name: 'Credits' })
+  await expect(credits.getByRole('alert')).toContainText('could not be loaded')
+  // the rest of the desktop keeps working
+  await page.getByRole('navigation', { name: 'Taskbar' }).getByRole('button', { name: SHOWCASE }).click()
+  await expect(showcase(page)).toBeVisible()
+  await page.unroute(chunks)
+  await page.getByRole('navigation', { name: 'Taskbar' }).getByRole('button', { name: 'Credits' }).click()
+  await credits.getByRole('button', { name: 'Retry' }).click()
+  await expect(credits.getByRole('heading', { level: 2, name: 'Credits' })).toBeVisible()
+  await expect(credits.getByRole('alert')).toHaveCount(0)
+})
+
 const jsDosScripts = (page: Page) => page.locator('head script[src="/js-dos/js-dos.js"]')
 
 /** Double-clicks a DOS program's shortcut and waits for js-dos to put its canvas in the window. */

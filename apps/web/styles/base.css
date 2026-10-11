@@ -16,8 +16,8 @@ body {
     radial-gradient(864px 992px at 108% 32%, var(--glow-b), rgba(0, 0, 0, 0) 72%),
     radial-gradient(992px 672px at 18% 108%, var(--glow-c), rgba(0, 0, 0, 0) 70%);
   background-attachment: fixed;
-  font-family:
-    var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* --font-inter is Inter then the matched fallbacks of styles/font-fallbacks.css (next/font's `fallback` in the layouts) */
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: var(--body-size);
   line-height: var(--body-line);
   -webkit-font-smoothing: antialiased;
@@ -150,17 +150,30 @@ h2 {
 }
 
 /* footer */
+/* a sibling after <main> (a landmark of its own), so it re-creates main's column and trailing space */
+main:has(+ .site-footer) {
+  padding-bottom: var(--section-gap);
+}
+
 .site-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 6px 20px;
-  margin-top: var(--section-gap);
+  max-width: calc(var(--column) + 2 * var(--gutter));
+  margin: 0 auto 108px;
+  padding-inline: var(--gutter);
   padding-bottom: 64px;
   font-size: 12.5px;
   color: var(--ink-soft);
   transition: var(--theme-transition);
+}
+
+@media (max-width: 640px) {
+  .site-footer {
+    margin-bottom: 72px;
+  }
 }
 
 .site-footer nav {

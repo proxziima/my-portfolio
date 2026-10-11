@@ -94,8 +94,9 @@ jobs:
       # One suite at a time: wall-clock assertions in the cms favicon tests need an unshared CPU.
       - name: tests with coverage
         run: bunx turbo run test ${AFFECTED:+"$AFFECTED"} --concurrency=1 -- --coverage
+      # a path, not a filter: bun matches a bare argument against every test path (initial-scripts.test.ts too)
       - name: repo scripts
-        run: bun test scripts
+        run: bun test ./scripts
       - name: upload coverage
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -206,6 +207,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      # Hash and manifest only: needs no ffmpeg or encoders; fails when a source or recipe changed without `assets:build`.
+      - name: pipeline assets match their sources
+        run: bun run --cwd apps/web assets:check
       - name: client bundle carries no secrets or prompt fragments
         run: |
           bunx turbo run build --filter=web
@@ -264,6 +268,79 @@ jobs:
             apps/web/playwright-report
             apps/web/test-results
             ci-logs/
+          retention-days: 7
+
+  # Lighthouse budgets on the production build of the letter, against the throwaway CMS: no secret is read
+  # and the real CMS is never touched. Budgets and how to update them: docs/observability.md, "Performance budgets".
+  lighthouse:
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.cms == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CMS_URL: http://127.0.0.1:3001
+      SITE_URL: http://127.0.0.1:3100
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/secrets
+      - uses: ./.github/actions/cms
+        with:
+          web-url: http://127.0.0.1:3100
+      - name: playwright version
+        id: playwright
+        working-directory: apps/web
+        run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: playwright browsers cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # The Lighthouse runner drives Playwright's Chromium, the browser every checkpoint was measured with.
+      - name: chromium and its system libraries
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium
+      # The image's server: standalone carries neither static files nor public/, laid out as the Dockerfile does.
+      - name: build and start web
+        run: |
+          bunx turbo run build --filter=web --cache=local:r
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+          mkdir -p "$GITHUB_WORKSPACE/ci-logs"
+          PORT=3100 HOSTNAME=127.0.0.1 nohup node apps/web/.next/standalone/apps/web/server.js > "$GITHUB_WORKSPACE/ci-logs/web.log" 2>&1 &
+          for _ in $(seq 60); do
+            curl -fsS http://127.0.0.1:3100/ > /dev/null && exit 0
+            sleep 2
+          done
+          tail -n 100 "$GITHUB_WORKSPACE/ci-logs/web.log"
+          exit 1
+      - name: initial JS keeps posthog, three, eve and zod out, within budget; the desk renders in its worker
+        working-directory: apps/web
+        run: node scripts/perf/chunks.ts --url http://127.0.0.1:3100
+      # Five runs per form factor with Lighthouse 13.5.0 (the checkpoints' version), CPU calibrated to
+      # PageSpeed's hardware class from this runner's benchmark index; each assertion takes the median.
+      - name: lighthouse (mobile and desktop, 5 runs each)
+        working-directory: apps/web
+        run: node scripts/perf/lighthouse.ts --url http://127.0.0.1:3100/ --runs 5 --calibrate --lhci --out .perf/ci
+      - name: budgets (mobile)
+        working-directory: apps/web/.perf/ci/mobile
+        run: bunx @lhci/cli@0.15.1 assert --config=../../../lighthouserc.mobile.json
+      - name: budgets (desktop)
+        if: success() || failure()
+        working-directory: apps/web/.perf/ci/desktop
+        run: bunx @lhci/cli@0.15.1 assert --config=../../../lighthouserc.desktop.json
+      - name: lighthouse reports and service logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lighthouse
+          path: |
+            apps/web/.perf/ci
+            ci-logs/
+          include-hidden-files: true
+          if-no-files-found: ignore
           retention-days: 7
 
   # Each affected production image builds (no push). Layers are cached per service.
@@ -339,7 +416,7 @@ jobs:
 
   # The single required check: green when every gate passed or was skipped as unaffected.
   ci-ok:
-    needs: [changes, repo, verify, drift, agents, bundle, e2e, docker]
+    needs: [changes, repo, verify, drift, agents, bundle, e2e, lighthouse, docker]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

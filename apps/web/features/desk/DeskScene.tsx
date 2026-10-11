@@ -1,29 +1,53 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { useInView } from '@/lib/dom/use-in-view'
 import { useReducedMotion } from '@/lib/dom/use-reduced-motion'
 import { createDeskAudio, type DeskAudio } from './audio'
-import { OS_PATH } from './config'
+import { DESK_ASSETS, OS_PATH } from './config'
 import { createDeskEngine, type DeskEngine } from './engine'
+import { GlHostError, type GlFailure, type GlHost, type HostKind } from './gl/host'
+import { selectHost } from './gl/select-host'
+import { isTouchDevice, watchApproach } from './intent'
 import { cappedPixelRatio } from './pixel-ratio'
+import { reducePower, type Power } from './power'
 import { watchScreen } from './screen-events'
 import styles from './DeskScene.module.css'
 // global: the screen's DOM is built imperatively, so its CRT layers cannot take module class names
 import './screen-fx.css'
 
+/** Why the scene gave up, for `experience_failed.reason`. */
+export type DeskFailure = GlFailure
+
+export interface DeskSceneProps {
+  /** `host`: the thread that failed (`webgl_unavailable` is always the main one: a worker without WebGL is not a failure). */
+  onFail: (reason: DeskFailure, host: HostKind) => void
+  /** `host`: which thread drew the first frame with the models. */
+  onReady: (host: HostKind) => void
+  muted: boolean
+  /** The figure is in full screen: that is there to use the OS, so it boots the monitor. */
+  fullscreen: boolean
+  /** The monitor's power as it changes, for the figure (full screen rebinds to the late iframe). */
+  onPower: (power: Power) => void
+}
+
 /**
  * The desk in the figure box. Builds the engine once per mount, sizes it to the box, drives the
- * camera from the pointer and the screen's events, and renders only while on screen. It also owns
- * the scene's sounds: key and mouse foley for what happens inside the OS, a startup chime and an
- * office ambience that muffles as the camera zooms in, all silent until the first gesture and
- * whenever `muted`. `onFail` fires if WebGL is missing or an asset fails, so the figure can
- * collapse to its caption.
+ * camera from the pointer and the screen's events, and renders only while on screen. It owns the
+ * monitor's power: the screen is a dark tube until the visitor approaches (`watchApproach`: the
+ * pointer entering the box, keyboard focus on the screen, on touch the box half in view) or the
+ * figure goes full screen; then the OS boots, its own boot console being the loading state. It also
+ * owns the scene's sounds: key and mouse foley for what happens inside the OS, a startup chime and
+ * an office ambience that muffles as the camera zooms in, all silent until the first gesture and
+ * whenever `muted`. The WebGL draws in a worker where the browser can, else on the main thread
+ * (`selectHost`). `onFail` fires if WebGL is missing, an asset fails or the context is lost, so the
+ * figure can collapse to its caption; `onReady` fires on the first frame drawn with the models.
  */
-export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolean }) {
+export function DeskScene({ onFail, onReady, muted, fullscreen, onPower }: DeskSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<DeskAudio | null>(null)
   const [engine, setEngine] = useState<DeskEngine | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [power, dispatchPower] = useReducer(reducePower, 'off')
   const visible = useInView(hostRef)
   const reduce = useReducedMotion()
 
@@ -32,19 +56,32 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
     if (!host) return
     let live = true
     const audio = createDeskAudio()
+    let gl: GlHost
     let created: DeskEngine
     try {
+      // the drawing thread picks AVIF or WebP itself: it is the one that decodes them
+      gl = selectHost(DESK_ASSETS)
       created = createDeskEngine({
-        host,
+        container: host,
+        host: gl,
         screenSrc: OS_PATH,
-        onFirstFrame: () => { if (live) setLoaded(true) },
+        onFirstFrame: () => {
+          if (!live) return
+          setLoaded(true)
+          onReady(gl.kind)
+        },
         onFrame: (distance) => audio.setDistance(distance),
       })
     } catch {
       audio.dispose()
-      onFail()
+      onFail('webgl_unavailable', 'main')
       return
     }
+    // a lost context collapses the figure as a load error does (a worker's loss is not one: the main thread takes over)
+    const fail = (reason: DeskFailure) => {
+      if (live) onFail(reason, reason === 'webgl_unavailable' ? 'main' : gl.kind)
+    }
+    gl.onFail(fail)
     audioRef.current = audio
     const engine = created
     const fit = () => {
@@ -67,8 +104,15 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
     }
     watchDpr()
     const unlock = () => audio.unlock()
+    const touch = isTouchDevice()
+    // the figure box: the host fills it, and the pointer enters it well before it reaches the screen
+    const box = host.parentElement ?? host
+    const stopApproach = watchApproach(box, engine.screen.element, touch, (source) => dispatchPower({ type: 'intent', source }))
+    const offLoaded = engine.screen.onLoaded(() => {
+      if (live) dispatchPower({ type: 'loaded' })
+    })
     const unwatch = watchScreen(
-      engine.iframe,
+      engine.screen.element,
       (want) => engine.goTo(want ? 'monitor' : 'desk'),
       (input) => {
         unlock()
@@ -86,13 +130,15 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
       engine.setPointer({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: ((e.clientY - r.top) / r.height) * 2 - 1 })
     }
     host.addEventListener('pointermove', onMove)
-    engine.load().catch(() => { if (live) onFail() })
+    engine.load().catch((e: unknown) => fail(e instanceof GlHostError ? e.reason : 'load_error'))
     setEngine(engine)
     return () => {
       live = false
       ro.disconnect()
       dprQuery?.removeEventListener('change', onDpr)
       unwatch()
+      stopApproach()
+      offLoaded()
       host.removeEventListener('pointermove', onMove)
       host.removeEventListener('pointerdown', unlock)
       host.removeEventListener('keydown', unlock)
@@ -101,7 +147,20 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
       setEngine(null)
       engine.dispose()
     }
-  }, [onFail])
+  }, [onFail, onReady])
+
+  // powerOn is idempotent: an engine rebuilt while powered (a remount) boots its own screen again
+  useEffect(() => {
+    if (engine && power !== 'off') engine.screen.powerOn()
+  }, [engine, power])
+
+  useEffect(() => {
+    onPower(power)
+  }, [power, onPower])
+
+  useEffect(() => {
+    if (fullscreen) dispatchPower({ type: 'intent', source: 'fullscreen' })
+  }, [fullscreen])
 
   // depends on `engine` too: the audio is created with it, so the choice is re-applied once it exists
   useEffect(() => {
@@ -119,5 +178,5 @@ export function DeskScene({ onFail, muted }: { onFail: () => void; muted: boolea
     else engine.stop()
   }, [engine, visible])
 
-  return <div ref={hostRef} className={styles.host} data-loaded={loaded} data-anchor="desk-scene" />
+  return <div ref={hostRef} className={styles.host} data-loaded={loaded} data-power={power} data-anchor="desk-scene" />
 }

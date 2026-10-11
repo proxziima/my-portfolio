@@ -1,0 +1,1139 @@
+{
+  "desk.computer.model": {
+    "source": "5b7ecb5d0d1c21ab1253fc57b64f235f4040ba0751cfe0ff204141deb1dbc236",
+    "recipe": "26601e406dc5e6e4f6497cfe8fcc53bcf39652dedb470b0a8e70adcf552f65ba",
+    "tools": {
+      "gltf-transform": "4.5.1",
+      "meshoptimizer": "1.3.0"
+    },
+    "outputs": [
+      "/assets/desk/computer.d460259735.glb"
+    ],
+    "value": "/assets/desk/computer.d460259735.glb",
+    "parity": {
+      "quantize": {
+        "position": 16,
+        "texcoord": 16
+      },
+      "nodes": [
+        "monitor_base",
+        "computer",
+        "keyboard",
+        "mouse",
+        "cables"
+      ]
+    }
+  },
+  "desk.decor.model": {
+    "source": "b25f99d3fbf42cb54009c398b61eed86b78679f426800237daa5077c7a46c832",
+    "recipe": "9635e07d3d482b25b52fd1b4145a92385490d6030a0757ca5f85d2f6b78db05d",
+    "tools": {
+      "gltf-transform": "4.5.1",
+      "meshoptimizer": "1.3.0"
+    },
+    "outputs": [
+      "/assets/desk/decor.05f19c1c50.glb"
+    ],
+    "value": "/assets/desk/decor.05f19c1c50.glb",
+    "parity": {
+      "quantize": {
+        "position": 16,
+        "texcoord": 16
+      },
+      "nodes": [
+        "binder_1",
+        "coffee",
+        "paper",
+        "paper_holder_bottom",
+        "paper_stack_1",
+        "paper_stack_2",
+        "plant",
+        "paper_holder_top",
+        "binder_2"
+      ]
+    }
+  },
+  "desk.environment.model": {
+    "source": "817a3daf8da639268bcd57327277919888432e6e53a75a4201e7c2788b329672",
+    "recipe": "996fa54648a4a46c1aa4fafbd576946d2533689c24386a2b7e5a73aa9ba700f3",
+    "tools": {
+      "gltf-transform": "4.5.1",
+      "meshoptimizer": "1.3.0"
+    },
+    "outputs": [
+      "/assets/desk/environment.e2f9334272.glb"
+    ],
+    "value": "/assets/desk/environment.e2f9334272.glb",
+    "parity": {
+      "quantize": {
+        "position": 16,
+        "texcoord": 16
+      },
+      "nodes": [
+        "Background",
+        "desk",
+        "chair_base",
+        "chair_seat"
+      ]
+    }
+  },
+  "desk.computer.texture": {
+    "source": "276c0573e3b9c8e0cdcaf27bed04fc482f247ad32e7c923dc24f8027dd9a531a",
+    "recipe": "77db5f0bc4b98b0af8d17bc3da8fba7878197f4e7acfc792cb664cedea5c933f",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/computer.253a711d73.avif",
+      "/assets/desk/computer.ab91da5774.webp"
+    ],
+    "value": {
+      "avif": "/assets/desk/computer.253a711d73.avif",
+      "webp": "/assets/desk/computer.ab91da5774.webp",
+      "width": 2048,
+      "height": 2048
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "avif",
+          "q": 62,
+          "ssim": 0.99538
+        },
+        {
+          "variant": "webp",
+          "q": 82,
+          "ssim": 0.99561
+        }
+      ]
+    }
+  },
+  "desk.decor.texture": {
+    "source": "8d10fe92fe4583d369979dc9d9e00de55b2378c84e379577586a300403fba903",
+    "recipe": "937e1e00c4458a0723eac3079d122fc11989552059b775eb4e2dd6188c1a945c",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/decor.705a7bcd50.avif",
+      "/assets/desk/decor.724c5357e3.webp"
+    ],
+    "value": {
+      "avif": "/assets/desk/decor.705a7bcd50.avif",
+      "webp": "/assets/desk/decor.724c5357e3.webp",
+      "width": 2048,
+      "height": 2048
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "avif",
+          "q": 54,
+          "ssim": 0.99511
+        },
+        {
+          "variant": "webp",
+          "q": 82,
+          "ssim": 0.99612
+        }
+      ]
+    }
+  },
+  "desk.environment.texture": {
+    "source": "20ed3e935b9135497b0ecd3b742b1579dffce5a705b972b291d4a9a5959b60be",
+    "recipe": "a07a044351314820da90192230d47f6afce9235935ef41476df1c373ca4d089a",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/environment.fa7839018b.avif",
+      "/assets/desk/environment.23741d6cd3.webp"
+    ],
+    "value": {
+      "avif": "/assets/desk/environment.fa7839018b.avif",
+      "webp": "/assets/desk/environment.23741d6cd3.webp",
+      "width": 2048,
+      "height": 2048
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "avif",
+          "q": 50,
+          "ssim": 0.99507
+        },
+        {
+          "variant": "webp",
+          "q": 82,
+          "ssim": 0.99636
+        }
+      ]
+    }
+  },
+  "desk.screen.smudges": {
+    "source": "40a193b51032669561dec6e10aff6e049cd9df1527a9e2cfe17fc3569933d716",
+    "recipe": "6b426ee2d0cf830ec19eca60fd740472410cb02353c66e77f56218c24763c49e",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/screen/smudges.2048w.b41fd36564.avif",
+      "/assets/desk/screen/smudges.2048w.40a193b510.jpg"
+    ],
+    "value": {
+      "width": 2048,
+      "height": 1638,
+      "variants": [
+        {
+          "src": "/assets/desk/screen/smudges.2048w.b41fd36564.avif",
+          "width": 2048,
+          "height": 1638,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/desk/screen/smudges.2048w.40a193b510.jpg",
+          "width": 2048,
+          "height": 1638,
+          "type": "image/jpeg"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.998,
+      "variants": [
+        {
+          "variant": "avif 2048w",
+          "q": 54,
+          "ssim": 0.99812
+        },
+        {
+          "variant": "jpg 2048w",
+          "q": "source",
+          "ssim": 1
+        }
+      ],
+      "dropped": [
+        "avif 1280w: 248637 bytes, not less than the 2048w variant",
+        "webp 1280w: no quality ≥ q80 passes ssim ≥ 0.998 below the source's 292727 bytes"
+      ]
+    }
+  },
+  "desk.screen.shadow": {
+    "source": "054d30f0b51b79a8a5c557cc94ea08962c7649be3363e1cc3b3f4d48ee23ad34",
+    "recipe": "b6cdfbfa50b45a027c4bd8ce4ce09488e75d9dcfd0ac8d41a0433ff861087ba2",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/desk/screen/shadow.77c0f24850.avif",
+      "/assets/desk/screen/shadow.98e5a41003.webp"
+    ],
+    "value": {
+      "width": 845,
+      "height": 676,
+      "variants": [
+        {
+          "src": "/assets/desk/screen/shadow.77c0f24850.avif",
+          "width": 845,
+          "height": 676,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/desk/screen/shadow.98e5a41003.webp",
+          "width": 845,
+          "height": 676,
+          "type": "image/webp"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "avif 845w",
+          "q": 50,
+          "ssim": 0.99965
+        },
+        {
+          "variant": "webp 845w",
+          "q": 82,
+          "ssim": 1
+        }
+      ]
+    }
+  },
+  "desk.screen.staticBase": {
+    "source": "7e2c02e975ac5e7871767fac085f07fb1fbfdca639a80f2d2eac7d606946e9d0",
+    "recipe": "756693d98b667c563c785a862b225405ced08b85c5cf6b1bd1cdff9bc59513de",
+    "tools": {
+      "ffmpeg": "8.1.1-full_build-www.gyan.dev"
+    },
+    "outputs": [
+      "/assets/desk/screen/static-base.h264.27348f3593.mp4"
+    ],
+    "value": {
+      "width": 640,
+      "height": 480,
+      "sources": [
+        {
+          "src": "/assets/desk/screen/static-base.h264.27348f3593.mp4",
+          "type": "video/mp4; codecs=\"avc1.4D401E\""
+        }
+      ]
+    },
+    "parity": {
+      "gate": {
+        "ssim": 0.995,
+        "vmaf": 95,
+        "lumaMean": 0.02,
+        "lumaStd": 0.97,
+        "hf": 0.95,
+        "composite": {
+          "opacity": 0.5,
+          "crop": "600x480+20+0"
+        }
+      },
+      "sourceBytes": 2876621,
+      "seam": 0.98057,
+      "variants": [
+        {
+          "codec": "h264",
+          "setting": "crf 17",
+          "bytes": 2069836,
+          "frames": {
+            "source": 182,
+            "encode": 182
+          },
+          "ssim": 0.997292,
+          "vmaf": 97.934,
+          "lumaMean": 1.0002,
+          "lumaStd": 0.9982,
+          "hf": 0.989
+        }
+      ],
+      "dropped": [
+        "vp9: no crf passes below h264's 2069836 bytes; left out",
+        "av1: no crf passes below h264's 2069836 bytes; left out"
+      ],
+      "trials": {
+        "h264": [
+          {
+            "crf": 14,
+            "bytes": 3105902,
+            "pass": true
+          },
+          {
+            "crf": 21,
+            "bytes": 746732,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8824582293750396 < 0.97",
+              "hf energy ×0.6301164363076851 < 0.95"
+            ]
+          },
+          {
+            "crf": 17,
+            "bytes": 2069836,
+            "pass": true
+          },
+          {
+            "crf": 19,
+            "bytes": 1293154,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9386661149780108 < 0.97",
+              "hf energy ×0.7823479582490979 < 0.95"
+            ]
+          },
+          {
+            "crf": 18,
+            "bytes": 1662966,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9101980829828459 < 0.95"
+            ]
+          }
+        ],
+        "vp9": [
+          {
+            "crf": 16,
+            "bytes": 470554,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8516910186492659 < 0.97",
+              "hf energy ×0.5042784689837642 < 0.95"
+            ]
+          },
+          {
+            "crf": 15,
+            "bytes": 535612,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8611468295033297 < 0.97",
+              "hf energy ×0.5330881643315277 < 0.95"
+            ]
+          },
+          {
+            "crf": 14,
+            "bytes": 602111,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8698424484364538 < 0.97",
+              "hf energy ×0.5566044685008974 < 0.95"
+            ]
+          },
+          {
+            "crf": 13,
+            "bytes": 678534,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8766441963290729 < 0.97",
+              "hf energy ×0.5781934198009322 < 0.95"
+            ]
+          },
+          {
+            "crf": 12,
+            "bytes": 767411,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8841856863718431 < 0.97",
+              "hf energy ×0.6027292240886991 < 0.95"
+            ]
+          },
+          {
+            "crf": 11,
+            "bytes": 882979,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8928985941248361 < 0.97",
+              "hf energy ×0.6297803946331509 < 0.95"
+            ]
+          },
+          {
+            "crf": 10,
+            "bytes": 1022353,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9002589615188211 < 0.97",
+              "hf energy ×0.6567090636786527 < 0.95"
+            ]
+          },
+          {
+            "crf": 9,
+            "bytes": 1207301,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9114441646456733 < 0.97",
+              "hf energy ×0.6910627095210602 < 0.95"
+            ]
+          },
+          {
+            "crf": 8,
+            "bytes": 1381211,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9192884845522231 < 0.97",
+              "hf energy ×0.7148092728847518 < 0.95"
+            ]
+          },
+          {
+            "crf": 7,
+            "bytes": 1666237,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9303507317563976 < 0.97",
+              "hf energy ×0.7528963224556215 < 0.95"
+            ]
+          },
+          {
+            "crf": 6,
+            "bytes": 2007844,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9423258943278168 < 0.97",
+              "hf energy ×0.7903824459344437 < 0.95"
+            ]
+          },
+          {
+            "crf": 5,
+            "bytes": 2492081,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9544022650372017 < 0.97",
+              "hf energy ×0.8376231702142489 < 0.95"
+            ]
+          }
+        ],
+        "av1": [
+          {
+            "crf": 16,
+            "bytes": 230082,
+            "pass": false,
+            "misses": [
+              "luma std ×0.847808565401527 < 0.97",
+              "hf energy ×0.466922701115469 < 0.95"
+            ]
+          },
+          {
+            "crf": 15,
+            "bytes": 290233,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8638379389109616 < 0.97",
+              "hf energy ×0.5075284308261111 < 0.95"
+            ]
+          },
+          {
+            "crf": 14,
+            "bytes": 330816,
+            "pass": false,
+            "misses": [
+              "luma std ×0.870736749815065 < 0.97",
+              "hf energy ×0.5287984750841236 < 0.95"
+            ]
+          },
+          {
+            "crf": 13,
+            "bytes": 374486,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8779137722324833 < 0.97",
+              "hf energy ×0.5481118745806257 < 0.95"
+            ]
+          },
+          {
+            "crf": 12,
+            "bytes": 430909,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8847214900961536 < 0.97",
+              "hf energy ×0.5680805797274613 < 0.95"
+            ]
+          },
+          {
+            "crf": 11,
+            "bytes": 555719,
+            "pass": false,
+            "misses": [
+              "luma std ×0.8936377700254354 < 0.97",
+              "hf energy ×0.5832567948156481 < 0.95"
+            ]
+          },
+          {
+            "crf": 10,
+            "bytes": 663275,
+            "pass": false,
+            "misses": [
+              "luma std ×0.899640604869983 < 0.97",
+              "hf energy ×0.5994773784653984 < 0.95"
+            ]
+          },
+          {
+            "crf": 9,
+            "bytes": 802162,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9072551141010127 < 0.97",
+              "hf energy ×0.6216654418748105 < 0.95"
+            ]
+          },
+          {
+            "crf": 8,
+            "bytes": 985165,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9194718850762366 < 0.97",
+              "hf energy ×0.6623860473818254 < 0.95"
+            ]
+          },
+          {
+            "crf": 7,
+            "bytes": 1151124,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9285311339942696 < 0.97",
+              "hf energy ×0.6923523947488074 < 0.95"
+            ]
+          },
+          {
+            "crf": 6,
+            "bytes": 1495690,
+            "pass": false,
+            "misses": [
+              "luma std ×0.941474626213265 < 0.97",
+              "hf energy ×0.7405090355874567 < 0.95"
+            ]
+          },
+          {
+            "crf": 5,
+            "bytes": 1835364,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9523814138808934 < 0.97",
+              "hf energy ×0.7859335482120137 < 0.95"
+            ]
+          },
+          {
+            "crf": 4,
+            "bytes": 2371694,
+            "pass": false,
+            "misses": [
+              "luma std ×0.9672516441227468 < 0.97",
+              "hf energy ×0.8488636732909649 < 0.95"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "desk.screen.staticLayer": {
+    "source": "07bb7569c2b460a06e09c6832e010966405d6a3848e83df8168212f97937fbb9",
+    "recipe": "ac10609dfe16857b7e11940843c756136f09c94289440c633201aab945636de5",
+    "tools": {
+      "ffmpeg": "8.1.1-full_build-www.gyan.dev"
+    },
+    "outputs": [
+      "/assets/desk/screen/static-layer.av1.6bf255df22.webm",
+      "/assets/desk/screen/static-layer.h264.abb75bf968.mp4"
+    ],
+    "value": {
+      "width": 640,
+      "height": 480,
+      "sources": [
+        {
+          "src": "/assets/desk/screen/static-layer.av1.6bf255df22.webm",
+          "type": "video/webm; codecs=\"av01.0.04M.08\""
+        },
+        {
+          "src": "/assets/desk/screen/static-layer.h264.abb75bf968.mp4",
+          "type": "video/mp4; codecs=\"avc1.4D401E\""
+        }
+      ]
+    },
+    "parity": {
+      "gate": {
+        "ssim": 0.995,
+        "vmaf": 95,
+        "lumaMean": 0.02,
+        "lumaStd": 0.97,
+        "hf": 0.95,
+        "composite": {
+          "opacity": 0.1,
+          "crop": "600x480+20+0"
+        }
+      },
+      "sourceBytes": 4492461,
+      "seam": 0.90268,
+      "variants": [
+        {
+          "codec": "av1",
+          "setting": "crf 11",
+          "bytes": 913307,
+          "frames": {
+            "source": 900,
+            "encode": 900
+          },
+          "ssim": 0.999855,
+          "vmaf": 97.711,
+          "lumaMean": 1.0006,
+          "lumaStd": 0.997,
+          "hf": 0.952
+        },
+        {
+          "codec": "h264",
+          "setting": "crf 22",
+          "bytes": 1018117,
+          "frames": {
+            "source": 900,
+            "encode": 900
+          },
+          "ssim": 0.999902,
+          "vmaf": 97.718,
+          "lumaMean": 0.9999,
+          "lumaStd": 0.9982,
+          "hf": 0.9599
+        }
+      ],
+      "dropped": [
+        "vp9: no crf passes below h264's 1018117 bytes; left out"
+      ],
+      "trials": {
+        "h264": [
+          {
+            "crf": 14,
+            "bytes": 2161291,
+            "pass": true
+          },
+          {
+            "crf": 21,
+            "bytes": 1126257,
+            "pass": true
+          },
+          {
+            "crf": 25,
+            "bytes": 695664,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.8046342211794448 < 0.95"
+            ]
+          },
+          {
+            "crf": 23,
+            "bytes": 897983,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9115519684353661 < 0.95"
+            ]
+          },
+          {
+            "crf": 22,
+            "bytes": 1018117,
+            "pass": true
+          }
+        ],
+        "vp9": [
+          {
+            "crf": 16,
+            "bytes": 894439,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.8749151606144161 < 0.95"
+            ]
+          },
+          {
+            "crf": 15,
+            "bytes": 965281,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.8897882946344701 < 0.95"
+            ]
+          },
+          {
+            "crf": 14,
+            "bytes": 1017385,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.8990588815519767 < 0.95"
+            ]
+          },
+          {
+            "crf": 13,
+            "bytes": 1076811,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9106787052818628 < 0.95"
+            ]
+          }
+        ],
+        "av1": [
+          {
+            "crf": 16,
+            "bytes": 612077,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9057640213126404 < 0.95"
+            ]
+          },
+          {
+            "crf": 15,
+            "bytes": 677599,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9219579397758024 < 0.95"
+            ]
+          },
+          {
+            "crf": 14,
+            "bytes": 719078,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9332283973640709 < 0.95"
+            ]
+          },
+          {
+            "crf": 13,
+            "bytes": 771771,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9381162471269524 < 0.95"
+            ]
+          },
+          {
+            "crf": 12,
+            "bytes": 829169,
+            "pass": false,
+            "misses": [
+              "hf energy ×0.9431388516269108 < 0.95"
+            ]
+          },
+          {
+            "crf": 11,
+            "bytes": 913307,
+            "pass": true
+          }
+        ]
+      }
+    }
+  },
+  "desk.audio.key1": {
+    "source": "4a413b3a0d4e0f95a60a0b76e9cb7a43ad756f744fadcfcf64b53b723dc854da",
+    "recipe": "f9405693250973ec524418d14615bb23efc336846c6081312cc8fc2a6e2e3b7a",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-1.4a413b3a0d.mp3"
+    ],
+    "value": "/assets/desk/audio/key-1.4a413b3a0d.mp3"
+  },
+  "desk.audio.key2": {
+    "source": "d8663f1577d8a3b68fc3ca1a85fe67f1f346c5b8fe461ff10f81db5d4eb0d172",
+    "recipe": "5170af942770c9c5de34fe6b4eb267c42fcd3b516110daad514ab47460b873da",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-2.d8663f1577.mp3"
+    ],
+    "value": "/assets/desk/audio/key-2.d8663f1577.mp3"
+  },
+  "desk.audio.key3": {
+    "source": "31997a19d9b0147d24199aaa4bd243e6faea7dd710ab2490c8cc0d66df5c7090",
+    "recipe": "39bc285f7d859362f7c012f6401a952ed949297cb4833a2b1cc965c2967229e6",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-3.31997a19d9.mp3"
+    ],
+    "value": "/assets/desk/audio/key-3.31997a19d9.mp3"
+  },
+  "desk.audio.key4": {
+    "source": "fa1206a4cbb8e117c5465e2bb9cc83d0d2f4444b9ed8ca5046d7b4b2b0629cdc",
+    "recipe": "2d41d45bec5f6c9a3c1d699f70c03bde0d6a6a24e0ef624e7c7283b431248bbf",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-4.fa1206a4cb.mp3"
+    ],
+    "value": "/assets/desk/audio/key-4.fa1206a4cb.mp3"
+  },
+  "desk.audio.key5": {
+    "source": "6cd1c85a10e0947646b0f3ded51c0343ec14d95194e17f677533417edf1945be",
+    "recipe": "1ca951b52c4479a5aa1c69c99b57126b643d519f55866844de3b1c9f91f44523",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-5.6cd1c85a10.mp3"
+    ],
+    "value": "/assets/desk/audio/key-5.6cd1c85a10.mp3"
+  },
+  "desk.audio.key6": {
+    "source": "e65afce367b0b0a70396f41633864432cf17a42a525f4dac08f69011673e708f",
+    "recipe": "bf68f30d9e4e85281fe911d2a485fef7a32c418c1e96e387ce2c8eb70a207287",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/key-6.e65afce367.mp3"
+    ],
+    "value": "/assets/desk/audio/key-6.e65afce367.mp3"
+  },
+  "desk.audio.mouseDown": {
+    "source": "454c75d2370b7eb12d48575ea5783821e38f767de8117f7557c2b473bb695249",
+    "recipe": "3dfc4e3497a019c460480a8856078f9f5a88a5811221a5c3b8c221c6012a25aa",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/mouse-down.454c75d237.mp3"
+    ],
+    "value": "/assets/desk/audio/mouse-down.454c75d237.mp3"
+  },
+  "desk.audio.mouseUp": {
+    "source": "e06dd429c5fb741148f74a690a6223b8ddc7191f29c91b221340f661b1636e47",
+    "recipe": "15fae08185afe9694df2d2ea2ad41dd64ab87f125e6247928a9cc046aa1c70e7",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/mouse-up.e06dd429c5.mp3"
+    ],
+    "value": "/assets/desk/audio/mouse-up.e06dd429c5.mp3"
+  },
+  "desk.audio.office": {
+    "source": "fffe9677c5bf476b1528abfd1d24bb5ab089941091d7c3d92bf5234b5d4599d8",
+    "recipe": "15c4b50804b4b1c24dab5bfa12ef821772118dc73495b93857672e9aa7f4aa48",
+    "tools": {},
+    "outputs": [
+      "/assets/desk/audio/office.fffe9677c5.mp3"
+    ],
+    "value": "/assets/desk/audio/office.fffe9677c5.mp3"
+  },
+  "blowout.bulb": {
+    "source": "cc89cf948346d71ce475e05a55b39a5f8d6c5085288e74087b96dce51f0af2cc",
+    "recipe": "de698e3eecc23756879d37436d601cf9bdcb4544e122520dd5a4a1fe090ff7aa",
+    "tools": {},
+    "outputs": [
+      "/assets/blowout/bulb-explode.cc89cf9483.mp3"
+    ],
+    "value": "/assets/blowout/bulb-explode.cc89cf9483.mp3"
+  },
+  "theme.rockerOn": {
+    "source": "5c8e20dfd15bfba6f01f01034ef3a7a58512adec31b02e87af9a5ad6c8ceafaf",
+    "recipe": "0ff910f001338b2b445d20113a9e5a20d2603e5fe358ace4e1a0f60ff04e735b",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/theme-switch/rocker-on.64w.20cad66760.avif",
+      "/assets/theme-switch/rocker-on.128w.c6828d4352.avif",
+      "/assets/theme-switch/rocker-on.192w.b649078040.avif",
+      "/assets/theme-switch/rocker-on.64w.be5cf97abd.webp",
+      "/assets/theme-switch/rocker-on.128w.9223fdf87d.webp",
+      "/assets/theme-switch/rocker-on.192w.0127526d1d.webp"
+    ],
+    "value": {
+      "width": 530,
+      "height": 700,
+      "variants": [
+        {
+          "src": "/assets/theme-switch/rocker-on.64w.20cad66760.avif",
+          "width": 64,
+          "height": 85,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.128w.c6828d4352.avif",
+          "width": 128,
+          "height": 169,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.192w.b649078040.avif",
+          "width": 192,
+          "height": 254,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.64w.be5cf97abd.webp",
+          "width": 64,
+          "height": 85,
+          "type": "image/webp"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.128w.9223fdf87d.webp",
+          "width": 128,
+          "height": 169,
+          "type": "image/webp"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-on.192w.0127526d1d.webp",
+          "width": 192,
+          "height": 254,
+          "type": "image/webp"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.99,
+      "variants": [
+        {
+          "variant": "avif 64w",
+          "q": 58,
+          "ssim": 0.99232
+        },
+        {
+          "variant": "avif 128w",
+          "q": 50,
+          "ssim": 0.99106
+        },
+        {
+          "variant": "avif 192w",
+          "q": 50,
+          "ssim": 0.99281
+        },
+        {
+          "variant": "webp 64w",
+          "q": 82,
+          "ssim": 0.99289
+        },
+        {
+          "variant": "webp 128w",
+          "q": 82,
+          "ssim": 0.99341
+        },
+        {
+          "variant": "webp 192w",
+          "q": 82,
+          "ssim": 0.99337
+        }
+      ]
+    }
+  },
+  "theme.rockerOff": {
+    "source": "2d6c1ff7f5ab03c8d106ab362c923a0ce24f2c9bf7c56e158856ed83e348adc0",
+    "recipe": "b5129d1d1868d43de393daa44aae6e929c339855a89629ca4c514b030c71b507",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/theme-switch/rocker-off.64w.f685d018ef.avif",
+      "/assets/theme-switch/rocker-off.128w.18de4ddb0b.avif",
+      "/assets/theme-switch/rocker-off.192w.ac7a0c1dee.avif",
+      "/assets/theme-switch/rocker-off.64w.799936f308.webp",
+      "/assets/theme-switch/rocker-off.128w.a2a38285f5.webp",
+      "/assets/theme-switch/rocker-off.192w.ef1b4748df.webp"
+    ],
+    "value": {
+      "width": 530,
+      "height": 700,
+      "variants": [
+        {
+          "src": "/assets/theme-switch/rocker-off.64w.f685d018ef.avif",
+          "width": 64,
+          "height": 85,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.128w.18de4ddb0b.avif",
+          "width": 128,
+          "height": 169,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.192w.ac7a0c1dee.avif",
+          "width": 192,
+          "height": 254,
+          "type": "image/avif"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.64w.799936f308.webp",
+          "width": 64,
+          "height": 85,
+          "type": "image/webp"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.128w.a2a38285f5.webp",
+          "width": 128,
+          "height": 169,
+          "type": "image/webp"
+        },
+        {
+          "src": "/assets/theme-switch/rocker-off.192w.ef1b4748df.webp",
+          "width": 192,
+          "height": 254,
+          "type": "image/webp"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.99,
+      "variants": [
+        {
+          "variant": "avif 64w",
+          "q": 54,
+          "ssim": 0.99147
+        },
+        {
+          "variant": "avif 128w",
+          "q": 50,
+          "ssim": 0.99184
+        },
+        {
+          "variant": "avif 192w",
+          "q": 50,
+          "ssim": 0.99266
+        },
+        {
+          "variant": "webp 64w",
+          "q": 82,
+          "ssim": 0.99306
+        },
+        {
+          "variant": "webp 128w",
+          "q": 82,
+          "ssim": 0.99264
+        },
+        {
+          "variant": "webp 192w",
+          "q": 82,
+          "ssim": 0.99315
+        }
+      ]
+    }
+  },
+  "theme.rockerAtlas": {
+    "source": "f5080ddde2787a679e13dec596c5f67eaba4ced5ccbd833f190f514e3c6efb8e",
+    "recipe": "595d586991e3e22e4da4acc80f7c9835e02141ed39e57f83c38c4b2f77be2d13",
+    "tools": {
+      "sharp": "0.35.5",
+      "libvips": "8.18.7"
+    },
+    "outputs": [
+      "/assets/theme-switch/rocker-atlas.86d22dc54d.webp"
+    ],
+    "value": {
+      "width": 1060,
+      "height": 1120,
+      "variants": [
+        {
+          "src": "/assets/theme-switch/rocker-atlas.86d22dc54d.webp",
+          "width": 1060,
+          "height": 1120,
+          "type": "image/webp"
+        }
+      ]
+    },
+    "parity": {
+      "gate": 0.995,
+      "variants": [
+        {
+          "variant": "webp 1060w",
+          "q": 82,
+          "ssim": 0.99645
+        }
+      ]
+    }
+  },
+  "siteFonts.inter": {
+    "source": "c940764593d0fe5d596be327ca7558855e018039fb78509aa21921fd3644c3e4",
+    "recipe": "0d7f37f080a3f8ebf9c43d68d5bdbce580f1a1c01c4b5e5757eaff3d594926d0",
+    "tools": {},
+    "outputs": [
+      "app/fonts/Inter-latin.woff2"
+    ]
+  },
+  "siteFonts.caveat": {
+    "source": "7a0049db01fdd8fc7af7ef36675862a72a5c76d0cb45ae63c9f5b6f1b769dac7",
+    "recipe": "6dec2dcbc0c19d4709ab21cfd7667fbb60fd250df27bcf6942354ad92b445c9c",
+    "tools": {},
+    "outputs": [
+      "app/fonts/Caveat-latin.woff2"
+    ]
+  },
+  "osFonts.millennium": {
+    "source": "98fb4bc1e806757efa7778fccf22cf5dc4cf1b972430dce8e811fbbfa74bd904",
+    "recipe": "de67d88628b104286c6536f45b9810bf566c3eccbc0c6b9346a993c7c88eefae",
+    "tools": {
+      "wawoff2": "2.0.1"
+    },
+    "outputs": [
+      "app/(os)/fonts/Millennium.woff2"
+    ]
+  },
+  "osFonts.millenniumBold": {
+    "source": "7cc0f2a1b4395791195ac582dd22781a0b69001be7eeaf0626839ec608da81d5",
+    "recipe": "e2efcdd9d6f335d69a130825c2896a3874435c9d3ffd71651051fa1e6e8414cf",
+    "tools": {
+      "wawoff2": "2.0.1"
+    },
+    "outputs": [
+      "app/(os)/fonts/Millennium-Bold.woff2"
+    ]
+  },
+  "osFonts.ultra": {
+    "source": "af0439a2dbbc1263c4774074d0c4db06920ecdd6487d55ab1e68a82c9f71da07",
+    "recipe": "cf097a9428ef316840a94331dd4a82cc138e04f40765a0b7eec581d1e6f0dbb4",
+    "tools": {},
+    "outputs": [
+      "app/(os)/fonts/Ultra-latin.woff2"
+    ]
+  }
+}

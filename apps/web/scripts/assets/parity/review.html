@@ -1,0 +1,193 @@
+<!doctype html>
+<!--
+  The CRT loops' human review (spec §4.4), local only and never served by the site. Source and encode
+  side by side, each composited exactly as features/desk/screen-fx.css draws the layers over the OS
+  desktop capture, with a blind swap and frame stepping. From the repo root:
+
+    bunx serve apps/web -p 3300      then open http://localhost:3300/scripts/assets/parity/review.html
+
+  (any free port but 3000/3001). It reads the encodes from assets-src/manifest.lock.json. A copy with
+  a `review-data.js` beside it (window.REVIEW = { under, clips: [...] }) also works from file://.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRT loop review</title>
+<style>
+  :root { color-scheme: dark; --bg: #111; --fg: #ddd; --muted: #888; --line: #333; --accent: #6cf; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  header label { display: flex; gap: 6px; align-items: center; }
+  select, button { font: inherit; background: #222; color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; }
+  button:hover { border-color: var(--accent); }
+  main { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; justify-content: center; }
+  figure { margin: 0; }
+  figcaption { color: var(--muted); padding: 6px 0; min-height: 1.4em; }
+  /* the 1280×1024 screen element, shown at --scale */
+  .frame { width: calc(1280px * var(--scale)); height: calc(1024px * var(--scale)); overflow: hidden; position: relative; }
+  .screen { width: 1280px; height: 1024px; transform: scale(var(--scale)); transform-origin: 0 0; position: relative; overflow: hidden; }
+  .screen > img.under { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* from screen-fx.css: the veil, then the layers plus-lighter at their opacity, object-fit cover */
+  .fx { position: absolute; inset: 0; }
+  .fx::before { content: ''; position: absolute; inset: 0; background: #000; opacity: 0.14; }
+  .fx video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; mix-blend-mode: plus-lighter; }
+  .raw .under, .raw .fx::before { display: none; }
+  .raw .fx video { mix-blend-mode: normal; opacity: 1 !important; }
+  .raw .fx video + video { display: none; }
+  #status { color: var(--muted); padding: 0 16px 16px; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <label>Clip <select id="clip"></select></label>
+  <label>Encode <select id="codec"></select></label>
+  <label>View
+    <select id="view">
+      <option value="composite">composited (as the page shows it)</option>
+      <option value="both">both layers composited</option>
+      <option value="raw">raw layer</option>
+    </select>
+  </label>
+  <label>Scale
+    <select id="scale"><option>0.5</option><option selected>0.75</option><option>1</option><option>2</option><option>4</option></select>
+  </label>
+  <button id="play">Play / pause</button>
+  <button id="back">◀ frame</button>
+  <button id="fwd">frame ▶</button>
+  <button id="blind">Blind swap</button>
+  <button id="reveal">Reveal</button>
+</header>
+<main>
+  <figure><div class="frame"><div class="screen" id="a"></div></div><figcaption id="capA"></figcaption></figure>
+  <figure><div class="frame"><div class="screen" id="b"></div></div><figcaption id="capB"></figcaption></figure>
+</main>
+<div id="status"></div>
+<script>
+'use strict'
+const FPS = 30000 / 1001
+const $ = (id) => document.getElementById(id)
+let data = null
+let swapped = false
+let blind = false
+
+/** The lock's video entries as clips: the source and each encode, in selection order. */
+async function load() {
+  if (window.REVIEW) return window.REVIEW
+  const lock = await (await fetch('/assets-src/manifest.lock.json')).json()
+  const clips = []
+  for (const [id, entry] of Object.entries(lock)) {
+    if (!entry.value || !Array.isArray(entry.value.sources)) continue
+    const variants = (entry.parity && entry.parity.variants) || []
+    clips.push({
+      id,
+      opacity: entry.parity.gate.composite.opacity,
+      source: `/assets-src/${sourceOf(id)}`,
+      encodes: entry.value.sources.map((s, i) => ({ label: `${variants[i] ? `${variants[i].codec} ${variants[i].setting}` : s.type} (${variants[i] ? (variants[i].bytes / 1024).toFixed(0) + ' KB' : ''})`, src: `/public${s.src}`, type: s.type })),
+    })
+  }
+  return { under: '/scripts/assets/parity/screen-under.png', clips }
+}
+// recipes.ts is TS: the review knows the two sources by id
+const sourceOf = (id) => ({ 'desk.screen.staticBase': 'desk/screen/static-base.mp4', 'desk.screen.staticLayer': 'desk/screen/static-layer.mp4' })[id]
+
+function video(src, opacity, clipId) {
+  const v = document.createElement('video')
+  v.dataset.clip = clipId
+  v.src = src
+  v.muted = true
+  v.loop = true
+  v.playsInline = true
+  v.preload = 'auto'
+  v.style.opacity = opacity
+  return v
+}
+
+/** One side: the under, the veil and the layer(s); `pick` maps a clip to the file this side plays. */
+function side(el, pick) {
+  el.replaceChildren()
+  const view = $('view').value
+  el.classList.toggle('raw', view === 'raw')
+  const under = document.createElement('img')
+  under.className = 'under'
+  under.src = data.under
+  const fx = document.createElement('div')
+  fx.className = 'fx'
+  const clip = data.clips[$('clip').value]
+  const layers = view === 'both' ? data.clips : [clip]
+  for (const c of layers) fx.append(video(c === clip ? pick(c) : c.source, c.opacity, c.id))
+  el.append(under, fx)
+}
+
+const videos = () => [...document.querySelectorAll('video')]
+
+function render() {
+  const clip = data.clips[$('clip').value]
+  const encode = clip.encodes[$('codec').value]
+  const src = () => clip.source
+  const enc = () => encode.src
+  side(swapped ? $('b') : $('a'), src)
+  side(swapped ? $('a') : $('b'), enc)
+  const capSrc = `source: ${clip.source.split('/').pop()}`
+  const capEnc = `encode: ${encode.label}`
+  $('capA').textContent = blind ? 'A' : swapped ? capEnc : capSrc
+  $('capB').textContent = blind ? 'B' : swapped ? capSrc : capEnc
+  $('status').textContent = `${encode.type}${document.createElement('video').canPlayType(encode.type) ? '' : '  (this browser cannot play this encode)'}`
+  videos().forEach((v) => v.play().catch(() => {}))
+}
+
+// keep both sides of each clip on one clock, frame for frame (the two clips loop at different lengths)
+function sync() {
+  const lead = {}
+  for (const v of videos()) {
+    const l = (lead[v.dataset.clip] ??= v)
+    if (l !== v && Math.abs(v.currentTime - l.currentTime) > 0.5 / FPS) v.currentTime = l.currentTime
+  }
+  requestAnimationFrame(sync)
+}
+
+function step(frames) {
+  const vs = videos()
+  vs.forEach((v) => v.pause())
+  const lead = vs.find((v) => v.dataset.clip === data.clips[$('clip').value].id)
+  const n = Math.max(0, Math.floor(lead.currentTime * FPS) + frames)
+  // the middle of frame n, so every decoder lands on the same frame
+  const t = (n + 0.5) / FPS
+  vs.forEach((v) => (v.currentTime = Math.min(t, (v.duration || t) - 0.5 / FPS)))
+  $('status').textContent = `frame ${n}`
+}
+
+;(async () => {
+  data = await load()
+  data.clips.forEach((c, i) => $('clip').append(new Option(c.id, i)))
+  const fillCodecs = () => {
+    $('codec').replaceChildren(...data.clips[$('clip').value].encodes.map((e, i) => new Option(e.label, i)))
+  }
+  fillCodecs()
+  document.documentElement.style.setProperty('--scale', $('scale').value)
+  $('clip').onchange = () => (fillCodecs(), render())
+  $('codec').onchange = render
+  $('view').onchange = render
+  $('scale').onchange = () => document.documentElement.style.setProperty('--scale', $('scale').value)
+  $('play').onclick = () => {
+    const vs = videos()
+    const paused = vs[0].paused
+    vs.forEach((v) => (paused ? v.play().catch(() => {}) : v.pause()))
+  }
+  $('back').onclick = () => step(-1)
+  $('fwd').onclick = () => step(1)
+  $('blind').onclick = () => {
+    blind = true
+    swapped = Math.random() < 0.5
+    render()
+  }
+  $('reveal').onclick = () => {
+    blind = false
+    render()
+  }
+  render()
+  sync()
+})()
+</script>
+</body>
+</html>

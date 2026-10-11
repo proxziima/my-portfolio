@@ -2,12 +2,10 @@ import type { ComponentType } from 'react'
 import type { Messenger as MessengerData, Portfolio } from '@/lib/cms/types'
 import type { IconName } from './icons'
 import type { Size } from './window-geometry'
-import { Credits } from './apps/Credits'
 import { dosApp } from './apps/dos-app'
-import { Conversation } from './apps/messenger/Conversation'
 import { withName } from './apps/messenger/labels'
-import { Messenger } from './apps/messenger/Messenger'
 import { Showcase } from './apps/Showcase'
+import { lazyApp } from './lazy-app'
 
 /** What the OS apps read: the portfolio plus the content only the desktop shows. */
 export interface OsData extends Portfolio {
@@ -69,6 +67,11 @@ export const withChildren = (apps: readonly Family[], id: string): string[] => [
 /** The chrome every DOS program shares, as the reference's Doom window. */
 const DOS_CHROME = { status: 'Powered by JSDOS & DOSBox', barColor: '#1c1c1c' } as const
 
+// opened by a double-click, so their code waits for it; Showcase is the boot app and stays eager
+const Credits = lazyApp(() => import('./apps/Credits').then((m) => ({ default: m.Credits })), 'Credits')
+const Messenger = lazyApp(() => import('./apps/messenger/Messenger').then((m) => ({ default: m.Messenger })), 'Messenger')
+const Conversation = lazyApp(() => import('./apps/messenger/Conversation').then((m) => ({ default: m.Conversation })), 'Conversation')
+
 export const APPS: readonly OsApp[] = [
   // the reference's "Henry Heffernan - Showcase 2022", with our owner and this year
   { id: 'showcase', title: (data) => `${data.profile.name} - Showcase ${new Date().getFullYear()}`, shortcut: 'My Showcase', icon: 'folder', component: Showcase },
@@ -78,19 +81,19 @@ export const APPS: readonly OsApp[] = [
     shortcut: 'My Resume',
     icon: 'resume',
     // Acrobat Reader for DOS opening the résumé (content/resume.md, built in by `bun run resume:pdf`)
-    component: dosApp('/resume.jsdos', 'Resume'),
+    component: dosApp('resume', '/resume.jsdos', 'Resume'),
     // its 640×480 VGA screen, as tall as the Showcase window, like AutoCAD
     aspect: 4 / 3,
     ...DOS_CHROME,
   },
   { id: 'credits', title: 'Credits', shortcut: 'Credits', icon: 'document', component: Credits, size: { width: 1100, height: 800 } },
-  { id: 'doom', title: 'Doom', shortcut: 'Doom', icon: 'doom', component: dosApp('/doom.jsdos', 'Doom'), size: { width: 980, height: 670 }, ...DOS_CHROME },
+  { id: 'doom', title: 'Doom', shortcut: 'Doom', icon: 'doom', component: dosApp('doom', '/doom.jsdos', 'Doom'), size: { width: 980, height: 670 }, ...DOS_CHROME },
   {
     id: 'autocad',
     title: 'AutoCAD Release 12',
     shortcut: 'AutoCAD',
     icon: 'autocad',
-    component: dosApp('/autocad.jsdos', 'AutoCAD'),
+    component: dosApp('autocad', '/autocad.jsdos', 'AutoCAD'),
     // its 640×480 VGA screen, as tall as the Showcase window (about 1149×862 on the 1280×1024 desk)
     aspect: 4 / 3,
     ...DOS_CHROME,

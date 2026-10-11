@@ -1,6 +1,7 @@
 import { getConversation, insertEvaluation, updateConversation } from '@repo/twin/db'
 import { db } from '../db'
 import { getEnv } from '../env'
+import type { TraceIdentity } from '../observability/trace-context'
 import { recentTurns } from '../transcript'
 import { classifyIntent } from './classify'
 import { scoreIntent } from './score'
@@ -8,13 +9,14 @@ import { signalsOf } from './signals'
 
 /**
  * evaluate_call_intent: runs after each final reply, never before it streams, so it adds nothing
- * to time-to-first-token (spec §7). Idempotent per (session, turn, sequence).
+ * to time-to-first-token (spec §7). Idempotent per (session, turn, sequence). `trace` ties the
+ * classifier's generation span to the visitor.
  */
-export async function evaluateCallIntent(sessionId: string, turnId: string, sequence: number): Promise<void> {
+export async function evaluateCallIntent(sessionId: string, turnId: string, sequence: number, trace?: TraceIdentity): Promise<void> {
   const conversation = await getConversation(db(), sessionId)
   if (!conversation || conversation.state.ended) return
   const started = Date.now()
-  const classification = await classifyIntent(await recentTurns(sessionId, 6), getEnv().TWIN_CLASSIFIER_TIMEOUT_MS)
+  const classification = await classifyIntent(await recentTurns(sessionId, 6), getEnv().TWIN_CLASSIFIER_TIMEOUT_MS, trace)
   const latencyMs = Date.now() - started
   const signals = signalsOf(conversation.state)
   const result = scoreIntent(signals, classification, conversation.state)

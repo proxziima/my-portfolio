@@ -21,9 +21,14 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.0",
     "@openrouter/ai-sdk-provider": "3.1.0",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "0.218.0",
+    "@opentelemetry/sdk-trace-base": "2.11.0",
     "@photon-ai/chat-adapter-imessage": "3.2.0",
+    "@posthog/ai": "8.13.5",
+    "@repo/observability": "*",
     "@repo/twin": "*",
-    "@workflow/world-postgres": "5.0.0-beta.48",
+    "@workflow/world-postgres": "5.0.1",
     "ai": "7.0.127",
     "chat": "4.41.1",
     "eve": "0.71.0",
@@ -31,10 +36,12 @@
     "google-auth-library": "11.1.0",
     "just-bash": "3.6.0",
     "pg": "8.23.1",
-    "zod": "4.5.4"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
+    "@opentelemetry/context-async-hooks": "2.11.0",
+    "@opentelemetry/core": "2.11.0",
     "@types/node": "24.x",
     "@vitest/coverage-v8": "5.0.3",
     "jose": "6.2.12",

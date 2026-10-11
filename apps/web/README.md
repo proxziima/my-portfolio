@@ -18,7 +18,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+This project self-hosts its fonts with [`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font): Inter and Caveat (`app/fonts/`), Ultra and Millennium (`app/(os)/fonts/`). The asset pipeline writes them from `assets-src/fonts/` (`bun run assets:build`), so no build fetches from Google.
 
 ## Learn More
 

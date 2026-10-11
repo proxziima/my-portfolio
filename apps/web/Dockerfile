@@ -20,13 +20,17 @@ COPY apps/payload/package.json apps/payload/
 COPY apps/web/package.json apps/web/
 COPY packages/cms-types/package.json packages/cms-types/
 COPY packages/eslint-config/package.json packages/eslint-config/
+COPY packages/observability/package.json packages/observability/
 COPY packages/twin/package.json packages/twin/
 COPY packages/typescript-config/package.json packages/typescript-config/
 RUN bun install --frozen-lockfile
 
 COPY . .
-# next/font/google downloads the fonts here, so the build needs network access.
-RUN bunx turbo run build --filter=web
+# The fonts are self-hosted (next/font/local, committed woff2 files): the build fetches none.
+# Source maps go to PostHog when the build is given the secret (BuildKit), then are deleted either way.
+RUN --mount=type=secret,id=posthog_cli_token,env=POSTHOG_CLI_TOKEN \
+    --mount=type=secret,id=posthog_cli_env_id,env=POSTHOG_CLI_ENV_ID \
+    bunx turbo run build --filter=web
 
 # Standalone output mirrors the monorepo layout: the server is apps/web/server.js. Static assets and
 # public/ are not part of it and are copied next to it.

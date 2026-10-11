@@ -61,8 +61,8 @@ The figure is a three.js scene (`apps/web/features/desk/`): three baked GLBs wit
 The models come from [Henry Heffernan's portfolio](https://github.com/henryjeff/portfolio-website) (MIT). To replace them with your own desk:
 
 1. Export each part as a GLB with baked lighting (from Spline: **Export → 3D → GLTF**; from Blender: bake to a texture, then export glTF Binary). Keep the monitor's screen a flat quad roughly at the reference's place, or move `SCREEN` in `apps/web/features/desk/config.ts` to match.
-2. Convert the baked textures to 2048² WebP (`sharp`, quality 85) and drop everything in `apps/web/public/desk/`.
-3. Point `DESK_ASSETS` in `config.ts` at the new files; adjust `MODEL_SCALE` if the export's units differ.
+2. Convert the baked textures to 2048² WebP (`sharp`, quality 85) and drop everything in `apps/web/assets-src/desk/` (the sources; never served).
+3. Run `bun run --cwd apps/web assets:build` (hashed outputs land in `public/assets/`, ids in the generated `lib/assets/manifest.ts`), point the `ASSETS.desk` ids in `features/desk/config.ts` at them; adjust `MODEL_SCALE` if the export's units differ.
 
 The CMS's **Site settings → Figure** group and **Spline scenes** collection are no longer read by the web app; they stay until a migration removes them.
 
@@ -79,6 +79,8 @@ Details, including the production cookie-domain requirement, are in [apps/payloa
 ## Deploy
 
 Production is an Easypanel Compose service built from [`docker-compose.yml`](docker-compose.yml): `web` (port 3000) and `cms` (port 3001, SQLite and uploads on the `cms-data` volume). Variables are listed in [`.env.deploy.example`](.env.deploy.example). Step by step, including the first deploy, updates, backups and troubleshooting: [docs/deploy-easypanel.md](docs/deploy-easypanel.md).
+
+Analytics, error tracking, LLM traces and SEO setup (PostHog, Search Console, event catalog, dashboards): [docs/observability.md](docs/observability.md).
 
 ## MCP
 
