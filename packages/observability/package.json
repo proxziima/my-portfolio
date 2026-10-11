@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "24.x",
+    "@types/node": "25.x",
     "typescript": "7.0.2",
     "vitest": "5.0.3"
   }
