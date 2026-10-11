@@ -13,7 +13,8 @@ type Atlas = { source: CanvasImageSource; width: number; height: number; release
  */
 async function decodeAtlas(src: string): Promise<Atlas> {
   if (typeof createImageBitmap === 'function') {
-    const response = await fetch(src)
+    // an <img> would load it at low priority; fetch() defaults to high and would compete with the page's own resources
+    const response = await fetch(src, { priority: 'low' })
     if (!response.ok) throw new Error(`rocker atlas: HTTP ${response.status}`)
     const bitmap = await createImageBitmap(await response.blob())
     return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() }

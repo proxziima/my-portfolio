@@ -72,7 +72,8 @@ describe('useRocker, decoding off the main thread', () => {
     const decoded = bitmap()
     decode.mockResolvedValueOnce(decoded)
     await mount(1)
-    expect(fetchMock).toHaveBeenCalledWith(ATLAS.src)
+    // at an image's priority: a fetch() is High by default and would compete with the page's own resources
+    expect(fetchMock).toHaveBeenCalledWith(ATLAS.src, { priority: 'low' })
     // the blob as fetched, with the defaults: the same pixels drawImage would take from an <img>
     expect(decode).toHaveBeenCalledWith(blob)
     expect(api.ready).toBe(true)
