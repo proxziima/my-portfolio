@@ -66,8 +66,8 @@ describe('checkLock', () => {
     expect(checkLock(recipes, lockFor(), readSource, io({ readOutput }))).toEqual([{ id: 'desk.audio.key1', problem: 'output changed', detail: key }])
   })
 
-  it('does not hash-check an output whose name carries no hash (the OS fonts)', () => {
-    const font: Recipe = { id: 'osFonts.millennium', kind: 'font', source: 'fonts/Millennium.ttf' }
+  it('does not hash-check an output whose name carries no hash (the fonts)', () => {
+    const font: Recipe = { id: 'osFonts.millennium', kind: 'font', source: 'fonts/Millennium.ttf', dir: 'app/(os)/fonts' }
     const lock: Lock = { [font.id]: { source: sha256('ttf'), recipe: recipeHash(font), tools: {}, outputs: ['app/(os)/fonts/Millennium.woff2'] } }
     expect(checkLock([font], lock, readSource, io({ exists: () => true, readOutput: () => Buffer.from('woff2') }))).toEqual([])
   })

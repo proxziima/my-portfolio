@@ -194,7 +194,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up --build -d
 ```
 
 Easypanel can't do this by itself (it uses one compose file), so this is for a server you run by hand.
-`next/font/google` downloads the fonts during the web build, so the build needs network access.
+The web build fetches no fonts: they are self-hosted (`next/font/local`, committed under `apps/web/app/fonts` and `apps/web/app/(os)/fonts`).
 
 ## Backups
 

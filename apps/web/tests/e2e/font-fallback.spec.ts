@@ -85,10 +85,15 @@ const cls = async (page: Page) =>
 
 const frames = (page: Page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 
-/** Inter's `@font-face` rules as the page has them: display and source URLs. */
+/**
+ * Inter's `@font-face` rules as the page has them: display and source URLs. next/font names the face itself (the
+ * self-hosted `next/font/local` face after its variable, `inter`), so the family is the first one `--font-inter` names.
+ */
 const interFaces = (page: Page) =>
-  page.evaluate(() =>
-    [...document.styleSheets].flatMap((sheet) => {
+  page.evaluate(() => {
+    const unquote = (family: string) => family.trim().replace(/^(['"])(.*)\1$/, '$2').toLowerCase()
+    const inter = unquote(getComputedStyle(document.documentElement).getPropertyValue('--font-inter').split(',')[0] ?? '')
+    return [...document.styleSheets].flatMap((sheet) => {
       let rules: CSSRule[] = []
       try {
         rules = [...sheet.cssRules]
@@ -96,13 +101,13 @@ const interFaces = (page: Page) =>
         return [] // a cross-origin sheet
       }
       return rules
-        .filter((r): r is CSSFontFaceRule => r instanceof CSSFontFaceRule && /^['"]?Inter['"]?$/.test(r.style.getPropertyValue('font-family').trim()))
+        .filter((r): r is CSSFontFaceRule => r instanceof CSSFontFaceRule && inter !== '' && unquote(r.style.getPropertyValue('font-family')) === inter)
         .map((r) => ({
           display: r.style.getPropertyValue('font-display'),
           urls: [...r.style.getPropertyValue('src').matchAll(/url\(["']?([^"')]+)["']?\)/g)].map((m) => new URL(m[1]!, sheet.href ?? location.href).href),
         }))
-    }),
-  )
+    })
+  })
 
 for (const size of SIZES) {
   test(`a normal load shows the letter in Inter from its first paint, with no shift, at ${size.width}×${size.height}`, async ({ browser }) => {

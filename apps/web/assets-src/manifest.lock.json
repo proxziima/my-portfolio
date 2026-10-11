@@ -1092,9 +1092,25 @@
       ]
     }
   },
+  "siteFonts.inter": {
+    "source": "c940764593d0fe5d596be327ca7558855e018039fb78509aa21921fd3644c3e4",
+    "recipe": "0d7f37f080a3f8ebf9c43d68d5bdbce580f1a1c01c4b5e5757eaff3d594926d0",
+    "tools": {},
+    "outputs": [
+      "app/fonts/Inter-latin.woff2"
+    ]
+  },
+  "siteFonts.caveat": {
+    "source": "7a0049db01fdd8fc7af7ef36675862a72a5c76d0cb45ae63c9f5b6f1b769dac7",
+    "recipe": "6dec2dcbc0c19d4709ab21cfd7667fbb60fd250df27bcf6942354ad92b445c9c",
+    "tools": {},
+    "outputs": [
+      "app/fonts/Caveat-latin.woff2"
+    ]
+  },
   "osFonts.millennium": {
     "source": "98fb4bc1e806757efa7778fccf22cf5dc4cf1b972430dce8e811fbbfa74bd904",
-    "recipe": "dcbd5a640969ae8d0dc4de55d5329048ebdbd5ab59e7f2b8992ad5df051003bc",
+    "recipe": "de67d88628b104286c6536f45b9810bf566c3eccbc0c6b9346a993c7c88eefae",
     "tools": {
       "wawoff2": "2.0.1"
     },
@@ -1104,12 +1120,20 @@
   },
   "osFonts.millenniumBold": {
     "source": "7cc0f2a1b4395791195ac582dd22781a0b69001be7eeaf0626839ec608da81d5",
-    "recipe": "a292ed41597331b34de225132ed82bd76be813fcf8770011d86dd8a767ed0bc5",
+    "recipe": "e2efcdd9d6f335d69a130825c2896a3874435c9d3ffd71651051fa1e6e8414cf",
     "tools": {
       "wawoff2": "2.0.1"
     },
     "outputs": [
       "app/(os)/fonts/Millennium-Bold.woff2"
+    ]
+  },
+  "osFonts.ultra": {
+    "source": "af0439a2dbbc1263c4774074d0c4db06920ecdd6487d55ab1e68a82c9f71da07",
+    "recipe": "cf097a9428ef316840a94331dd4a82cc138e04f40765a0b7eec581d1e6f0dbb4",
+    "tools": {},
+    "outputs": [
+      "app/(os)/fonts/Ultra-latin.woff2"
     ]
   }
 }
