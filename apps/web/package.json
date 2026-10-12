@@ -26,7 +26,7 @@
     "@payloadcms/richtext-lexical": "3.90.2",
     "@repo/observability": "*",
     "@repo/twin": "*",
-    "eve": "0.74.0",
+    "eve": "0.76.0",
     "jose": "6.2.12",
     "next": "16.4.0",
     "pg": "8.23.1",
